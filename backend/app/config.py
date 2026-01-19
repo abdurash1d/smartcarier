@@ -190,6 +190,21 @@ class Settings(BaseSettings):
     OAUTH_ENABLED: bool = False
 
     # =========================================================================
+    # 🐛 ERROR MONITORING & LOGGING
+    # =========================================================================
+    
+    # Sentry DSN for error tracking and performance monitoring
+    # Get your DSN from: https://sentry.io (FREE tier available!)
+    # Example: https://abc123@o123456.ingest.sentry.io/123456
+    SENTRY_DSN: str = ""
+    
+    # Sentry environment (auto-detected from DEBUG)
+    @property
+    def sentry_environment(self) -> str:
+        """Get Sentry environment based on DEBUG flag."""
+        return "development" if self.DEBUG else "production"
+
+    # =========================================================================
     # 💳 PAYMENTS (Stripe)
     # =========================================================================
 
@@ -295,30 +310,34 @@ def validate_openai_config() -> dict:
     }
 
 
-def print_config_summary():
+def log_config_summary():
     """
-    Print a summary of current configuration.
+    Log a summary of current configuration.
     
     Useful for debugging and verifying settings on startup.
     Masks sensitive values like API keys.
+    Uses logging instead of print for production compatibility.
     """
+    import logging
+    logger = logging.getLogger(__name__)
+    
     def mask_key(key: str) -> str:
         """Mask API key, showing only first and last 4 characters."""
         if not key or len(key) < 10:
             return "NOT SET"
         return f"{key[:4]}...{key[-4:]}"
     
-    print("\n" + "=" * 60)
-    print("📋 SMARTCAREER AI - CONFIGURATION SUMMARY")
-    print("=" * 60)
+    logger.info("=" * 60)
+    logger.info("SMARTCAREER AI - CONFIGURATION SUMMARY")
+    logger.info("=" * 60)
     
-    print("\n🔑 OpenAI Configuration:")
-    print(f"   API Key:     {mask_key(settings.OPENAI_API_KEY)}")
-    print(f"   Model:       {settings.OPENAI_MODEL}")
-    print(f"   Max Tokens:  {settings.OPENAI_MAX_TOKENS}")
-    print(f"   Temperature: {settings.OPENAI_TEMPERATURE}")
+    logger.info("OpenAI Configuration:")
+    logger.info(f"   API Key:     {mask_key(settings.OPENAI_API_KEY)}")
+    logger.info(f"   Model:       {settings.OPENAI_MODEL}")
+    logger.info(f"   Max Tokens:  {settings.OPENAI_MAX_TOKENS}")
+    logger.info(f"   Temperature: {settings.OPENAI_TEMPERATURE}")
     
-    print("\n🗄️ Database:")
+    logger.info("Database:")
     # Mask password in database URL
     db_url = settings.DATABASE_URL
     if "@" in db_url:
@@ -326,18 +345,22 @@ def print_config_summary():
         masked_url = parts[0].rsplit(":", 1)[0] + ":****@" + parts[1]
     else:
         masked_url = db_url
-    print(f"   URL: {masked_url}")
+    logger.info(f"   URL: {masked_url}")
     
-    print("\n🌐 Application:")
-    print(f"   Name:    {settings.APP_NAME}")
-    print(f"   Version: {settings.APP_VERSION}")
-    print(f"   Debug:   {settings.DEBUG}")
+    logger.info("Application:")
+    logger.info(f"   Name:    {settings.APP_NAME}")
+    logger.info(f"   Version: {settings.APP_VERSION}")
+    logger.info(f"   Debug:   {settings.DEBUG}")
     
-    print("\n🔗 CORS Origins:")
+    logger.info("CORS Origins:")
     for origin in settings.cors_origins_list:
-        print(f"   - {origin}")
+        logger.info(f"   - {origin}")
     
-    print("\n" + "=" * 60 + "\n")
+    logger.info("=" * 60)
+
+
+# Legacy function name for backward compatibility
+print_config_summary = log_config_summary
 
 
 # =============================================================================

@@ -131,3 +131,6 @@ Agar **"Python Version"** maydoni ko'rinmasa:
 
 
 
+
+
+

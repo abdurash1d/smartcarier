@@ -45,6 +45,7 @@ import {
 } from "lucide-react";
 import { useTranslation } from "@/hooks/useTranslation";
 import { LanguageSwitcher } from "@/components/ui/language-switcher";
+import { ThemeToggle } from "@/components/ui/theme-toggle";
 
 // =============================================================================
 // ANIMATION VARIANTS
@@ -159,7 +160,7 @@ const pricingPlans = [
   },
   {
     name: "Pro",
-    price: "29",
+    price: "4",
     description: "For serious job seekers",
     features: [
       "Unlimited AI resumes",
@@ -363,6 +364,9 @@ export default function LandingPage() {
 
             {/* Language Switcher + Auth Buttons */}
             <div className="flex items-center gap-3">
+              {/* Dark Mode Toggle */}
+              <ThemeToggle />
+              
               {/* Language Switcher */}
               <LanguageSwitcher variant="minimal" />
               

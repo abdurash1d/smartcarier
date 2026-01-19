@@ -96,3 +96,6 @@ Lekin bu ham ishlamasligi mumkin - **eng yaxshi yechim Python versiyasini o'zgar
 
 
 
+
+
+

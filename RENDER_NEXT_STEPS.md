@@ -233,3 +233,6 @@ Agar muammo bo'lsa:
 
 
 
+
+
+

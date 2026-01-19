@@ -146,3 +146,6 @@ Agar xatolik bo'lsa, logs'ni tekshiring va xatolikni ko'ring.
 
 
 
+
+
+

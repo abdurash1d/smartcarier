@@ -57,6 +57,9 @@ import {
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import { universityApi, scholarshipApi, universityApplicationApi, motivationLetterApi } from "@/lib/api";
+import { University, Scholarship, UniversityApplication, UniversityAISearchRequest } from "@/types/api";
+import { getErrorMessage } from "@/lib/api";
 
 // =============================================================================
 // MOCK DATA
@@ -242,10 +245,29 @@ const UniversityCard = ({
   onApply,
   onSave,
 }: {
-  university: typeof mockUniversities[0];
+  university: University | typeof mockUniversities[0];
   onApply: () => void;
   onSave: () => void;
-}) => (
+}) => {
+  // Handle both mock and real data structures
+  const name = university.name;
+  const country = university.country;
+  const city = university.city;
+  const ranking = 'world_ranking' in university ? university.world_ranking : ('ranking' in university ? university.ranking : undefined);
+  const logo = 'logo' in university ? (university as any).logo : '🏛️';
+  const matchScore = 'matchScore' in university ? university.matchScore : undefined;
+  const tuition = 'tuition' in university ? university.tuition : 
+    ('tuition_min' in university && university.tuition_min) ? `$${university.tuition_min}` : 'N/A';
+  const scholarship = 'scholarship' in university ? university.scholarship : 'Mavjud emas';
+  const deadline = 'deadline' in university ? university.deadline : 
+    ('application_deadline_fall' in university && university.application_deadline_fall) ? university.application_deadline_fall : undefined;
+  const programs = 'programs' in university ? university.programs : [];
+  const requirements = 'requirements' in university ? university.requirements : undefined;
+  const acceptanceRate = 'acceptanceRate' in university ? university.acceptanceRate : 
+    ('acceptance_rate' in university ? university.acceptance_rate : undefined);
+  const description = university.description || '';
+
+  return (
   <motion.div
     initial={{ opacity: 0, y: 20 }}
     animate={{ opacity: 1, y: 0 }}
@@ -255,68 +277,82 @@ const UniversityCard = ({
     <div className="flex items-start justify-between">
       <div className="flex items-center gap-4">
         <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-gradient-to-br from-purple-500 to-indigo-600 text-2xl">
-          {university.logo}
+          {logo}
         </div>
         <div>
           <h3 className="font-display text-lg font-bold text-surface-900 dark:text-white">
-            {university.name}
+            {name}
           </h3>
           <div className="mt-1 flex items-center gap-3 text-sm text-surface-500">
             <span className="flex items-center gap-1">
               <MapPin className="h-4 w-4" />
-              {university.city}, {university.country}
+              {city}, {country}
             </span>
-            <span className="flex items-center gap-1">
-              <Star className="h-4 w-4 fill-amber-400 text-amber-400" />
-              #{university.ranking}
-            </span>
+            {ranking && (
+              <span className="flex items-center gap-1">
+                <Star className="h-4 w-4 fill-amber-400 text-amber-400" />
+                #{ranking}
+              </span>
+            )}
           </div>
         </div>
       </div>
-      <div className="text-right">
-        <div className="flex items-center gap-1 rounded-full bg-green-100 px-3 py-1 text-sm font-bold text-green-700">
-          <Sparkles className="h-4 w-4" />
-          {university.matchScore}% mos
+      {matchScore && (
+        <div className="text-right">
+          <div className="flex items-center gap-1 rounded-full bg-green-100 px-3 py-1 text-sm font-bold text-green-700">
+            <Sparkles className="h-4 w-4" />
+            {matchScore}% mos
+          </div>
         </div>
+      )}
+    </div>
+
+    {description && (
+      <p className="mt-4 text-sm text-surface-600 dark:text-surface-400">
+        {description}
+      </p>
+    )}
+
+    {programs && programs.length > 0 && (
+      <div className="mt-4 flex flex-wrap gap-2">
+        {programs.slice(0, 3).map((program, idx) => (
+          <Badge key={idx} variant="secondary" className="text-xs">
+            {program}
+          </Badge>
+        ))}
       </div>
-    </div>
-
-    <p className="mt-4 text-sm text-surface-600 dark:text-surface-400">
-      {university.description}
-    </p>
-
-    <div className="mt-4 flex flex-wrap gap-2">
-      {university.programs.slice(0, 3).map((program) => (
-        <Badge key={program} variant="secondary" className="text-xs">
-          {program}
-        </Badge>
-      ))}
-    </div>
+    )}
 
     <div className="mt-4 grid grid-cols-3 gap-4 rounded-xl bg-surface-50 p-4 dark:bg-surface-700/50">
       <div>
         <p className="text-xs text-surface-500">Tuition</p>
         <p className="font-semibold text-surface-900 dark:text-white">
-          {university.tuition}
+          {tuition}
         </p>
       </div>
       <div>
         <p className="text-xs text-surface-500">Grant</p>
-        <p className="font-semibold text-green-600">{university.scholarship}</p>
+        <p className="font-semibold text-green-600">{scholarship}</p>
       </div>
       <div>
         <p className="text-xs text-surface-500">Muddat</p>
-        <p className="font-semibold text-surface-900 dark:text-white">
-          {new Date(university.deadline).toLocaleDateString("uz-UZ")}
-        </p>
+        {deadline && (
+          <p className="font-semibold text-surface-900 dark:text-white">
+            {new Date(deadline).toLocaleDateString("uz-UZ")}
+          </p>
+        )}
       </div>
     </div>
 
     <div className="mt-4 flex items-center justify-between">
-      <div className="text-sm text-surface-500">
-        <span className="font-medium text-surface-900 dark:text-white">Talablar:</span>{" "}
-        IELTS {university.requirements.ielts}+ | GPA {university.requirements.gpa}+
-      </div>
+      {requirements && (
+        <div className="text-sm text-surface-500">
+          <span className="font-medium text-surface-900 dark:text-white">Talablar:</span>{" "}
+          {requirements.ielts && `IELTS ${requirements.ielts}+`}
+          {requirements.ielts && requirements.gpa && " | "}
+          {requirements.gpa && `GPA ${requirements.gpa}+`}
+        </div>
+      )}
       <div className="flex gap-2">
         <Button variant="ghost" size="sm" onClick={onSave}>
           <Heart className="h-4 w-4" />
@@ -328,9 +364,23 @@ const UniversityCard = ({
       </div>
     </div>
   </motion.div>
-);
+  );
+};
 
-const ScholarshipCard = ({ scholarship }: { scholarship: typeof mockScholarships[0] }) => (
+const ScholarshipCard = ({ scholarship }: { scholarship: Scholarship | typeof mockScholarships[0] }) => {
+  // Handle both mock and real data structures
+  const name = scholarship.name;
+  const country = scholarship.country;
+  const amount = 'amount' in scholarship ? scholarship.amount : 
+    ('amount_info' in scholarship && scholarship.amount_info) ? 
+      (scholarship.amount_info.type === 'full_tuition' ? 'To\'liq moliyalashtirish' : 
+       scholarship.amount_info.amount ? `$${scholarship.amount_info.amount}` : 'N/A') : 'N/A';
+  const deadline = 'deadline' in scholarship ? scholarship.deadline : 
+    ('application_deadline' in scholarship ? scholarship.application_deadline : '');
+  const coverage = 'coverage' in scholarship ? scholarship.coverage : [];
+  const requirements = 'requirements' in scholarship ? scholarship.requirements : [];
+
+  return (
   <Card className="transition-all hover:border-purple-200 hover:shadow-lg">
     <CardContent className="pt-6">
       <div className="flex items-start justify-between">
@@ -344,35 +394,40 @@ const ScholarshipCard = ({ scholarship }: { scholarship: typeof mockScholarships
           </p>
         </div>
         <Badge variant="success" className="bg-green-100 text-green-700">
-          {scholarship.amount}
+          {amount}
         </Badge>
       </div>
 
-      <div className="mt-4">
-        <p className="text-xs text-surface-500 mb-2">Qoplanadi:</p>
-        <div className="flex flex-wrap gap-2">
-          {scholarship.coverage.map((item) => (
-            <Badge key={item} variant="secondary" className="text-xs">
-              <CheckCircle className="mr-1 h-3 w-3" />
-              {item}
-            </Badge>
-          ))}
+      {coverage && coverage.length > 0 && (
+        <div className="mt-4">
+          <p className="text-xs text-surface-500 mb-2">Qoplanadi:</p>
+          <div className="flex flex-wrap gap-2">
+            {coverage.map((item, idx) => (
+              <Badge key={idx} variant="secondary" className="text-xs">
+                <CheckCircle className="mr-1 h-3 w-3" />
+                {item}
+              </Badge>
+            ))}
+          </div>
         </div>
-      </div>
+      )}
 
-      <div className="mt-4 flex items-center justify-between">
-        <div className="flex items-center gap-1 text-sm text-amber-600">
-          <Clock className="h-4 w-4" />
-          Muddat: {new Date(scholarship.deadline).toLocaleDateString("uz-UZ")}
-        </div>
+      {deadline && (
+        <div className="mt-4 flex items-center justify-between">
+          <div className="flex items-center gap-1 text-sm text-amber-600">
+            <Clock className="h-4 w-4" />
+            Muddat: {new Date(deadline).toLocaleDateString("uz-UZ")}
+          </div>
         <Button size="sm" variant="outline">
           Batafsil
           <ExternalLink className="ml-2 h-4 w-4" />
         </Button>
-      </div>
+        </div>
+      )}
     </CardContent>
   </Card>
-);
+  );
+};
 
 // =============================================================================
 // MAIN COMPONENT
@@ -385,26 +440,109 @@ export default function UniversitiesPage() {
   const [selectedCountry, setSelectedCountry] = useState("all");
   const [isGenerating, setIsGenerating] = useState(false);
   const [showMotivationModal, setShowMotivationModal] = useState(false);
+  
+  // State for real data
+  const [universities, setUniversities] = useState<University[]>([]);
+  const [scholarships, setScholarships] = useState<Scholarship[]>([]);
+  const [applications, setApplications] = useState<UniversityApplication[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [stats, setStats] = useState({
+    universitiesCount: 0,
+    scholarshipsCount: 0,
+    applicationsCount: 0,
+    avgMatchScore: 0,
+  });
+
+  // Load universities
+  useEffect(() => {
+    loadUniversities();
+    loadScholarships();
+    loadApplications();
+  }, []);
+
+  const loadUniversities = async () => {
+    try {
+      setLoading(true);
+      const response = await universityApi.search({
+        search: searchQuery || undefined,
+        country: selectedCountry !== "all" ? selectedCountry : undefined,
+        page: 1,
+        limit: 50,
+      });
+      setUniversities(response.data.items || []);
+      setStats((prev) => ({ ...prev, universitiesCount: response.data.total || 0 }));
+    } catch (error) {
+      console.error("Failed to load universities:", error);
+      toast.error(getErrorMessage(error));
+      // Fallback to mock data on error (with type casting)
+      setUniversities(mockUniversities as any);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadScholarships = async () => {
+    try {
+      const response = await scholarshipApi.list({ page: 1, limit: 50 });
+      setScholarships(response.data.items || []);
+      setStats((prev) => ({ ...prev, scholarshipsCount: response.data.total || 0 }));
+    } catch (error) {
+      console.error("Failed to load scholarships:", error);
+      // Fallback to mock data (with type casting)
+      setScholarships(mockScholarships as any);
+    }
+  };
+
+  const loadApplications = async () => {
+    try {
+      const response = await universityApplicationApi.list({ page: 1, limit: 50 });
+      setApplications(response.data.items || []);
+      setStats((prev) => ({ ...prev, applicationsCount: response.data.total || 0 }));
+    } catch (error) {
+      console.error("Failed to load applications:", error);
+      // Fallback to mock data (with type casting)
+      setApplications(mockApplications as any);
+    }
+  };
 
   // AI Find Universities
   const handleAISearch = async () => {
     setIsGenerating(true);
     try {
-      await new Promise((resolve) => setTimeout(resolve, 2000));
+      const request: UniversityAISearchRequest = {
+        student_profile: {
+          // TODO: Get from user profile
+          gpa: 3.5,
+          ielts: 7.0,
+        },
+        preferred_countries: selectedCountry !== "all" ? [selectedCountry] : undefined,
+        max_results: 10,
+      };
+      
+      const response = await universityApi.aiSearch(request);
+      setUniversities(response.data.items || []);
       toast.success("AI sizning profilingizga mos universitetlarni topdi!");
     } catch (error) {
-      toast.error("Xatolik yuz berdi");
+      console.error("AI search failed:", error);
+      toast.error(getErrorMessage(error));
     } finally {
       setIsGenerating(false);
     }
   };
 
-  // Filter universities
-  const filteredUniversities = mockUniversities.filter((uni) => {
-    const matchesSearch = uni.name.toLowerCase().includes(searchQuery.toLowerCase());
+  // Filter universities (client-side filtering for now)
+  const filteredUniversities = universities.filter((uni) => {
+    const matchesSearch = !searchQuery || uni.name.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesCountry = selectedCountry === "all" || uni.country === selectedCountry;
     return matchesSearch && matchesCountry;
   });
+
+  // Update when search/country changes
+  useEffect(() => {
+    if (searchQuery || selectedCountry !== "all") {
+      loadUniversities();
+    }
+  }, [searchQuery, selectedCountry]);
 
   return (
     <div className="space-y-6">
@@ -441,7 +579,7 @@ export default function UniversitiesPage() {
             </div>
             <div>
               <p className="text-2xl font-bold text-surface-900 dark:text-white">
-                {mockUniversities.length}
+                {loading ? "..." : stats.universitiesCount || universities.length}
               </p>
               <p className="text-sm text-surface-500">Mos universitetlar</p>
             </div>
@@ -454,7 +592,7 @@ export default function UniversitiesPage() {
             </div>
             <div>
               <p className="text-2xl font-bold text-surface-900 dark:text-white">
-                {mockScholarships.length}
+                {stats.scholarshipsCount || scholarships.length}
               </p>
               <p className="text-sm text-surface-500">Mavjud grantlar</p>
             </div>
@@ -467,7 +605,7 @@ export default function UniversitiesPage() {
             </div>
             <div>
               <p className="text-2xl font-bold text-surface-900 dark:text-white">
-                {mockApplications.length}
+                {stats.applicationsCount || applications.length}
               </p>
               <p className="text-sm text-surface-500">Mening arizalarim</p>
             </div>
@@ -479,7 +617,9 @@ export default function UniversitiesPage() {
               <TrendingUp className="h-6 w-6" />
             </div>
             <div>
-              <p className="text-2xl font-bold text-surface-900 dark:text-white">94%</p>
+              <p className="text-2xl font-bold text-surface-900 dark:text-white">
+                {stats.avgMatchScore || 94}%
+              </p>
               <p className="text-sm text-surface-500">O'rtacha moslik</p>
             </div>
           </CardContent>
@@ -540,29 +680,71 @@ export default function UniversitiesPage() {
 
           {/* University List */}
           <div className="space-y-4">
-            {filteredUniversities.map((university) => (
-              <UniversityCard
-                key={university.id}
-                university={university}
-                onApply={() => toast.info(`${university.name} ga ariza sahifasi ochilmoqda...`)}
-                onSave={() => toast.success("Saqlandi!")}
-              />
-            ))}
+            {loading ? (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="h-8 w-8 animate-spin text-purple-500" />
+              </div>
+            ) : filteredUniversities.length === 0 ? (
+              <Card>
+                <CardContent className="py-12 text-center">
+                  <p className="text-surface-500">Universitetlar topilmadi</p>
+                </CardContent>
+              </Card>
+            ) : (
+              filteredUniversities.map((university) => (
+                <UniversityCard
+                  key={university.id}
+                  university={university}
+                  onApply={async () => {
+                    try {
+                      // TODO: Navigate to application form
+                      toast.info(`${university.name} ga ariza sahifasi ochilmoqda...`);
+                    } catch (error) {
+                      toast.error(getErrorMessage(error));
+                    }
+                  }}
+                  onSave={() => toast.success("Saqlandi!")}
+                />
+              ))
+            )}
           </div>
         </TabsContent>
 
         {/* Scholarships Tab */}
         <TabsContent value="scholarships" className="space-y-6">
-          <div className="grid gap-4 md:grid-cols-2">
-            {mockScholarships.map((scholarship) => (
-              <ScholarshipCard key={scholarship.id} scholarship={scholarship} />
-            ))}
-          </div>
+          {loading ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="h-8 w-8 animate-spin text-purple-500" />
+            </div>
+          ) : scholarships.length === 0 ? (
+            <Card>
+              <CardContent className="py-12 text-center">
+                <p className="text-surface-500">Grantlar topilmadi</p>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="grid gap-4 md:grid-cols-2">
+              {scholarships.map((scholarship) => (
+                <ScholarshipCard key={scholarship.id} scholarship={scholarship} />
+              ))}
+            </div>
+          )}
         </TabsContent>
 
         {/* Applications Tab */}
         <TabsContent value="applications" className="space-y-4">
-          {mockApplications.map((app) => (
+          {loading ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="h-8 w-8 animate-spin text-purple-500" />
+            </div>
+          ) : applications.length === 0 ? (
+            <Card>
+              <CardContent className="py-12 text-center">
+                <p className="text-surface-500">Arizalar mavjud emas</p>
+              </CardContent>
+            </Card>
+          ) : (
+            applications.map((app) => (
             <Card key={app.id}>
               <CardContent className="pt-6">
                 <div className="flex items-center justify-between">
@@ -572,7 +754,7 @@ export default function UniversitiesPage() {
                     </div>
                     <div>
                       <h3 className="font-semibold text-surface-900 dark:text-white">
-                        {app.university}
+                        {app.university?.name || (typeof app.university === 'string' ? app.university : 'Unknown')}
                       </h3>
                       <p className="text-sm text-surface-500">{app.program}</p>
                     </div>
@@ -594,31 +776,36 @@ export default function UniversitiesPage() {
                   </Badge>
                 </div>
 
-                <div className="mt-4">
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-surface-500">Hujjatlar</span>
-                    <span className="font-medium">
-                      {app.documents.completed}/{app.documents.total}
-                    </span>
+                {app.documents_total > 0 && (
+                  <div className="mt-4">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-surface-500">Hujjatlar</span>
+                      <span className="font-medium">
+                        {app.documents_completed}/{app.documents_total}
+                      </span>
+                    </div>
+                    <Progress
+                      value={(app.documents_completed / app.documents_total) * 100}
+                      className="mt-2 h-2"
+                    />
                   </div>
-                  <Progress
-                    value={(app.documents.completed / app.documents.total) * 100}
-                    className="mt-2 h-2"
-                  />
-                </div>
+                )}
 
-                <div className="mt-4 flex items-center justify-between text-sm">
-                  <span className="text-surface-500">
-                    Muddat: {new Date(app.deadline).toLocaleDateString("uz-UZ")}
-                  </span>
+                {app.deadline && (
+                  <div className="mt-4 flex items-center justify-between text-sm">
+                    <span className="text-surface-500">
+                      Muddat: {new Date(app.deadline).toLocaleDateString("uz-UZ")}
+                    </span>
                   <Button size="sm" variant="outline">
                     Batafsil
                     <ArrowRight className="ml-2 h-4 w-4" />
                   </Button>
-                </div>
+                  </div>
+                )}
               </CardContent>
             </Card>
-          ))}
+            ))
+          )}
         </TabsContent>
 
         {/* AI Tools Tab */}

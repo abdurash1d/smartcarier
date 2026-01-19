@@ -404,6 +404,22 @@ class User(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin):
         lazy="dynamic",
     )
     
+    # Notifications (user alerts)
+    notifications = relationship(
+        "Notification",
+        back_populates="user",
+        cascade="all, delete-orphan",
+        lazy="dynamic",
+    )
+    
+    # Saved Searches (quick access to frequent searches)
+    saved_searches = relationship(
+        "SavedSearch",
+        back_populates="user",
+        cascade="all, delete-orphan",
+        lazy="dynamic",
+    )
+    
     # =========================================================================
     # PASSWORD METHODS
     # =========================================================================

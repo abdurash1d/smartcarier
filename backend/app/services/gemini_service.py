@@ -118,6 +118,49 @@ class GeminiService:
         """Gemini ishga tayyormi?"""
         return self.model is not None
     
+    async def generate(
+        self, 
+        prompt: str, 
+        response_format: str = "text"
+    ) -> str:
+        """
+        Generic AI generation method.
+        
+        Args:
+            prompt: Text prompt
+            response_format: "text" or "json"
+            
+        Returns:
+            Generated text
+        """
+        if not self.is_available:
+            raise Exception("Gemini API not configured")
+        
+        try:
+            # Add JSON instruction if needed
+            if response_format == "json":
+                prompt = f"{prompt}\n\nIMPORTANT: Return ONLY valid JSON, no other text."
+            
+            # Generate response
+            response = await self.model.generate_content_async(prompt)
+            
+            # Extract text
+            text = response.text.strip()
+            
+            # Clean up JSON response if needed
+            if response_format == "json":
+                # Remove markdown code blocks if present
+                if text.startswith("```json"):
+                    text = text.replace("```json", "").replace("```", "").strip()
+                elif text.startswith("```"):
+                    text = text.replace("```", "").strip()
+            
+            return text
+            
+        except Exception as e:
+            logger.error(f"Generation failed: {e}")
+            raise
+    
     async def generate_resume(self, user_data: Dict[str, Any]) -> Dict[str, Any]:
         """
         AI yordamida professional rezyume yaratish
