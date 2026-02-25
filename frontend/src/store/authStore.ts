@@ -63,6 +63,8 @@ interface RegisterData {
   full_name: string;
   phone?: string;
   role?: "student" | "company";
+  company_name?: string;
+  company_website?: string;
 }
 
 // =============================================================================

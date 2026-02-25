@@ -9,7 +9,7 @@ All v1 API routes are registered here.
 from fastapi import APIRouter
 from app.api.v1.routes import (
     auth, users, resumes, jobs, applications, 
-    admin, payments, universities,
+    admin, payments,
     profile, notifications, saved_searches
 )
 from app.routers import ai  # Import AI router
@@ -67,13 +67,6 @@ api_router.include_router(
     payments.router,
     prefix="/payments",
     tags=["Payments"]
-)
-
-# Universities Router - University applications and scholarships
-api_router.include_router(
-    universities.router,
-    prefix="",
-    tags=["Universities"]
 )
 
 # Profile Router - User profile management

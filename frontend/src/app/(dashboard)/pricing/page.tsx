@@ -51,8 +51,6 @@ const pricingPlans: PricingPlan[] = [
     features: [
       "1 AI-generated resume",
       "5 job applications/month",
-      "3 AI university searches",
-      "1 motivation letter",
       "Basic job matching",
       "Email support",
     ],
@@ -75,8 +73,6 @@ const pricingPlans: PricingPlan[] = [
     description: "For serious job seekers and students",
     features: [
       "Unlimited AI resume generation",
-      "Unlimited university search",
-      "Unlimited motivation letters",
       "50 job applications/month",
       "Auto-apply to matching jobs",
       "Priority job matching",

@@ -47,8 +47,8 @@ class UserRegister(BaseModel):
     password: str = Field(
         ...,
         min_length=8,
-        max_length=100,
-        description="Password (min 8 chars, must include uppercase, lowercase, digit)",
+        max_length=72,
+        description="Password (min 8, max 72 chars, must include uppercase, lowercase, digit)",
         examples=["StrongPass123!"]
     )
     
@@ -226,8 +226,8 @@ class ResetPasswordRequest(BaseModel):
     new_password: str = Field(
         ...,
         min_length=8,
-        max_length=100,
-        description="New password"
+        max_length=72,
+        description="New password (min 8, max 72 chars)"
     )
     
     @field_validator('new_password')
@@ -262,8 +262,8 @@ class ChangePasswordRequest(BaseModel):
     new_password: str = Field(
         ...,
         min_length=8,
-        max_length=100,
-        description="New password"
+        max_length=72,
+        description="New password (min 8, max 72 chars)"
     )
     
     @field_validator('new_password')

@@ -221,7 +221,7 @@ class Settings(BaseSettings):
     # Allowed origins for CORS (frontend URLs)
     # Add your frontend URL for production
     # Can be comma-separated string or JSON list
-    CORS_ORIGINS: str = "http://localhost:3000,http://127.0.0.1:3000"
+    CORS_ORIGINS: str = "http://localhost:3000,http://127.0.0.1:3000,http://localhost:3001,http://127.0.0.1:3001"
     
     @property
     def cors_origins_list(self) -> List[str]:

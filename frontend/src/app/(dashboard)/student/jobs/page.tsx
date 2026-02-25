@@ -62,7 +62,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { CardSkeleton, Skeleton } from "@/components/ui/skeleton";
+import { SkeletonCard, Skeleton } from "@/components/ui/skeleton";
 import {
   Select,
   SelectContent,
@@ -80,196 +80,7 @@ import {
 import { formatRelativeTime, formatSalaryRange, cn } from "@/lib/utils";
 import type { Job, JobType, ExperienceLevel } from "@/types/api";
 
-// =============================================================================
-// MOCK DATA - Extended
-// =============================================================================
-
-const mockJobs: (Job & { matchScore?: number })[] = [
-  {
-    id: "job-1",
-    company_id: "company-1",
-    title: "Senior Backend Developer",
-    description: `We are looking for an experienced Backend Developer to join our growing engineering team. You will be responsible for designing and implementing scalable server-side applications.
-
-**Responsibilities:**
-- Design and implement RESTful APIs
-- Write clean, maintainable code
-- Collaborate with frontend developers
-- Optimize application performance
-- Mentor junior developers
-
-**What we offer:**
-- Competitive salary
-- Remote work options
-- Health insurance
-- Learning budget
-- Team events`,
-    requirements: {
-      skills: ["Python", "FastAPI", "PostgreSQL", "Docker", "AWS", "Redis"],
-      experience: "5+ years",
-      education: "Bachelor's in Computer Science or related field",
-    },
-    salary_min: 3000,
-    salary_max: 5000,
-    location: "Tashkent",
-    job_type: "full_time",
-    experience_level: "senior",
-    status: "active",
-    applications_count: 45,
-    views_count: 892,
-    created_at: "2024-01-15T10:00:00Z",
-    updated_at: "2024-01-15T10:00:00Z",
-    company: {
-      name: "EPAM Systems",
-      logo_url: "/logos/epam.png",
-    },
-    matchScore: 95,
-  },
-  {
-    id: "job-2",
-    company_id: "company-2",
-    title: "Full Stack Engineer",
-    description: `Join our dynamic team as a Full Stack Engineer. You'll work on cutting-edge technologies and help build products that millions of users love.
-
-**What you'll do:**
-- Build responsive web applications
-- Develop and maintain APIs
-- Write tests and documentation
-- Participate in code reviews
-
-**Requirements:**
-- Strong JavaScript/TypeScript skills
-- Experience with React and Node.js
-- Database knowledge (SQL and NoSQL)`,
-    requirements: {
-      skills: ["React", "Node.js", "TypeScript", "MongoDB", "GraphQL"],
-      experience: "3+ years",
-      education: "Bachelor's degree preferred",
-    },
-    salary_min: 2500,
-    salary_max: 4000,
-    location: "Remote",
-    job_type: "remote",
-    experience_level: "mid",
-    status: "active",
-    applications_count: 78,
-    views_count: 1245,
-    created_at: "2024-01-14T10:00:00Z",
-    updated_at: "2024-01-14T10:00:00Z",
-    company: {
-      name: "Uzum Market",
-      logo_url: "/logos/uzum.png",
-    },
-    matchScore: 88,
-  },
-  {
-    id: "job-3",
-    company_id: "company-3",
-    title: "Junior Frontend Developer",
-    description: `Perfect opportunity for developers starting their career. You'll learn from experienced mentors while building real products.
-
-**What we're looking for:**
-- Basic HTML, CSS, JavaScript knowledge
-- Familiarity with React or Vue
-- Eager to learn
-- Good communication skills`,
-    requirements: {
-      skills: ["HTML", "CSS", "JavaScript", "React", "Git"],
-      experience: "0-2 years",
-      education: "Degree in CS or bootcamp graduate",
-    },
-    salary_min: 800,
-    salary_max: 1500,
-    location: "Tashkent",
-    job_type: "full_time",
-    experience_level: "junior",
-    status: "active",
-    applications_count: 156,
-    views_count: 2345,
-    created_at: "2024-01-18T10:00:00Z",
-    updated_at: "2024-01-18T10:00:00Z",
-    company: {
-      name: "Click.uz",
-      logo_url: "/logos/click.png",
-    },
-    matchScore: 72,
-  },
-  {
-    id: "job-4",
-    company_id: "company-4",
-    title: "DevOps Engineer",
-    description: `We need a DevOps Engineer to help us scale our infrastructure and improve our deployment processes.`,
-    requirements: {
-      skills: ["Kubernetes", "Docker", "AWS", "Terraform", "CI/CD", "Linux"],
-      experience: "4+ years",
-    },
-    salary_min: 3500,
-    salary_max: 6000,
-    location: "Hybrid",
-    job_type: "hybrid",
-    experience_level: "senior",
-    status: "active",
-    applications_count: 23,
-    views_count: 567,
-    created_at: "2024-01-12T10:00:00Z",
-    updated_at: "2024-01-12T10:00:00Z",
-    company: {
-      name: "Payme",
-      logo_url: "/logos/payme.png",
-    },
-    matchScore: 65,
-  },
-  {
-    id: "job-5",
-    company_id: "company-5",
-    title: "Mobile Developer (React Native)",
-    description: `Build beautiful mobile experiences for our e-commerce platform.`,
-    requirements: {
-      skills: ["React Native", "TypeScript", "Redux", "REST APIs", "iOS", "Android"],
-      experience: "2+ years",
-    },
-    salary_min: 2000,
-    salary_max: 3500,
-    location: "Tashkent",
-    job_type: "full_time",
-    experience_level: "mid",
-    status: "active",
-    applications_count: 34,
-    views_count: 678,
-    created_at: "2024-01-10T10:00:00Z",
-    updated_at: "2024-01-10T10:00:00Z",
-    company: {
-      name: "Korzinka",
-      logo_url: "/logos/korzinka.png",
-    },
-    matchScore: 78,
-  },
-  {
-    id: "job-6",
-    company_id: "company-6",
-    title: "Data Scientist",
-    description: `Join our AI team and work on machine learning models that power our recommendation engine.`,
-    requirements: {
-      skills: ["Python", "TensorFlow", "PyTorch", "SQL", "Pandas", "Machine Learning"],
-      experience: "3+ years",
-    },
-    salary_min: 3000,
-    salary_max: 5500,
-    location: "Remote",
-    job_type: "remote",
-    experience_level: "mid",
-    status: "active",
-    applications_count: 56,
-    views_count: 890,
-    created_at: "2024-01-08T10:00:00Z",
-    updated_at: "2024-01-08T10:00:00Z",
-    company: {
-      name: "MyTaxi",
-      logo_url: "/logos/mytaxi.png",
-    },
-    matchScore: 82,
-  },
-];
+// NOTE: Job data is loaded from backend via useJobs().
 
 // =============================================================================
 // FILTER OPTIONS
@@ -825,8 +636,8 @@ const searchSuggestions = [
 // =============================================================================
 
 export default function JobsPage() {
-  const { isLoading } = useJobs();
-  const [jobs, setJobs] = useState(mockJobs);
+  const { jobs, isLoading, fetchJobs } = useJobs();
+  const [localJobs, setLocalJobs] = useState<(Job & { matchScore?: number })[]>([]);
   const [selectedJob, setSelectedJob] = useState<(Job & { matchScore?: number }) | null>(null);
   const [savedJobs, setSavedJobs] = useState<Set<string>>(new Set());
   const [searchQuery, setSearchQuery] = useState("");
@@ -835,6 +646,16 @@ export default function JobsPage() {
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [showApplyDialog, setShowApplyDialog] = useState(false);
   const [showMobileFilters, setShowMobileFilters] = useState(false);
+
+  // Load jobs from backend
+  useEffect(() => {
+    fetchJobs();
+  }, [fetchJobs]);
+
+  // Keep localJobs in sync (and allow adding matchScore client-side later)
+  useEffect(() => {
+    setLocalJobs(jobs as (Job & { matchScore?: number })[]);
+  }, [jobs]);
 
   // Filter states
   const [filters, setFilters] = useState({
@@ -900,7 +721,7 @@ export default function JobsPage() {
     (filters.datePosted !== "all" ? 1 : 0);
 
   // Filter jobs
-  const filteredJobs = jobs.filter((job) => {
+  const filteredJobs = localJobs.filter((job) => {
     const matchesSearch =
       !searchQuery ||
       job.title.toLowerCase().includes(searchQuery.toLowerCase()) ||

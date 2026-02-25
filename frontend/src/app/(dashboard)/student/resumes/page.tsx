@@ -42,7 +42,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { CardSkeleton } from "@/components/ui/skeleton";
+import { SkeletonCard } from "@/components/ui/skeleton";
 import {
   Select,
   SelectContent,
@@ -59,49 +59,6 @@ import {
 } from "@/components/ui/dialog";
 import { formatRelativeTime, formatDate } from "@/lib/utils";
 import type { Resume } from "@/types/api";
-
-// =============================================================================
-// MOCK DATA (replace with real data)
-// =============================================================================
-
-const mockResumes: Resume[] = [
-  {
-    id: "1",
-    user_id: "user-1",
-    title: "Senior Software Engineer Resume",
-    content: {} as any,
-    ai_generated: true,
-    status: "published",
-    view_count: 45,
-    ats_score: 92,
-    created_at: "2024-01-15T10:00:00Z",
-    updated_at: "2024-01-20T14:30:00Z",
-  },
-  {
-    id: "2",
-    user_id: "user-1",
-    title: "Full Stack Developer Resume",
-    content: {} as any,
-    ai_generated: true,
-    status: "draft",
-    view_count: 12,
-    ats_score: 85,
-    created_at: "2024-01-10T08:00:00Z",
-    updated_at: "2024-01-18T09:00:00Z",
-  },
-  {
-    id: "3",
-    user_id: "user-1",
-    title: "Backend Developer Resume",
-    content: {} as any,
-    ai_generated: false,
-    status: "published",
-    view_count: 28,
-    ats_score: 78,
-    created_at: "2024-01-05T12:00:00Z",
-    updated_at: "2024-01-16T16:00:00Z",
-  },
-];
 
 // =============================================================================
 // ANIMATION VARIANTS
@@ -126,14 +83,26 @@ const itemVariants = {
 
 export default function ResumesPage() {
   const { t } = useTranslation();
-  const [resumes, setResumes] = useState<Resume[]>(mockResumes);
-  const [isLoading, setIsLoading] = useState(false);
+  const {
+    resumes,
+    isLoading,
+    fetchResumes,
+    deleteResume,
+    publishResume,
+    archiveResume,
+    downloadResume,
+    createResume,
+  } = useResume();
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [sortBy, setSortBy] = useState<string>("updated");
   const [activeMenu, setActiveMenu] = useState<string | null>(null);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
+
+  useEffect(() => {
+    fetchResumes();
+  }, [fetchResumes]);
 
   // Filter and sort resumes
   const filteredResumes = resumes
@@ -161,20 +130,23 @@ export default function ResumesPage() {
     setActiveMenu(null);
     switch (action) {
       case "publish":
-        // Handle publish
+        await publishResume(resume.id);
         break;
       case "archive":
-        // Handle archive
+        await archiveResume(resume.id);
         break;
       case "download":
-        // Handle download
+        await downloadResume(resume.id);
         break;
       case "duplicate":
-        // Handle duplicate
+        await createResume({
+          title: `${resume.title} (Copy)`,
+          content: resume.content,
+        });
         break;
       case "delete":
         if (confirm("Are you sure you want to delete this resume?")) {
-          setResumes((prev) => prev.filter((r) => r.id !== resume.id));
+          await deleteResume(resume.id);
         }
         break;
     }
@@ -342,7 +314,7 @@ export default function ResumesPage() {
       {isLoading ? (
         <div className={`grid gap-4 ${viewMode === "grid" ? "md:grid-cols-2 lg:grid-cols-3" : ""}`}>
           {[1, 2, 3].map((i) => (
-            <CardSkeleton key={i} />
+            <SkeletonCard key={i} />
           ))}
         </div>
       ) : filteredResumes.length === 0 ? (

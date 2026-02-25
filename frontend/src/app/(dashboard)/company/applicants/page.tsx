@@ -22,7 +22,7 @@ import {
   XCircle,
   MessageSquare,
 } from "lucide-react";
-import { useApplications, useJobs } from "@/hooks/useJobs";
+import { useJobs } from "@/hooks/useJobs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -35,41 +35,33 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { TableRowSkeleton } from "@/components/ui/skeleton";
+import { SkeletonTable } from "@/components/ui/skeleton";
 import { formatRelativeTime, cn } from "@/lib/utils";
 import type { ApplicationStatus } from "@/types/api";
 
 export default function CompanyApplicantsPage() {
-  const { myJobs, fetchMyJobs } = useJobs();
-  const {
-    jobApplications,
-    isLoading,
-    fetchJobApplications,
-    updateApplicationStatus,
-  } = useApplications();
+  const { jobs, fetchJobs } = useJobs();
+  const [isLoading, setIsLoading] = useState(false);
   const [selectedJob, setSelectedJob] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
 
   useEffect(() => {
-    fetchMyJobs();
+    fetchJobs();
   }, []);
 
-  useEffect(() => {
-    if (selectedJob && selectedJob !== "all") {
-      fetchJobApplications(selectedJob);
-    }
-  }, [selectedJob]);
+  // Note: Detailed job applications per job are not yet wired to backend.
+  // For now we rely on applications embedded on each job (mock data on the job objects).
 
   // Get all applications from all jobs
-  const allApplications = selectedJob === "all" 
-    ? myJobs.flatMap((job) => 
-        (job as any).applications || []
-      )
-    : jobApplications;
+  const allApplications = selectedJob === "all"
+    ? jobs.flatMap((job: any) => job.applications || [])
+    : jobs
+        .filter((job) => job.id === selectedJob)
+        .flatMap((job: any) => job.applications || []);
 
   // Filter applications
-  const filteredApplications = allApplications.filter((app) => {
+  const filteredApplications = allApplications.filter((app: any) => {
     const matchesSearch =
       !searchQuery ||
       app.applicant?.full_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -78,8 +70,8 @@ export default function CompanyApplicantsPage() {
     return matchesSearch && matchesStatus;
   });
 
-  const handleStatusChange = async (applicationId: string, newStatus: string) => {
-    await updateApplicationStatus(applicationId, newStatus);
+  const handleStatusChange = async (_applicationId: string, _newStatus: string) => {
+    // TODO: Wire to real backend endpoint: PUT /applications/{id}/status
   };
 
   return (
@@ -116,7 +108,7 @@ export default function CompanyApplicantsPage() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Jobs</SelectItem>
-                {myJobs.map((job) => (
+                {jobs.map((job) => (
                   <SelectItem key={job.id} value={job.id}>
                     {job.title}
                   </SelectItem>
@@ -147,12 +139,8 @@ export default function CompanyApplicantsPage() {
       <Card>
         <CardContent className="p-0">
           {isLoading ? (
-            <div className="divide-y divide-surface-200 dark:divide-surface-700">
-              {[1, 2, 3, 4].map((i) => (
-                <div key={i} className="p-4">
-                  <TableRowSkeleton />
-                </div>
-              ))}
+            <div className="p-4">
+              <SkeletonTable rows={4} />
             </div>
           ) : filteredApplications.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12 text-center">

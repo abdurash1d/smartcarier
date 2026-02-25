@@ -12,7 +12,7 @@
 
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -36,6 +36,7 @@ import {
   AlertCircle,
 } from "lucide-react";
 import { useTranslation } from "@/hooks/useTranslation";
+import { useApplications } from "@/hooks/useApplications";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -49,108 +50,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { formatRelativeTime, formatDate } from "@/lib/utils";
-import type { Application, ApplicationStatus } from "@/types/api";
-
-// =============================================================================
-// MOCK DATA
-// =============================================================================
-
-const mockApplications: (Application & {
-  job: {
-    title: string;
-    company: { name: string; logo_url?: string };
-    location: string;
-    salary_min?: number;
-    salary_max?: number;
-  };
-})[] = [
-  {
-    id: "app-1",
-    job_id: "job-1",
-    user_id: "user-1",
-    resume_id: "resume-1",
-    cover_letter: "I am excited to apply...",
-    status: "interview",
-    applied_at: "2024-01-15T10:00:00Z",
-    reviewed_at: "2024-01-17T14:00:00Z",
-    interview_at: "2024-01-25T10:00:00Z",
-    updated_at: "2024-01-20T10:00:00Z",
-    job: {
-      title: "Senior Backend Developer",
-      company: { name: "EPAM Systems" },
-      location: "Tashkent",
-      salary_min: 3000,
-      salary_max: 5000,
-    },
-  },
-  {
-    id: "app-2",
-    job_id: "job-2",
-    user_id: "user-1",
-    resume_id: "resume-1",
-    status: "reviewing",
-    applied_at: "2024-01-14T08:00:00Z",
-    reviewed_at: "2024-01-16T10:00:00Z",
-    updated_at: "2024-01-16T10:00:00Z",
-    job: {
-      title: "Full Stack Engineer",
-      company: { name: "Uzum Market" },
-      location: "Remote",
-      salary_min: 2500,
-      salary_max: 4000,
-    },
-  },
-  {
-    id: "app-3",
-    job_id: "job-3",
-    user_id: "user-1",
-    resume_id: "resume-2",
-    status: "pending",
-    applied_at: "2024-01-18T12:00:00Z",
-    updated_at: "2024-01-18T12:00:00Z",
-    job: {
-      title: "Software Developer",
-      company: { name: "Click.uz" },
-      location: "Tashkent",
-      salary_min: 2000,
-      salary_max: 3500,
-    },
-  },
-  {
-    id: "app-4",
-    job_id: "job-4",
-    user_id: "user-1",
-    resume_id: "resume-1",
-    status: "accepted",
-    applied_at: "2024-01-10T09:00:00Z",
-    reviewed_at: "2024-01-12T11:00:00Z",
-    updated_at: "2024-01-15T14:00:00Z",
-    job: {
-      title: "Python Developer",
-      company: { name: "Payme" },
-      location: "Tashkent",
-      salary_min: 2500,
-      salary_max: 3500,
-    },
-  },
-  {
-    id: "app-5",
-    job_id: "job-5",
-    user_id: "user-1",
-    resume_id: "resume-1",
-    status: "rejected",
-    applied_at: "2024-01-08T10:00:00Z",
-    reviewed_at: "2024-01-11T15:00:00Z",
-    updated_at: "2024-01-11T15:00:00Z",
-    job: {
-      title: "Frontend Developer",
-      company: { name: "MyTaxi" },
-      location: "Tashkent",
-      salary_min: 1800,
-      salary_max: 3000,
-    },
-  },
-];
+import type { ApplicationStatus } from "@/types/api";
 
 // =============================================================================
 // STATUS CONFIG
@@ -215,28 +115,24 @@ const itemVariants = {
 
 export default function ApplicationsPage() {
   const { t } = useTranslation();
-  const [applications] = useState(mockApplications);
+  const { applications, stats, fetchMyApplications, isLoading } = useApplications();
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [sortBy, setSortBy] = useState("applied_at");
   const [activeMenu, setActiveMenu] = useState<string | null>(null);
 
-  // Calculate stats
-  const stats = {
-    total: applications.length,
-    pending: applications.filter((a) => a.status === "pending").length,
-    reviewing: applications.filter((a) => a.status === "reviewing").length,
-    interview: applications.filter((a) => a.status === "interview").length,
-    accepted: applications.filter((a) => a.status === "accepted").length,
-    rejected: applications.filter((a) => a.status === "rejected").length,
-  };
+  useEffect(() => {
+    fetchMyApplications();
+  }, [fetchMyApplications]);
 
   // Filter applications
   const filteredApplications = applications
     .filter((app) => {
+      const job = app.job;
       const matchesSearch =
-        app.job.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        app.job.company.name.toLowerCase().includes(searchQuery.toLowerCase());
+        !searchQuery ||
+        (job?.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          job?.company?.name?.toLowerCase().includes(searchQuery.toLowerCase()));
       const matchesStatus =
         statusFilter === "all" || app.status === statusFilter;
       return matchesSearch && matchesStatus;
@@ -447,14 +343,14 @@ export default function ApplicationsPage() {
                       {/* Job Info */}
                       <div className="flex gap-4">
                         {/* Company Logo */}
-                        <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-purple-100 to-indigo-100 text-xl font-bold text-purple-600">
-                          {application.job.company.name.charAt(0)}
+                          <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-purple-100 to-indigo-100 text-xl font-bold text-purple-600">
+                          {application.job?.company?.name?.charAt(0) ?? "C"}
                         </div>
 
                         <div>
                           <div className="flex items-center gap-3">
                             <h3 className="font-display text-lg font-semibold text-surface-900">
-                              {application.job.title}
+                              {application.job?.title ?? "Untitled job"}
                             </h3>
                             <Badge
                               className={`gap-1 ${status.bgColor} ${status.color}`}
@@ -464,12 +360,12 @@ export default function ApplicationsPage() {
                             </Badge>
                           </div>
                           <p className="text-surface-600">
-                            {application.job.company.name}
+                            {application.job?.company?.name ?? ""}
                           </p>
                           <div className="mt-2 flex flex-wrap items-center gap-4 text-sm text-surface-500">
                             <span className="flex items-center gap-1">
                               <MapPin className="h-4 w-4" />
-                              {application.job.location}
+                              {application.job?.location ?? ""}
                             </span>
                             <span className="flex items-center gap-1">
                               <Clock className="h-4 w-4" />

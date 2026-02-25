@@ -33,7 +33,6 @@ import {
   Moon,
   Sun,
   ChevronRight,
-  GraduationCap,
 } from "lucide-react";
 import { useAuth, useRequireAuth } from "@/hooks/useAuth";
 import { useTranslation } from "@/hooks/useTranslation";
@@ -66,13 +65,6 @@ const getNavigation = (t: (key: string) => string) => [
     href: "/student/jobs",
     icon: Briefcase,
     badge: t("dashboard.sidebar.new"),
-    badgeColor: "success",
-  },
-  {
-    name: t("dashboard.sidebar.universities"),
-    href: "/student/universities",
-    icon: GraduationCap,
-    badge: t("dashboard.sidebar.ai"),
     badgeColor: "success",
   },
   {

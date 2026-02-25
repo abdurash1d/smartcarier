@@ -10,6 +10,8 @@
 
 import { useCallback, useState } from "react";
 import type { Job } from "@/types/api";
+import { jobApi, getErrorMessage } from "@/lib/api";
+import { toast } from "sonner";
 
 // =============================================================================
 // TYPES
@@ -36,71 +38,16 @@ interface JobFilters {
 }
 
 // =============================================================================
-// MOCK DATA
-// =============================================================================
-
-const mockJobs: Job[] = [
-  {
-    id: "job-1",
-    company_id: "company-1",
-    title: "Senior Backend Developer",
-    description: "We are looking for an experienced backend developer to join our team.",
-    requirements: {
-      skills: ["Python", "FastAPI", "PostgreSQL"],
-      experience: "3+ years",
-    },
-    salary_min: 3000,
-    salary_max: 5000,
-    location: "Tashkent",
-    job_type: "full_time",
-    experience_level: "senior",
-    status: "active",
-    applications_count: 12,
-    views_count: 156,
-    created_at: "2024-01-15T10:00:00Z",
-    updated_at: "2024-01-15T10:00:00Z",
-    company: {
-      name: "EPAM Systems",
-      logo_url: "/logos/epam.png",
-    },
-  },
-  {
-    id: "job-2",
-    company_id: "company-2",
-    title: "Full Stack Engineer",
-    description: "Join our dynamic team as a full stack engineer.",
-    requirements: {
-      skills: ["React", "Node.js", "TypeScript"],
-      experience: "2+ years",
-    },
-    salary_min: 2500,
-    salary_max: 4000,
-    location: "Remote",
-    job_type: "remote",
-    experience_level: "mid",
-    status: "active",
-    applications_count: 25,
-    views_count: 234,
-    created_at: "2024-01-14T10:00:00Z",
-    updated_at: "2024-01-14T10:00:00Z",
-    company: {
-      name: "Uzum Market",
-      logo_url: "/logos/uzum.png",
-    },
-  },
-];
-
-// =============================================================================
 // HOOK
 // =============================================================================
 
 export function useJobs() {
   const [state, setState] = useState<JobsState>({
-    jobs: mockJobs,
+    jobs: [],
     currentJob: null,
     isLoading: false,
     error: null,
-    totalCount: 2,
+    totalCount: 0,
     currentPage: 1,
     totalPages: 1,
   });
@@ -117,52 +64,63 @@ export function useJobs() {
         setFilters(newFilters);
       }
 
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 500));
+      const params: any = {
+        page,
+        ...filters,
+        ...newFilters,
+      };
 
-      // In real app: const response = await api.get('/jobs', { params: { ...filters, page } });
-      
+      const response = await jobApi.list(params);
+      const data = response.data as {
+        items?: Job[];
+        total?: number;
+        page?: number;
+        limit?: number;
+        pages?: number;
+      };
+
       setState((prev) => ({
         ...prev,
-        jobs: mockJobs,
+        jobs: data.items || [],
         isLoading: false,
-        totalCount: mockJobs.length,
-        currentPage: page,
-        totalPages: 1,
+        totalCount: data.total ?? (data.items?.length || 0),
+        currentPage: data.page ?? page,
+        totalPages: data.pages ?? 1,
       }));
     } catch (error) {
+      const message = getErrorMessage(error);
       setState((prev) => ({
         ...prev,
         isLoading: false,
-        error: "Failed to fetch jobs",
+        error: message,
       }));
+      toast.error(message);
     }
-  }, []);
+  }, [filters]);
 
   // Fetch single job
   const fetchJob = useCallback(async (id: string) => {
     setState((prev) => ({ ...prev, isLoading: true, error: null }));
 
     try {
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 500));
-
-      // In real app: const response = await api.get(`/jobs/${id}`);
-      const job = mockJobs.find((j) => j.id === id);
+      const response = await jobApi.get(id);
+      const job = response.data as Job;
       
       setState((prev) => ({
         ...prev,
-        currentJob: job || null,
+        currentJob: job,
         isLoading: false,
       }));
 
       return job;
     } catch (error) {
+      const message = getErrorMessage(error);
       setState((prev) => ({
         ...prev,
         isLoading: false,
-        error: "Failed to fetch job",
+        error: message,
       }));
+      toast.error(message);
     }
   }, []);
 
@@ -187,16 +145,9 @@ export function useJobs() {
     setState((prev) => ({ ...prev, isLoading: true, error: null }));
 
     try {
-      // Simulate AI matching
-      await new Promise((resolve) => setTimeout(resolve, 2000));
-
-      // In real app: const response = await api.post('/jobs/match', { resume_id: resumeId });
-      
-      // Return mock matched jobs with scores
-      const matchedJobs = mockJobs.map((job, index) => ({
-        ...job,
-        matchScore: 95 - index * 7,
-      }));
+      const response = await jobApi.match(resumeId);
+      const data = response.data as { items?: (Job & { matchScore?: number })[] };
+      const matchedJobs = data.items || [];
 
       setState((prev) => ({
         ...prev,
@@ -206,11 +157,13 @@ export function useJobs() {
 
       return matchedJobs;
     } catch (error) {
+      const message = getErrorMessage(error);
       setState((prev) => ({
         ...prev,
         isLoading: false,
-        error: "Failed to match jobs",
+        error: message,
       }));
+      toast.error(message);
       throw error;
     }
   }, []);

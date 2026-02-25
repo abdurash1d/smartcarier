@@ -56,19 +56,20 @@ const step1Schema = z
   .object({
     email: z
       .string()
-      .min(1, "Email is required")
-      .email("Please enter a valid email address"),
+      .min(1, "Email majburiy")
+      .email("Iltimos, to'g'ri email manzilini kiriting"),
     password: z
       .string()
-      .min(1, "Password is required")
-      .min(8, "Password must be at least 8 characters")
-      .regex(/[a-z]/, "Password must contain at least one lowercase letter")
-      .regex(/[A-Z]/, "Password must contain at least one uppercase letter")
-      .regex(/[0-9]/, "Password must contain at least one number"),
-    confirmPassword: z.string().min(1, "Please confirm your password"),
+      .min(1, "Parol majburiy")
+      .min(8, "Parol kamida 8 ta belgidan iborat bo'lishi kerak")
+      .max(72, "Parol 72 ta belgidan oshmasligi kerak")
+      .regex(/[a-z]/, "Parol kamida bitta kichik harfni o'z ichiga olishi kerak")
+      .regex(/[A-Z]/, "Parol kamida bitta katta harfni o'z ichiga olishi kerak")
+      .regex(/[0-9]/, "Parol kamida bitta raqamni o'z ichiga olishi kerak"),
+    confirmPassword: z.string().min(1, "Iltimos, parolni tasdiqlang"),
   })
   .refine((data) => data.password === data.confirmPassword, {
-    message: "Passwords don't match",
+    message: "Parollar mos kelmadi",
     path: ["confirmPassword"],
   });
 
@@ -76,19 +77,20 @@ const step1Schema = z
 const step2Schema = z.object({
   fullName: z
     .string()
-    .min(1, "Full name is required")
-    .min(2, "Name must be at least 2 characters")
-    .regex(/^[a-zA-Z\s']+$/, "Name can only contain letters"),
+    .min(1, "To'liq ism majburiy")
+    .min(2, "Ism kamida 2 ta belgidan iborat bo'lishi kerak")
+    .max(100, "Ism 100 ta belgidan oshmasligi kerak")
+    .regex(/^[\p{L}\s'.'-]+$/u, "Ism faqat harflardan iborat bo'lishi kerak"),
   phone: z
     .string()
-    .min(1, "Phone number is required")
-    .regex(/^\+?[0-9]{9,15}$/, "Please enter a valid phone number"),
+    .min(1, "Telefon raqam majburiy")
+    .regex(/^\+?[0-9]{9,15}$/, "Iltimos, to'g'ri telefon raqamini kiriting"),
 });
 
 // Step 3: Role selection
 const step3Schema = z.object({
   role: z.enum(["student", "company"], {
-    required_error: "Please select a role",
+    required_error: "Iltimos, rolni tanlang",
   }),
   companyName: z.string().optional(),
 });
@@ -105,26 +107,30 @@ type RegisterFormData = z.infer<typeof registerSchema>;
 // STEP CONFIGURATION
 // =============================================================================
 
-const steps = [
-  {
-    id: 1,
-    title: "Create Account",
-    description: "Set up your login credentials",
-    icon: Lock,
-  },
-  {
-    id: 2,
-    title: "Personal Info",
-    description: "Tell us about yourself",
-    icon: User,
-  },
-  {
-    id: 3,
-    title: "Choose Role",
-    description: "How will you use SmartCareer?",
-    icon: Sparkles,
-  },
-];
+const RegisterSteps = () => {
+  const { t } = useTranslation();
+  
+  return [
+    {
+      id: 1,
+      title: t("auth.register.steps.step1.title"),
+      description: t("auth.register.steps.step1.description"),
+      icon: Lock,
+    },
+    {
+      id: 2,
+      title: t("auth.register.steps.step2.title"),
+      description: t("auth.register.steps.step2.description"),
+      icon: User,
+    },
+    {
+      id: 3,
+      title: t("auth.register.steps.step3.title"),
+      description: t("auth.register.steps.step3.description"),
+      icon: Sparkles,
+    },
+  ];
+};
 
 // =============================================================================
 // ANIMATION VARIANTS
@@ -166,16 +172,23 @@ const fadeIn = {
 // =============================================================================
 
 function PasswordStrength({ password }: { password: string }) {
+  const { t } = useTranslation();
+  
   const checks = [
-    { label: "8+ characters", test: password.length >= 8 },
-    { label: "Lowercase", test: /[a-z]/.test(password) },
-    { label: "Uppercase", test: /[A-Z]/.test(password) },
-    { label: "Number", test: /[0-9]/.test(password) },
+    { label: t("auth.register.passwordChecks.characters"), test: password.length >= 8 },
+    { label: t("auth.register.passwordChecks.lowercase"), test: /[a-z]/.test(password) },
+    { label: t("auth.register.passwordChecks.uppercase"), test: /[A-Z]/.test(password) },
+    { label: t("auth.register.passwordChecks.number"), test: /[0-9]/.test(password) },
   ];
 
   const strength = checks.filter((c) => c.test).length;
   const strengthColors = ["bg-red-500", "bg-orange-500", "bg-yellow-500", "bg-green-500"];
-  const strengthLabels = ["Weak", "Fair", "Good", "Strong"];
+  const strengthLabels = [
+    t("auth.register.passwordStrength.weak"),
+    t("auth.register.passwordStrength.fair"),
+    t("auth.register.passwordStrength.good"),
+    t("auth.register.passwordStrength.strong"),
+  ];
 
   return (
     <div className="mt-2 space-y-2">
@@ -194,7 +207,7 @@ function PasswordStrength({ password }: { password: string }) {
       {/* Strength label */}
       {password && (
         <p className="text-xs text-surface-500">
-          Strength: <span className="font-medium">{strengthLabels[strength - 1] || "Too weak"}</span>
+          {t("auth.register.passwordStrength.label")}: <span className="font-medium">{strengthLabels[strength - 1] || t("auth.register.passwordStrength.tooWeak")}</span>
         </p>
       )}
       {/* Requirements */}
@@ -224,6 +237,7 @@ export default function RegisterPage() {
   const router = useRouter();
   const { register: registerUser, isLoading, error, clearError } = useAuth();
   const { t } = useTranslation();
+  const steps = RegisterSteps();
   const [currentStep, setCurrentStep] = useState(1);
   const [direction, setDirection] = useState(1);
   const [showPassword, setShowPassword] = useState(false);
@@ -348,7 +362,7 @@ export default function RegisterPage() {
           transition={{ delay: 0.3 }}
           className="font-display text-3xl font-bold text-surface-900"
         >
-          Welcome to SmartCareer! 🎉
+          {t("auth.register.success.title")}
         </motion.h1>
         <motion.p
           initial={{ opacity: 0, y: 20 }}
@@ -356,9 +370,9 @@ export default function RegisterPage() {
           transition={{ delay: 0.4 }}
           className="mt-3 text-surface-500"
         >
-          Your account has been created successfully.
+          {t("auth.register.success.message")}
           <br />
-          Redirecting you to login...
+          {t("auth.register.success.redirecting")}
         </motion.p>
         <motion.div
           initial={{ opacity: 0 }}
@@ -498,7 +512,7 @@ export default function RegisterPage() {
               >
                 {/* Email */}
                 <div className="space-y-2">
-                  <Label htmlFor="email">Email address</Label>
+                  <Label htmlFor="email">{t("auth.register.email")}</Label>
                   <div className="relative">
                     <Mail className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-surface-400" />
                     <input
@@ -524,7 +538,7 @@ export default function RegisterPage() {
 
                 {/* Password */}
                 <div className="space-y-2">
-                  <Label htmlFor="password">Password</Label>
+                  <Label htmlFor="password">{t("auth.register.password")}</Label>
                   <div className="relative">
                     <Lock className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-surface-400" />
                     <input
@@ -558,7 +572,7 @@ export default function RegisterPage() {
 
                 {/* Confirm Password */}
                 <div className="space-y-2">
-                  <Label htmlFor="confirmPassword">Confirm password</Label>
+                  <Label htmlFor="confirmPassword">{t("auth.register.confirmPassword")}</Label>
                   <div className="relative">
                     <Lock className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-surface-400" />
                     <input
@@ -604,7 +618,7 @@ export default function RegisterPage() {
               >
                 {/* Full Name */}
                 <div className="space-y-2">
-                  <Label htmlFor="fullName">Full name</Label>
+                  <Label htmlFor="fullName">{t("auth.register.fullName")}</Label>
                   <div className="relative">
                     <User className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-surface-400" />
                     <input
@@ -630,7 +644,7 @@ export default function RegisterPage() {
 
                 {/* Phone */}
                 <div className="space-y-2">
-                  <Label htmlFor="phone">Phone number</Label>
+                  <Label htmlFor="phone">{t("auth.register.phone")}</Label>
                   <div className="relative">
                     <Phone className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-surface-400" />
                     <input
@@ -653,7 +667,7 @@ export default function RegisterPage() {
                     <p className="text-sm text-red-600">{errors.phone.message}</p>
                   )}
                   <p className="text-xs text-surface-500">
-                    We'll use this for account recovery and job alerts
+                    {t("auth.register.phoneHelper")}
                   </p>
                 </div>
               </motion.div>
@@ -671,7 +685,7 @@ export default function RegisterPage() {
                 className="space-y-5"
               >
                 <div className="space-y-4">
-                  <Label>How will you use SmartCareer?</Label>
+                  <Label>{t("auth.register.howWillYouUse")}</Label>
 
                   {/* Student Option */}
                   <motion.button
@@ -710,10 +724,10 @@ export default function RegisterPage() {
                       </div>
                       <div>
                         <h3 className="font-display text-lg font-semibold text-surface-900">
-                          I'm a Job Seeker
+                          {t("auth.register.studentRole")}
                         </h3>
                         <p className="mt-1 text-sm text-surface-500">
-                          Looking for jobs, building my resume, and advancing my career
+                          {t("auth.register.studentDescription")}
                         </p>
                         <div className="mt-3 flex flex-wrap gap-2">
                           <span className="inline-flex items-center gap-1 rounded-full bg-purple-100 px-2 py-0.5 text-xs font-medium text-purple-700">
@@ -767,10 +781,10 @@ export default function RegisterPage() {
                       </div>
                       <div>
                         <h3 className="font-display text-lg font-semibold text-surface-900">
-                          I'm an Employer
+                          {t("auth.register.companyRole")}
                         </h3>
                         <p className="mt-1 text-sm text-surface-500">
-                          Posting jobs and finding talented candidates for my company
+                          {t("auth.register.companyDescription")}
                         </p>
                         <div className="mt-3 flex flex-wrap gap-2">
                           <span className="inline-flex items-center gap-1 rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700">
@@ -818,13 +832,13 @@ export default function RegisterPage() {
 
                 {/* Terms */}
                 <p className="text-xs text-surface-500">
-                  By creating an account, you agree to our{" "}
+                  {t("auth.register.terms.text")}{" "}
                   <Link href="/terms" className="text-purple-600 hover:underline">
-                    Terms of Service
+                    {t("auth.register.terms.termsLink")}
                   </Link>{" "}
-                  and{" "}
+                  {t("auth.register.terms.and")}{" "}
                   <Link href="/privacy" className="text-purple-600 hover:underline">
-                    Privacy Policy
+                    {t("auth.register.terms.privacyLink")}
                   </Link>
                 </p>
               </motion.div>
@@ -842,7 +856,7 @@ export default function RegisterPage() {
               className="h-12 flex-1 rounded-xl border-2"
             >
               <ArrowLeft className="mr-2 h-5 w-5" />
-              Back
+              {t("common.back")}
             </Button>
           )}
 
@@ -852,7 +866,7 @@ export default function RegisterPage() {
               onClick={nextStep}
               className="h-12 flex-1 rounded-xl bg-gradient-to-r from-purple-500 to-indigo-600 text-white font-semibold shadow-lg shadow-purple-500/25 hover:shadow-purple-500/40"
             >
-              Continue
+              {t("auth.register.continue")}
               <ArrowRight className="ml-2 h-5 w-5" />
             </Button>
           ) : (
@@ -868,7 +882,7 @@ export default function RegisterPage() {
                 </>
               ) : (
                 <>
-                  Create Account
+                  {t("auth.register.createButton")}
                   <Sparkles className="ml-2 h-5 w-5" />
                 </>
               )}
