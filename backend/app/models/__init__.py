@@ -130,6 +130,7 @@ from app.models.job import (
     JobType,                # Enum: full_time, part_time, remote, etc.
     ExperienceLevel,        # Enum: junior, mid, senior, lead
     JobStatus,              # Enum: draft, active, closed, filled
+    SavedJob,               # Bookmarked jobs by students
 )
 
 from app.models.application import (
@@ -201,6 +202,7 @@ __all__ = [
     "JobType",             # FULL_TIME, PART_TIME, REMOTE, HYBRID, etc.
     "ExperienceLevel",     # INTERN, JUNIOR, MID, SENIOR, LEAD, EXECUTIVE
     "JobStatus",           # DRAFT, ACTIVE, PAUSED, CLOSED, FILLED
+    "SavedJob",            # Student bookmarked jobs
     
     # -------------------------------------------------------------------------
     # Application Model & Enums

@@ -11,7 +11,7 @@
 
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
@@ -33,9 +33,12 @@ import {
   Moon,
   Sun,
   ChevronRight,
+  BookmarkCheck,
 } from "lucide-react";
 import { useAuth, useRequireAuth } from "@/hooks/useAuth";
 import { useTranslation } from "@/hooks/useTranslation";
+import { api } from "@/lib/api";
+import { formatRelativeTime } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Avatar } from "@/components/ui/avatar";
@@ -75,6 +78,11 @@ const getNavigation = (t: (key: string) => string) => [
     badgeColor: "warning",
   },
   {
+    name: "Saqlangan ishlar",
+    href: "/student/saved-jobs",
+    icon: BookmarkCheck,
+  },
+  {
     name: t("dashboard.settings.title"),
     href: "/student/settings",
     icon: Settings,
@@ -90,33 +98,6 @@ const getQuickActions = (t: (key: string) => string) => [
   },
 ];
 
-// =============================================================================
-// MOCK NOTIFICATIONS
-// =============================================================================
-
-const notifications = [
-  {
-    id: 1,
-    title: "Interview Scheduled",
-    message: "Your interview with Click.uz is tomorrow at 10 AM",
-    time: "2 hours ago",
-    unread: true,
-  },
-  {
-    id: 2,
-    title: "Application Viewed",
-    message: "EPAM viewed your application for Senior Developer",
-    time: "5 hours ago",
-    unread: true,
-  },
-  {
-    id: 3,
-    title: "Resume Tip",
-    message: "Add more skills to improve your ATS score",
-    time: "1 day ago",
-    unread: false,
-  },
-];
 
 // =============================================================================
 // MAIN LAYOUT
@@ -136,8 +117,36 @@ export default function StudentDashboardLayout({
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [isDark, setIsDark] = useState(false);
+  const [notifications, setNotifications] = useState<any[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
 
-  const unreadCount = notifications.filter((n) => n.unread).length;
+  // Fetch notifications on mount and when dropdown opens
+  useEffect(() => {
+    const loadNotifications = async () => {
+      try {
+        const res = await api.get("/notifications?limit=10");
+        const data = res.data;
+        setNotifications(data.notifications || []);
+        setUnreadCount(data.unread_count || 0);
+      } catch {
+        // Silently fail if notifications not available
+      }
+    };
+    loadNotifications();
+    // Refresh every 60 seconds
+    const interval = setInterval(loadNotifications, 60000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const markAllRead = async () => {
+    try {
+      await api.post("/notifications/read-all");
+      setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })));
+      setUnreadCount(0);
+    } catch {
+      // ignore
+    }
+  };
 
   // Get translated navigation items
   const navigation = getNavigation(t);
@@ -331,41 +340,53 @@ export default function StudentDashboardLayout({
                     >
                       <div className="flex items-center justify-between border-b border-surface-200 p-4 dark:border-surface-700">
                         <h3 className="font-semibold text-surface-900 dark:text-white">
-                          Notifications
+                          Bildirishnomalar
                         </h3>
-                        <button className="text-sm text-purple-600 hover:underline">
-                          Mark all as read
-                        </button>
+                        {unreadCount > 0 && (
+                          <button
+                            onClick={markAllRead}
+                            className="text-sm text-purple-600 hover:underline"
+                          >
+                            Barchasini o'qildi deb belgilash
+                          </button>
+                        )}
                       </div>
                       <div className="max-h-80 overflow-y-auto">
-                        {notifications.map((notification) => (
-                          <div
-                            key={notification.id}
-                            className={cn(
-                              "flex gap-3 border-b border-surface-100 p-4 last:border-0 dark:border-surface-700",
-                              notification.unread && "bg-purple-50/50 dark:bg-purple-900/10"
-                            )}
-                          >
-                            <div className="flex-1">
-                              <p className="font-medium text-surface-900 dark:text-white">
-                                {notification.title}
-                              </p>
-                              <p className="mt-0.5 text-sm text-surface-500">
-                                {notification.message}
-                              </p>
-                              <p className="mt-1 text-xs text-surface-400">
-                                {notification.time}
-                              </p>
-                            </div>
-                            {notification.unread && (
-                              <div className="h-2 w-2 rounded-full bg-purple-500" />
-                            )}
+                        {notifications.length === 0 ? (
+                          <div className="flex flex-col items-center justify-center py-8 text-center">
+                            <Bell className="h-8 w-8 text-surface-300" />
+                            <p className="mt-2 text-sm text-surface-500">Bildirishnoma yo'q</p>
                           </div>
-                        ))}
+                        ) : (
+                          notifications.map((n) => (
+                            <div
+                              key={n.id}
+                              className={cn(
+                                "flex gap-3 border-b border-surface-100 p-4 last:border-0 dark:border-surface-700",
+                                !n.is_read && "bg-purple-50/50 dark:bg-purple-900/10"
+                              )}
+                            >
+                              <div className="flex-1">
+                                <p className="font-medium text-surface-900 dark:text-white">
+                                  {n.title}
+                                </p>
+                                <p className="mt-0.5 text-sm text-surface-500">
+                                  {n.message}
+                                </p>
+                                <p className="mt-1 text-xs text-surface-400">
+                                  {formatRelativeTime(n.created_at)}
+                                </p>
+                              </div>
+                              {!n.is_read && (
+                                <div className="mt-1 h-2 w-2 flex-shrink-0 rounded-full bg-purple-500" />
+                              )}
+                            </div>
+                          ))
+                        )}
                       </div>
                       <div className="border-t border-surface-200 p-2 dark:border-surface-700">
                         <Button variant="ghost" size="sm" className="w-full">
-                          View All Notifications
+                          Barcha bildirishnomalar
                         </Button>
                       </div>
                     </motion.div>

@@ -78,6 +78,8 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { formatRelativeTime, formatSalaryRange, cn } from "@/lib/utils";
+import { jobApi } from "@/lib/api";
+import { toast } from "sonner";
 import type { Job, JobType, ExperienceLevel } from "@/types/api";
 
 // NOTE: Job data is loaded from backend via useJobs().
@@ -651,6 +653,13 @@ export default function JobsPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     fetchJobs();
+    // Load saved jobs
+    jobApi.savedJobs({ limit: 100 }).then((res) => {
+      const data = res.data?.data || res.data;
+      if (Array.isArray(data)) {
+        setSavedJobs(new Set(data.map((j: any) => j.id)));
+      }
+    }).catch(() => {});
   }, []);
 
   // Keep localJobs in sync (and allow adding matchScore client-side later)
@@ -775,17 +784,40 @@ export default function JobsPage() {
     }
   });
 
-  // Toggle save job
-  const toggleSaveJob = (jobId: string) => {
+  // Toggle save job (connected to real API)
+  const toggleSaveJob = async (jobId: string) => {
+    const isSaved = savedJobs.has(jobId);
+    // Optimistic update
     setSavedJobs((prev) => {
       const newSet = new Set(prev);
-      if (newSet.has(jobId)) {
+      if (isSaved) {
         newSet.delete(jobId);
       } else {
         newSet.add(jobId);
       }
       return newSet;
     });
+    try {
+      if (isSaved) {
+        await jobApi.unsaveJob(jobId);
+        toast.success("Ish saqlanganlardan o'chirildi.");
+      } else {
+        await jobApi.saveJob(jobId);
+        toast.success("Ish saqlandi!");
+      }
+    } catch {
+      // Revert on error
+      setSavedJobs((prev) => {
+        const newSet = new Set(prev);
+        if (isSaved) {
+          newSet.add(jobId);
+        } else {
+          newSet.delete(jobId);
+        }
+        return newSet;
+      });
+      toast.error("Xatolik yuz berdi.");
+    }
   };
 
   // Handle apply

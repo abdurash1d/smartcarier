@@ -445,6 +445,14 @@ class Job(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin):
         lazy="dynamic",                 # Return query for pagination
         order_by="Application.applied_at.desc()"
     )
+
+    # One-to-many: Job saved by many users
+    saved_by = relationship(
+        "SavedJob",
+        back_populates="job",
+        cascade="all, delete-orphan",
+        lazy="dynamic",
+    )
     
     # =========================================================================
     # VALIDATORS
@@ -605,3 +613,41 @@ class Job(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin):
             }
         
         return data
+
+
+# =============================================================================
+# SAVED JOB MODEL
+# =============================================================================
+
+class SavedJob(Base, UUIDMixin, TimestampMixin):
+    """
+    Saved (bookmarked) jobs by students.
+    
+    Allows students to bookmark jobs they are interested in.
+    Many-to-many relationship between users and jobs, stored as a table.
+    """
+    __tablename__ = "saved_jobs"
+    __table_args__ = (
+        Index("idx_saved_jobs_user", "user_id"),
+        Index("idx_saved_jobs_job", "job_id"),
+        {"comment": "Student bookmarked jobs"},
+    )
+
+    # Foreign keys
+    user_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    job_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("jobs.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+
+    # Relationships
+    user = relationship("User", back_populates="saved_jobs", lazy="select")
+    job = relationship("Job", back_populates="saved_by", lazy="select")
+
+    def __repr__(self) -> str:
+        return f"<SavedJob(user={self.user_id}, job={self.job_id})>"

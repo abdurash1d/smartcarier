@@ -395,6 +395,14 @@ class User(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin):
         cascade="all, delete-orphan",
         lazy="dynamic",
     )
+
+    # Saved Jobs (bookmarked jobs)
+    saved_jobs = relationship(
+        "SavedJob",
+        back_populates="user",
+        cascade="all, delete-orphan",
+        lazy="dynamic",
+    )
     
     # =========================================================================
     # PASSWORD METHODS
