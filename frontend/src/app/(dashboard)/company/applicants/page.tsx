@@ -37,31 +37,51 @@ import {
 } from "@/components/ui/select";
 import { SkeletonTable } from "@/components/ui/skeleton";
 import { formatRelativeTime, cn } from "@/lib/utils";
+import { jobApi, applicationApi, getErrorMessage } from "@/lib/api";
+import { toast } from "sonner";
 import type { ApplicationStatus } from "@/types/api";
 
 export default function CompanyApplicantsPage() {
-  const { jobs, fetchJobs } = useJobs();
+  const { jobs, fetchMyJobs } = useJobs();
   const [isLoading, setIsLoading] = useState(false);
+  const [applications, setApplications] = useState<any[]>([]);
   const [selectedJob, setSelectedJob] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
-    fetchJobs();
+    fetchMyJobs();
   }, []);
 
-  // Note: Detailed job applications per job are not yet wired to backend.
-  // For now we rely on applications embedded on each job (mock data on the job objects).
-
-  // Get all applications from all jobs
-  const allApplications = selectedJob === "all"
-    ? jobs.flatMap((job: any) => job.applications || [])
-    : jobs
-        .filter((job) => job.id === selectedJob)
-        .flatMap((job: any) => job.applications || []);
+  // When jobs load, fetch applications for each job
+  useEffect(() => {
+    if (jobs.length === 0) return;
+    const loadApplications = async () => {
+      setIsLoading(true);
+      try {
+        const jobsToFetch = selectedJob === "all" ? jobs : jobs.filter(j => j.id === selectedJob);
+        const allApps: any[] = [];
+        for (const job of jobsToFetch) {
+          try {
+            const res = await jobApi.applications(job.id);
+            const data = res.data as { items?: any[] };
+            const apps = data.items || [];
+            allApps.push(...apps.map((a: any) => ({ ...a, job })));
+          } catch {
+            // skip jobs with no application access
+          }
+        }
+        setApplications(allApps);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    loadApplications();
+  }, [jobs, selectedJob]);
 
   // Filter applications
-  const filteredApplications = allApplications.filter((app: any) => {
+  const filteredApplications = applications.filter((app: any) => {
     const matchesSearch =
       !searchQuery ||
       app.applicant?.full_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -70,8 +90,16 @@ export default function CompanyApplicantsPage() {
     return matchesSearch && matchesStatus;
   });
 
-  const handleStatusChange = async (_applicationId: string, _newStatus: string) => {
-    // TODO: Wire to real backend endpoint: PUT /applications/{id}/status
+  const handleStatusChange = async (applicationId: string, newStatus: string) => {
+    try {
+      await applicationApi.updateStatus(applicationId, newStatus);
+      setApplications((prev) =>
+        prev.map((a) => (a.id === applicationId ? { ...a, status: newStatus } : a))
+      );
+      toast.success("Holat yangilandi");
+    } catch (error) {
+      toast.error(getErrorMessage(error));
+    }
   };
 
   return (

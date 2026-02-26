@@ -648,9 +648,10 @@ export default function JobsPage() {
   const [showMobileFilters, setShowMobileFilters] = useState(false);
 
   // Load jobs from backend
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     fetchJobs();
-  }, [fetchJobs]);
+  }, []);
 
   // Keep localJobs in sync (and allow adding matchScore client-side later)
   useEffect(() => {

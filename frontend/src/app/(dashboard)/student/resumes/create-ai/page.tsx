@@ -63,6 +63,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
+import { useResume } from "@/hooks/useResume";
+import { useAuth } from "@/hooks/useAuth";
+import { toast } from "sonner";
 
 // =============================================================================
 // TYPES & SCHEMAS
@@ -144,25 +147,25 @@ type ResumeFormData = z.infer<typeof resumeSchema>;
 // =============================================================================
 
 const steps = [
-  { id: 1, title: "Personal Info", icon: User, description: "Basic contact details" },
-  { id: 2, title: "Experience", icon: Briefcase, description: "Work history" },
-  { id: 3, title: "Education", icon: GraduationCap, description: "Academic background" },
-  { id: 4, title: "Skills", icon: Code, description: "Your expertise" },
-  { id: 5, title: "Additional", icon: Award, description: "Extra sections" },
+  { id: 1, title: "Shaxsiy ma'lumot", icon: User, description: "Asosiy aloqa ma'lumotlari" },
+  { id: 2, title: "Tajriba", icon: Briefcase, description: "Ish tarixi" },
+  { id: 3, title: "Ta'lim", icon: GraduationCap, description: "O'quv ma'lumotlari" },
+  { id: 4, title: "Ko'nikmalar", icon: Code, description: "Sizning mutaxassisligingiz" },
+  { id: 5, title: "Qo'shimcha", icon: Award, description: "Qo'shimcha bo'limlar" },
 ];
 
 const templates = [
-  { id: "modern", name: "Modern", description: "Clean, contemporary design" },
-  { id: "classic", name: "Classic", description: "Traditional professional" },
-  { id: "minimal", name: "Minimal", description: "Simple and elegant" },
-  { id: "creative", name: "Creative", description: "Stand out from the crowd" },
+  { id: "modern", name: "Zamonaviy", description: "Toza, zamonaviy dizayn" },
+  { id: "classic", name: "Klassik", description: "An'anaviy professional" },
+  { id: "minimal", name: "Minimal", description: "Oddiy va elegant" },
+  { id: "creative", name: "Kreativ", description: "Boshqalardan ajralib turing" },
 ];
 
 const tones = [
-  { id: "professional", name: "Professional", description: "Formal and corporate" },
-  { id: "confident", name: "Confident", description: "Bold and assertive" },
-  { id: "friendly", name: "Friendly", description: "Warm and approachable" },
-  { id: "technical", name: "Technical", description: "Detail-oriented" },
+  { id: "professional", name: "Professional", description: "Rasmiy va korporativ" },
+  { id: "confident", name: "Ishonchli", description: "Qat'iy va dadil" },
+  { id: "friendly", name: "Do'stona", description: "Iliq va ochiq" },
+  { id: "technical", name: "Texnik", description: "Tafsilotlarga e'tibor beruvchi" },
 ];
 
 const commonSkills = {
@@ -183,10 +186,11 @@ const commonSkills = {
 
 export default function AIResumeBuilderPage() {
   const router = useRouter();
+  const { user } = useAuth();
+  const { generateResume, isGenerating } = useResume();
   const [currentStep, setCurrentStep] = useState(1);
   const [selectedTemplate, setSelectedTemplate] = useState("modern");
   const [selectedTone, setSelectedTone] = useState("professional");
-  const [isGenerating, setIsGenerating] = useState(false);
   const [isGenerated, setIsGenerated] = useState(false);
   const [previewZoom, setPreviewZoom] = useState(100);
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
@@ -347,23 +351,63 @@ export default function AIResumeBuilderPage() {
     setValue(field, currentSkills.filter((s) => s !== skill));
   };
 
-  // Generate Resume
+  // Generate Resume using AI API
   const handleGenerate = async () => {
-    setIsGenerating(true);
+    try {
+      const payload = {
+        personal_info: {
+          full_name: formData.fullName,
+          email: formData.email,
+          phone: formData.phone,
+          location: formData.location,
+          professional_title: formData.professionalTitle,
+          linkedin_url: formData.linkedinUrl,
+          portfolio_url: formData.portfolioUrl,
+        },
+        experience: formData.experiences.map((exp) => ({
+          company: exp.company,
+          position: exp.position,
+          start_date: exp.startDate,
+          end_date: exp.isCurrent ? null : exp.endDate,
+          is_current: exp.isCurrent,
+          description: exp.description,
+        })),
+        education: formData.education.map((edu) => ({
+          institution: edu.institution,
+          degree: edu.degree,
+          field: edu.field,
+          year: edu.year,
+        })),
+        skills: {
+          technical: formData.technicalSkills,
+          soft: formData.softSkills,
+        },
+        languages: formData.languages.map((l) => ({
+          name: l.name,
+          proficiency: l.proficiency,
+        })),
+        certifications: formData.certifications,
+        projects: formData.projects,
+        template: selectedTemplate,
+        tone: selectedTone,
+        title: `${formData.professionalTitle} Resume`,
+      };
 
-    // Simulate AI generation
-    await new Promise((resolve) => setTimeout(resolve, 3000));
-
-    setIsGenerating(false);
-    setIsGenerated(true);
-
-    // Confetti!
-    confetti({
-      particleCount: 100,
-      spread: 70,
-      origin: { y: 0.6 },
-      colors: ["#a855f7", "#6366f1", "#06b6d4"],
-    });
+      const result = await generateResume(payload as any);
+      if (result) {
+        setIsGenerated(true);
+        localStorage.removeItem("resume_draft");
+        confetti({
+          particleCount: 100,
+          spread: 70,
+          origin: { y: 0.6 },
+          colors: ["#a855f7", "#6366f1", "#06b6d4"],
+        });
+        setTimeout(() => router.push("/student/resumes"), 2000);
+      }
+    } catch (error) {
+      // error already shown by hook
+    }
   };
 
   // Progress calculation
@@ -378,7 +422,7 @@ export default function AIResumeBuilderPage() {
           <div className="flex items-center justify-between">
             <div>
               <h1 className="font-display text-xl font-bold text-surface-900 dark:text-white">
-                AI Resume Builder
+                AI Resume Yaratuvchi
               </h1>
               <p className="text-sm text-surface-500">
                 {steps[currentStep - 1].description}
@@ -387,7 +431,7 @@ export default function AIResumeBuilderPage() {
             {lastSaved && (
               <span className="flex items-center gap-1 text-xs text-surface-400">
                 <Save className="h-3 w-3" />
-                Saved {lastSaved.toLocaleTimeString()}
+                Saqlandi {lastSaved.toLocaleTimeString()}
               </span>
             )}
           </div>
@@ -395,8 +439,8 @@ export default function AIResumeBuilderPage() {
           {/* Progress Bar */}
           <div className="mt-4">
             <div className="mb-2 flex justify-between text-xs">
-              <span>Step {currentStep} of {steps.length}</span>
-              <span>{Math.round(progress)}% complete</span>
+              <span>{currentStep}-qadam, jami {steps.length}</span>
+              <span>{Math.round(progress)}% bajarildi</span>
             </div>
             <Progress value={progress} className="h-2" />
           </div>
@@ -437,10 +481,10 @@ export default function AIResumeBuilderPage() {
               >
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div className="sm:col-span-2">
-                    <Label htmlFor="fullName">Full Name *</Label>
+                    <Label htmlFor="fullName">To'liq ism *</Label>
                     <Input
                       id="fullName"
-                      placeholder="John Doe"
+                      placeholder="Ism Familiya"
                       icon={<User className="h-4 w-4" />}
                       error={errors.fullName?.message}
                       {...register("fullName")}
@@ -451,14 +495,14 @@ export default function AIResumeBuilderPage() {
                     <Input
                       id="email"
                       type="email"
-                      placeholder="john@example.com"
+                      placeholder="email@misol.com"
                       icon={<Mail className="h-4 w-4" />}
                       error={errors.email?.message}
                       {...register("email")}
                     />
                   </div>
                   <div>
-                    <Label htmlFor="phone">Phone *</Label>
+                    <Label htmlFor="phone">Telefon *</Label>
                     <Input
                       id="phone"
                       placeholder="+998 90 123 4567"
@@ -468,7 +512,7 @@ export default function AIResumeBuilderPage() {
                     />
                   </div>
                   <div>
-                    <Label htmlFor="location">Location</Label>
+                    <Label htmlFor="location">Joylashuv</Label>
                     <Input
                       id="location"
                       placeholder="Tashkent, Uzbekistan"
@@ -477,10 +521,10 @@ export default function AIResumeBuilderPage() {
                     />
                   </div>
                   <div>
-                    <Label htmlFor="professionalTitle">Professional Title *</Label>
+                    <Label htmlFor="professionalTitle">Professional unvon *</Label>
                     <Input
                       id="professionalTitle"
-                      placeholder="Senior Software Engineer"
+                      placeholder="masalan: Senior Software Engineer"
                       icon={<Briefcase className="h-4 w-4" />}
                       error={errors.professionalTitle?.message}
                       {...register("professionalTitle")}
@@ -496,7 +540,7 @@ export default function AIResumeBuilderPage() {
                     />
                   </div>
                   <div>
-                    <Label htmlFor="portfolioUrl">Portfolio / Website</Label>
+                    <Label htmlFor="portfolioUrl">Portfolio / Veb-sayt</Label>
                     <Input
                       id="portfolioUrl"
                       placeholder="https://yoursite.com"
@@ -534,31 +578,31 @@ export default function AIResumeBuilderPage() {
 
                     <div className="grid gap-4 sm:grid-cols-2">
                       <div>
-                        <Label>Company Name *</Label>
+                        <Label>Kompaniya nomi *</Label>
                         <Input
-                          placeholder="Acme Inc."
+                          placeholder="Kompaniya nomi"
                           {...register(`experiences.${index}.company`)}
                         />
                       </div>
                       <div>
-                        <Label>Position *</Label>
+                        <Label>Lavozim *</Label>
                         <Input
-                          placeholder="Software Engineer"
+                          placeholder="Lavozim nomi"
                           {...register(`experiences.${index}.position`)}
                         />
                       </div>
                       <div>
-                        <Label>Start Date *</Label>
+                        <Label>Boshlanish sanasi *</Label>
                         <Input
                           type="month"
                           {...register(`experiences.${index}.startDate`)}
                         />
                       </div>
                       <div>
-                        <Label>End Date</Label>
+                        <Label>Tugash sanasi</Label>
                         <Input
                           type="month"
-                          placeholder="Present"
+                          placeholder="Hozirgi vaqtgacha"
                           disabled={formData.experiences?.[index]?.isCurrent}
                           {...register(`experiences.${index}.endDate`)}
                         />
@@ -568,13 +612,13 @@ export default function AIResumeBuilderPage() {
                             {...register(`experiences.${index}.isCurrent`)}
                             className="rounded border-surface-300"
                           />
-                          Currently working here
+                          Hozirda ishlayapman
                         </label>
                       </div>
                       <div className="sm:col-span-2">
-                        <Label>Description *</Label>
+                        <Label>Tavsif *</Label>
                         <Textarea
-                          placeholder="Describe your responsibilities and achievements..."
+                          placeholder="Vazifalaringiz va yutuqlaringizni tasvirlab bering..."
                           rows={4}
                           {...register(`experiences.${index}.description`)}
                         />
@@ -599,7 +643,7 @@ export default function AIResumeBuilderPage() {
                   }
                 >
                   <Plus className="mr-2 h-4 w-4" />
-                  Add Experience
+                  Tajriba qo'shish
                 </Button>
               </motion.div>
             )}
@@ -630,28 +674,28 @@ export default function AIResumeBuilderPage() {
 
                     <div className="grid gap-4 sm:grid-cols-2">
                       <div className="sm:col-span-2">
-                        <Label>Institution *</Label>
+                        <Label>O'quv yurti *</Label>
                         <Input
-                          placeholder="University of..."
+                          placeholder="O'quv yurt nomi"
                           {...register(`education.${index}.institution`)}
                         />
                       </div>
                       <div>
-                        <Label>Degree *</Label>
+                        <Label>Daraja *</Label>
                         <Input
-                          placeholder="Bachelor's"
+                          placeholder="Bakalavriat"
                           {...register(`education.${index}.degree`)}
                         />
                       </div>
                       <div>
-                        <Label>Field of Study *</Label>
+                        <Label>Yo'nalish *</Label>
                         <Input
-                          placeholder="Computer Science"
+                          placeholder="Kompyuter fanlari"
                           {...register(`education.${index}.field`)}
                         />
                       </div>
                       <div>
-                        <Label>Graduation Year *</Label>
+                        <Label>Bitirish yili *</Label>
                         <Input
                           placeholder="2024"
                           {...register(`education.${index}.year`)}
@@ -675,7 +719,7 @@ export default function AIResumeBuilderPage() {
                   }
                 >
                   <Plus className="mr-2 h-4 w-4" />
-                  Add Education
+                  Ta'lim qo'shish
                 </Button>
               </motion.div>
             )}
@@ -691,10 +735,10 @@ export default function AIResumeBuilderPage() {
               >
                 {/* Technical Skills */}
                 <div>
-                  <Label>Technical Skills</Label>
+                  <Label>Texnik ko'nikmalar</Label>
                   <div className="mt-2 flex gap-2">
                     <Input
-                      placeholder="Add a skill..."
+                      placeholder="Ko'nikma qo'shing..."
                       value={skillInput.technical}
                       onChange={(e) =>
                         setSkillInput((prev) => ({ ...prev, technical: e.target.value }))
@@ -722,7 +766,7 @@ export default function AIResumeBuilderPage() {
                     ))}
                   </div>
                   <div className="mt-2">
-                    <p className="text-xs text-surface-500 mb-2">Suggested skills:</p>
+                    <p className="text-xs text-surface-500 mb-2">Tavsiya etilgan ko'nikmalar:</p>
                     <div className="flex flex-wrap gap-1">
                       {commonSkills.technical
                         .filter((s) => !formData.technicalSkills?.includes(s))
@@ -748,10 +792,10 @@ export default function AIResumeBuilderPage() {
 
                 {/* Soft Skills */}
                 <div>
-                  <Label>Soft Skills</Label>
+                  <Label>Ijtimoiy ko'nikmalar</Label>
                   <div className="mt-2 flex gap-2">
                     <Input
-                      placeholder="Add a skill..."
+                      placeholder="Ko'nikma qo'shing..."
                       value={skillInput.soft}
                       onChange={(e) =>
                         setSkillInput((prev) => ({ ...prev, soft: e.target.value }))
@@ -779,7 +823,7 @@ export default function AIResumeBuilderPage() {
                     ))}
                   </div>
                   <div className="mt-2">
-                    <p className="text-xs text-surface-500 mb-2">Suggested skills:</p>
+                    <p className="text-xs text-surface-500 mb-2">Tavsiya etilgan ko'nikmalar:</p>
                     <div className="flex flex-wrap gap-1">
                       {commonSkills.soft
                         .filter((s) => !formData.softSkills?.includes(s))
@@ -804,12 +848,12 @@ export default function AIResumeBuilderPage() {
 
                 {/* Languages */}
                 <div>
-                  <Label>Languages</Label>
+                  <Label>Tillar</Label>
                   <div className="mt-2 space-y-2">
                     {languageFields.map((field, index) => (
                       <div key={field.id} className="flex gap-2">
                         <Input
-                          placeholder="Language"
+                          placeholder="Til (masalan: O'zbek)"
                           {...register(`languages.${index}.name`)}
                         />
                         <Select
@@ -818,15 +862,15 @@ export default function AIResumeBuilderPage() {
                             setValue(`languages.${index}.proficiency`, v)
                           }
                         >
-                          <SelectTrigger className="w-40">
-                            <SelectValue placeholder="Level" />
+                          <SelectTrigger className="w-44">
+                            <SelectValue placeholder="Daraja" />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="native">Native</SelectItem>
-                            <SelectItem value="fluent">Fluent</SelectItem>
-                            <SelectItem value="advanced">Advanced</SelectItem>
-                            <SelectItem value="intermediate">Intermediate</SelectItem>
-                            <SelectItem value="basic">Basic</SelectItem>
+                            <SelectItem value="native">Ona tili</SelectItem>
+                            <SelectItem value="fluent">Ravon</SelectItem>
+                            <SelectItem value="advanced">Yuqori daraja</SelectItem>
+                            <SelectItem value="intermediate">O'rta daraja</SelectItem>
+                            <SelectItem value="basic">Boshlang'ich</SelectItem>
                           </SelectContent>
                         </Select>
                         {languageFields.length > 1 && (
@@ -848,7 +892,7 @@ export default function AIResumeBuilderPage() {
                       onClick={() => appendLanguage({ name: "", proficiency: "" })}
                     >
                       <Plus className="mr-2 h-4 w-4" />
-                      Add Language
+                      Til qo'shish
                     </Button>
                   </div>
                 </div>
@@ -868,7 +912,7 @@ export default function AIResumeBuilderPage() {
                 <div>
                   <Label className="flex items-center gap-2">
                     <Palette className="h-4 w-4" />
-                    Resume Template
+                    Resume shabloni
                   </Label>
                   <div className="mt-2 grid grid-cols-2 gap-2">
                     {templates.map((template) => (
@@ -894,7 +938,7 @@ export default function AIResumeBuilderPage() {
                 <div>
                   <Label className="flex items-center gap-2">
                     <Type className="h-4 w-4" />
-                    Writing Tone
+                    Yozish uslubi
                   </Label>
                   <div className="mt-2 grid grid-cols-2 gap-2">
                     {tones.map((tone) => (
@@ -918,21 +962,21 @@ export default function AIResumeBuilderPage() {
 
                 {/* Certifications */}
                 <div>
-                  <Label>Certifications (Optional)</Label>
+                  <Label>Sertifikatlar (ixtiyoriy)</Label>
                   <div className="mt-2 space-y-2">
                     {certificationFields.map((field, index) => (
                       <div key={field.id} className="flex gap-2">
                         <Input
-                          placeholder="Certification name"
+                          placeholder="Sertifikat nomi"
                           {...register(`certifications.${index}.name`)}
                         />
                         <Input
-                          placeholder="Issuer"
+                          placeholder="Berilgan tashkilot"
                           className="w-32"
                           {...register(`certifications.${index}.issuer`)}
                         />
                         <Input
-                          placeholder="Year"
+                          placeholder="Yil"
                           className="w-20"
                           {...register(`certifications.${index}.year`)}
                         />
@@ -955,7 +999,7 @@ export default function AIResumeBuilderPage() {
                       }
                     >
                       <Plus className="mr-2 h-4 w-4" />
-                      Add Certification
+                      Sertifikat qo'shish
                     </Button>
                   </div>
                 </div>
@@ -970,7 +1014,7 @@ export default function AIResumeBuilderPage() {
             {currentStep > 1 && (
               <Button variant="outline" onClick={prevStep} className="flex-1">
                 <ArrowLeft className="mr-2 h-4 w-4" />
-                Previous
+                Orqaga
               </Button>
             )}
 
@@ -979,7 +1023,7 @@ export default function AIResumeBuilderPage() {
                 onClick={nextStep}
                 className="flex-1 bg-gradient-to-r from-purple-500 to-indigo-600"
               >
-                Next
+                Keyingi
                 <ArrowRight className="ml-2 h-4 w-4" />
               </Button>
             ) : (
@@ -991,12 +1035,12 @@ export default function AIResumeBuilderPage() {
                 {isGenerating ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Generating...
+                    Yaratilmoqda...
                   </>
                 ) : (
                   <>
                     <Wand2 className="mr-2 h-4 w-4" />
-                    Generate with AI
+                    AI bilan yaratish
                   </>
                 )}
               </Button>
@@ -1011,7 +1055,7 @@ export default function AIResumeBuilderPage() {
         <div className="flex items-center justify-between border-b border-surface-200 bg-white p-4 dark:border-surface-700 dark:bg-surface-900">
           <div className="flex items-center gap-2">
             <Eye className="h-5 w-5 text-surface-500" />
-            <span className="font-medium text-surface-900 dark:text-white">Live Preview</span>
+            <span className="font-medium text-surface-900 dark:text-white">Jonli ko'rinish</span>
           </div>
           <div className="flex items-center gap-2">
             {/* Zoom controls */}
@@ -1033,7 +1077,7 @@ export default function AIResumeBuilderPage() {
             <div className="mx-2 h-6 w-px bg-surface-200" />
             <Button variant="outline" size="sm">
               <Download className="mr-2 h-4 w-4" />
-              Download PDF
+              PDF yuklash
             </Button>
           </div>
         </div>
@@ -1054,10 +1098,10 @@ export default function AIResumeBuilderPage() {
               {/* Header */}
               <div className="border-b-2 border-purple-500 pb-6">
                 <h1 className="text-3xl font-bold text-surface-900">
-                  {formData.fullName || "Your Name"}
+                  {formData.fullName || "Ismingiz"}
                 </h1>
                 <p className="mt-1 text-xl text-purple-600">
-                  {formData.professionalTitle || "Professional Title"}
+                  {formData.professionalTitle || "Professional unvon"}
                 </p>
                 <div className="mt-4 flex flex-wrap gap-4 text-sm text-surface-600">
                   {formData.email && (
@@ -1083,7 +1127,7 @@ export default function AIResumeBuilderPage() {
                 <div className="mt-6">
                   <h2 className="mb-4 flex items-center gap-2 text-lg font-bold text-surface-900">
                     <Briefcase className="h-5 w-5 text-purple-500" />
-                    Experience
+                    Tajriba
                   </h2>
                   <div className="space-y-4">
                     {formData.experiences
@@ -1093,7 +1137,7 @@ export default function AIResumeBuilderPage() {
                           <h3 className="font-semibold text-surface-900">{exp.position}</h3>
                           <p className="text-purple-600">{exp.company}</p>
                           <p className="text-sm text-surface-500">
-                            {exp.startDate} - {exp.isCurrent ? "Present" : exp.endDate}
+                            {exp.startDate} - {exp.isCurrent ? "Hozirgi vaqt" : exp.endDate}
                           </p>
                           <p className="mt-2 text-sm text-surface-600">{exp.description}</p>
                         </div>
@@ -1107,7 +1151,7 @@ export default function AIResumeBuilderPage() {
                 <div className="mt-6">
                   <h2 className="mb-4 flex items-center gap-2 text-lg font-bold text-surface-900">
                     <GraduationCap className="h-5 w-5 text-purple-500" />
-                    Education
+                    Ta'lim
                   </h2>
                   <div className="space-y-4">
                     {formData.education
@@ -1115,7 +1159,7 @@ export default function AIResumeBuilderPage() {
                       .map((edu, i) => (
                         <div key={i} className="border-l-2 border-purple-200 pl-4">
                           <h3 className="font-semibold text-surface-900">
-                            {edu.degree} in {edu.field}
+                            {edu.degree} — {edu.field}
                           </h3>
                           <p className="text-purple-600">{edu.institution}</p>
                           <p className="text-sm text-surface-500">{edu.year}</p>
@@ -1130,12 +1174,12 @@ export default function AIResumeBuilderPage() {
                 <div className="mt-6">
                   <h2 className="mb-4 flex items-center gap-2 text-lg font-bold text-surface-900">
                     <Code className="h-5 w-5 text-purple-500" />
-                    Skills
+                    Ko'nikmalar
                   </h2>
                   <div className="space-y-3">
                     {formData.technicalSkills?.length > 0 && (
                       <div>
-                        <h3 className="text-sm font-medium text-surface-600">Technical</h3>
+                        <h3 className="text-sm font-medium text-surface-600">Texnik</h3>
                         <div className="mt-1 flex flex-wrap gap-2">
                           {formData.technicalSkills.map((skill) => (
                             <span
@@ -1150,7 +1194,7 @@ export default function AIResumeBuilderPage() {
                     )}
                     {formData.softSkills?.length > 0 && (
                       <div>
-                        <h3 className="text-sm font-medium text-surface-600">Soft Skills</h3>
+                        <h3 className="text-sm font-medium text-surface-600">Ijtimoiy ko'nikmalar</h3>
                         <div className="mt-1 flex flex-wrap gap-2">
                           {formData.softSkills.map((skill) => (
                             <span
@@ -1172,7 +1216,7 @@ export default function AIResumeBuilderPage() {
                 <div className="mt-8 flex flex-col items-center justify-center py-16 text-center">
                   <FileText className="h-16 w-16 text-surface-300" />
                   <p className="mt-4 text-lg font-medium text-surface-400">
-                    Start filling the form to see your resume preview
+                    Resume ko'rinishini ko'rish uchun ma'lumotlarni to'ldiring
                   </p>
                 </div>
               )}
@@ -1203,18 +1247,18 @@ export default function AIResumeBuilderPage() {
                   <CheckCircle className="h-10 w-10 text-green-600" />
                 </motion.div>
                 <h2 className="font-display text-2xl font-bold text-surface-900">
-                  Resume Generated! 🎉
+                  Resume yaratildi! 🎉
                 </h2>
                 <p className="mt-2 text-surface-500">
-                  Your AI-powered resume is ready
+                  AI yordamida resume tayyor
                 </p>
                 <div className="mt-6 flex gap-3">
                   <Button variant="outline" onClick={() => setIsGenerated(false)}>
-                    Edit Resume
+                    Tahrirlash
                   </Button>
                   <Button className="bg-gradient-to-r from-purple-500 to-indigo-600">
                     <Download className="mr-2 h-4 w-4" />
-                    Download PDF
+                    PDF yuklash
                   </Button>
                 </div>
               </motion.div>

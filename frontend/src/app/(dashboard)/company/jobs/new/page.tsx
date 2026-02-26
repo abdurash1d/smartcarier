@@ -55,6 +55,7 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import { jobApi, getErrorMessage } from "@/lib/api";
 
 // =============================================================================
 // VALIDATION SCHEMA
@@ -199,9 +200,7 @@ export default function NewJobPage() {
 
     setIsGenerating(true);
     try {
-      // Simulate AI generation - replace with real API call
-      await new Promise((resolve) => setTimeout(resolve, 2000));
-      
+      // Fallback template — real AI endpoint can be wired later
       const generatedDescription = `Biz ${formData.title} lavozimiga tajribali mutaxassisni qidiryapmiz.
 
 O'z sohasida chuqur bilim va ko'nikmalarga ega bo'lgan nomzodlarni kutib qolamiz. Sizning vazifalaringiz:
@@ -226,17 +225,36 @@ Ish muhiti:
     }
   };
 
-  // Submit form
+  // Submit form - create job via API then publish
   const onSubmit = async (data: JobFormData) => {
     setIsSubmitting(true);
     try {
-      // API call would go here
-      await new Promise((resolve) => setTimeout(resolve, 1500));
-      
-      toast.success("Vakansiya muvaffaqiyatli yaratildi!");
+      const payload = {
+        title: data.title,
+        location: data.location,
+        job_type: data.jobType,
+        experience_level: data.experienceLevel,
+        description: data.description,
+        requirements: { text: data.requirements, skills: data.skills },
+        benefits: data.benefits,
+        salary_min: data.salaryMin,
+        salary_max: data.salaryMax,
+        is_salary_visible: data.isSalaryVisible,
+        vacancies: data.vacancies,
+        deadline: data.deadline || null,
+        department: data.department,
+      };
+
+      const res = await jobApi.create(payload);
+      const created = res.data as { id: string };
+
+      // Publish the newly created job
+      await jobApi.publish(created.id);
+
+      toast.success("Vakansiya muvaffaqiyatli e'lon qilindi!");
       router.push("/company/jobs");
     } catch (error) {
-      toast.error("Xatolik yuz berdi");
+      toast.error(getErrorMessage(error));
     } finally {
       setIsSubmitting(false);
     }
@@ -245,10 +263,26 @@ Ish muhiti:
   // Save as draft
   const saveDraft = async () => {
     try {
-      localStorage.setItem("job_draft", JSON.stringify(formData));
+      const payload = {
+        title: formData.title,
+        location: formData.location,
+        job_type: formData.jobType,
+        experience_level: formData.experienceLevel,
+        description: formData.description,
+        requirements: { text: formData.requirements, skills: formData.skills },
+        benefits: formData.benefits,
+        salary_min: formData.salaryMin,
+        salary_max: formData.salaryMax,
+        is_salary_visible: formData.isSalaryVisible,
+        vacancies: formData.vacancies,
+        deadline: formData.deadline || null,
+        department: formData.department,
+      };
+      await jobApi.create(payload);
       toast.success("Qoralama saqlandi");
+      router.push("/company/jobs");
     } catch (error) {
-      toast.error("Saqlashda xatolik");
+      toast.error(getErrorMessage(error));
     }
   };
 
@@ -417,7 +451,7 @@ Ish muhiti:
                         </div>
                         <Switch
                           checked={formData.isSalaryVisible}
-                          onCheckedChange={(v) => setValue("isSalaryVisible", v)}
+                          onCheckedChange={(v: boolean) => setValue("isSalaryVisible", v)}
                         />
                       </div>
                     </div>

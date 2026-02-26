@@ -22,6 +22,9 @@ export interface User {
   is_verified: boolean;
   avatar_url?: string;
   company_name?: string;
+  company_website?: string;
+  bio?: string;
+  location?: string;
   created_at: string;
   updated_at?: string;
   last_login?: string;

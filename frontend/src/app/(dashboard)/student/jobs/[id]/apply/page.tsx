@@ -872,27 +872,36 @@ export default function ApplyPage() {
   const [answers, setAnswers] = useState<Record<string, string>>({});
 
   // Load job and resumes
+  // Load job + resumes once on mount
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     const loadData = async () => {
       setIsLoading(true);
-      await Promise.all([fetchJob(jobId), fetchResumes()]);
+      const [jobResult, resumeResult] = await Promise.allSettled([
+        fetchJob(jobId),
+        fetchResumes(),
+      ]);
 
-      // Sync local copies
-      if (currentJob) {
-        setJob(currentJob as Job & { matchScore?: number });
-      }
-      if (resumes.length > 0) {
-        setResumesState(resumes as (Resume & { matchScore?: number })[]);
-        const bestMatch = (resumes as (Resume & { matchScore?: number })[]).reduce(
-          (best, current) =>
-            (current.matchScore || 0) > (best.matchScore || 0) ? current : best
-        );
-        setSelectedResumeId(bestMatch.id);
+      // Use resolved values directly to avoid stale closure deps
+      if (jobResult.status === "fulfilled" && jobResult.value) {
+        setJob(jobResult.value as Job & { matchScore?: number });
       }
       setIsLoading(false);
     };
     loadData();
-  }, [jobId, fetchJob, fetchResumes, currentJob, resumes]);
+  }, [jobId]);
+
+  // Sync resumes from hook to local state once loaded
+  useEffect(() => {
+    if (resumes.length > 0 && resumesState.length === 0) {
+      setResumesState(resumes as (Resume & { matchScore?: number })[]);
+      const bestMatch = (resumes as (Resume & { matchScore?: number })[]).reduce(
+        (best, current) =>
+          (current.matchScore || 0) > (best.matchScore || 0) ? current : best
+      );
+      setSelectedResumeId(bestMatch.id);
+    }
+  }, [resumes, resumesState.length]);
 
   // Get selected resume
   const selectedResume = resumesState.find((r) => r.id === selectedResumeId) || null;

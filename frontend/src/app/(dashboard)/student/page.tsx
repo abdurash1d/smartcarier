@@ -32,14 +32,19 @@ import {
   Bell,
   Target,
   Zap,
+  Loader2,
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useTranslation } from "@/hooks/useTranslation";
+import { useResume } from "@/hooks/useResume";
+import { useApplications } from "@/hooks/useApplications";
+import { useJobs } from "@/hooks/useJobs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { formatRelativeTime } from "@/lib/utils";
+import { Skeleton } from "@/components/ui/skeleton";
+import { formatRelativeTime, formatSalaryRange } from "@/lib/utils";
 
 // =============================================================================
 // ANIMATION VARIANTS
@@ -67,7 +72,30 @@ const itemVariants = {
 export default function StudentDashboardPage() {
   const { user } = useAuth();
   const { t } = useTranslation();
-  const [profileCompletion, setProfileCompletion] = useState(75);
+
+  const { resumes, isLoading: resumesLoading, fetchResumes } = useResume();
+  const { stats: appStats, applications, isLoading: appsLoading, fetchMyApplications } = useApplications();
+  const { jobs, isLoading: jobsLoading, fetchJobs } = useJobs();
+
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    fetchResumes();
+    fetchMyApplications();
+    fetchJobs({}, 1);
+  }, []);
+
+  const isLoading = resumesLoading || appsLoading;
+
+  // Compute profile completion based on real user data
+  const profileCompletion = (() => {
+    let score = 20; // base
+    if (user?.full_name) score += 20;
+    if (user?.email) score += 20;
+    if (user?.phone) score += 15;
+    if (user?.bio) score += 15;
+    if (user?.location) score += 10;
+    return score;
+  })();
 
   const greeting = () => {
     const hour = new Date().getHours();
@@ -76,125 +104,62 @@ export default function StudentDashboardPage() {
     return t("dashboard.greeting.evening");
   };
 
-  // =============================================================================
-  // MOCK DATA WITH TRANSLATIONS
-  // =============================================================================
-
   const stats = [
     {
       title: t("dashboard.stats.totalResumes"),
-      value: 3,
+      value: isLoading ? "—" : resumes.length,
       icon: FileText,
       color: "from-purple-500 to-indigo-600",
       bgColor: "bg-purple-100 dark:bg-purple-500/20",
       iconColor: "text-purple-600",
-      change: `+1 ${t("dashboard.stats.thisWeek")}`,
+      change: resumes.length > 0 ? `${resumes.length} ta resume` : t("dashboard.stats.thisWeek"),
       changeType: "positive",
     },
     {
       title: t("dashboard.stats.applicationsSent"),
-      value: 12,
+      value: isLoading ? "—" : appStats.total,
       icon: Send,
       color: "from-cyan-500 to-blue-600",
       bgColor: "bg-cyan-100 dark:bg-cyan-500/20",
       iconColor: "text-cyan-600",
-      change: `+5 ${t("dashboard.stats.thisWeek")}`,
+      change: appStats.pending > 0 ? `${appStats.pending} ta kutilmoqda` : "Ariza yo'q",
       changeType: "positive",
     },
     {
       title: t("dashboard.stats.interviewsScheduled"),
-      value: 2,
+      value: isLoading ? "—" : appStats.interview,
       icon: Calendar,
       color: "from-green-500 to-emerald-600",
       bgColor: "bg-green-100 dark:bg-green-500/20",
       iconColor: "text-green-600",
-      change: t("dashboard.stats.nextTomorrow"),
+      change: appStats.interview > 0 ? `${appStats.interview} ta interview` : "Intervyu yo'q",
       changeType: "neutral",
     },
     {
       title: t("dashboard.stats.profileViews"),
-      value: 45,
+      value: isLoading ? "—" : appStats.reviewing,
       icon: Eye,
       color: "from-amber-500 to-orange-600",
       bgColor: "bg-amber-100 dark:bg-amber-500/20",
       iconColor: "text-amber-600",
-      change: `+12% ${t("dashboard.stats.fromLastWeek")}`,
+      change: appStats.accepted > 0 ? `${appStats.accepted} ta qabul qilindi` : "Ko'rib chiqilmoqda",
       changeType: "positive",
     },
   ];
 
-  const recentActivity = [
-    {
-      id: 1,
-      type: "application",
-      title: `${t("dashboard.recentActivity.appliedTo")} Senior Developer ${t("dashboard.recentActivity.at")} EPAM`,
-      time: `2 ${t("dashboard.recentActivity.hoursAgo")}`,
-      icon: Send,
-      color: "bg-blue-100 text-blue-600 dark:bg-blue-500/20",
-    },
-    {
-      id: 2,
-      type: "interview",
-      title: `${t("dashboard.recentActivity.interviewScheduled")} ${t("dashboard.recentActivity.with")} Click.uz`,
-      time: `5 ${t("dashboard.recentActivity.hoursAgo")}`,
-      icon: Calendar,
-      color: "bg-green-100 text-green-600 dark:bg-green-500/20",
-    },
-    {
-      id: 3,
-      type: "view",
-      title: `${t("dashboard.recentActivity.resumeViewed")} Payme ${t("dashboard.recentActivity.hr")}`,
-      time: `1 ${t("dashboard.recentActivity.dayAgo")}`,
-      icon: Eye,
-      color: "bg-purple-100 text-purple-600 dark:bg-purple-500/20",
-    },
-    {
-      id: 4,
-      type: "resume",
-      title: t("dashboard.recentActivity.aiResumeGenerated"),
-      time: `2 ${t("dashboard.recentActivity.daysAgo")}`,
-      icon: Sparkles,
-      color: "bg-amber-100 text-amber-600 dark:bg-amber-500/20",
-    },
-    {
-      id: 5,
-      type: "status",
-      title: t("dashboard.recentActivity.applicationMoved"),
-      time: `3 ${t("dashboard.recentActivity.daysAgo")}`,
-      icon: CheckCircle,
-      color: "bg-cyan-100 text-cyan-600 dark:bg-cyan-500/20",
-    },
-  ];
-
-  const jobRecommendations = [
-    {
-      id: 1,
-      title: "Senior Backend Developer",
-      company: "EPAM Systems",
-      location: "Tashkent",
-      salary: "$3,000 - $5,000",
-      matchScore: 95,
-      tags: ["Python", "FastAPI", "PostgreSQL"],
-    },
-    {
-      id: 2,
-      title: "Full Stack Engineer",
-      company: "Uzum Market",
-      location: t("dashboard.jobs.remote"),
-      salary: "$2,500 - $4,000",
-      matchScore: 88,
-      tags: ["React", "Node.js", "TypeScript"],
-    },
-    {
-      id: 3,
-      title: "Software Developer",
-      company: "Click.uz",
-      location: "Tashkent",
-      salary: "$2,000 - $3,500",
-      matchScore: 82,
-      tags: ["Java", "Spring Boot", "Microservices"],
-    },
-  ];
+  // Build recent activity from real applications
+  const recentActivity = applications.slice(0, 5).map((app, i) => ({
+    id: app.id,
+    type: "application",
+    title: `${(app as any).job?.title || "Ish o'rni"} — ${(app as any).job?.company?.name || "Kompaniya"}`,
+    time: app.applied_at ? formatRelativeTime(app.applied_at) : "",
+    icon: app.status === "interview" ? Calendar : app.status === "accepted" ? CheckCircle : Send,
+    color: app.status === "interview"
+      ? "bg-green-100 text-green-600 dark:bg-green-500/20"
+      : app.status === "accepted"
+      ? "bg-cyan-100 text-cyan-600 dark:bg-cyan-500/20"
+      : "bg-blue-100 text-blue-600 dark:bg-blue-500/20",
+  }));
 
   const quickActions = [
     {
@@ -375,28 +340,38 @@ export default function StudentDashboardPage() {
               </Link>
             </CardHeader>
             <CardContent>
-              <div className="space-y-4">
-                {recentActivity.map((activity, index) => (
-                  <motion.div
-                    key={activity.id}
-                    initial={{ opacity: 0, x: -20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: index * 0.1 }}
-                    className="flex items-start gap-4"
-                  >
-                    <div className={`flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full ${activity.color}`}>
-                      <activity.icon className="h-5 w-5" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-surface-900 dark:text-white truncate">
-                        {activity.title}
-                      </p>
-                      <p className="text-xs text-surface-500">{activity.time}</p>
-                    </div>
-                    <ChevronRight className="h-5 w-5 text-surface-400" />
-                  </motion.div>
-                ))}
-              </div>
+              {appsLoading ? (
+                <div className="space-y-3">
+                  {[1,2,3].map(i => <Skeleton key={i} className="h-12 w-full" />)}
+                </div>
+              ) : recentActivity.length === 0 ? (
+                <p className="py-6 text-center text-sm text-surface-500">
+                  Hozircha faoliyat yo'q
+                </p>
+              ) : (
+                <div className="space-y-4">
+                  {recentActivity.map((activity, index) => (
+                    <motion.div
+                      key={activity.id}
+                      initial={{ opacity: 0, x: -20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: index * 0.1 }}
+                      className="flex items-start gap-4"
+                    >
+                      <div className={`flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full ${activity.color}`}>
+                        <activity.icon className="h-5 w-5" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-surface-900 dark:text-white truncate">
+                          {activity.title}
+                        </p>
+                        <p className="text-xs text-surface-500">{activity.time}</p>
+                      </div>
+                      <ChevronRight className="h-5 w-5 text-surface-400" />
+                    </motion.div>
+                  ))}
+                </div>
+              )}
             </CardContent>
           </Card>
         </motion.div>
@@ -414,41 +389,58 @@ export default function StudentDashboardPage() {
               </Link>
             </CardHeader>
             <CardContent>
-              <div className="space-y-4">
-                {jobRecommendations.map((job, index) => (
-                  <motion.div
-                    key={job.id}
-                    initial={{ opacity: 0, x: 20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: index * 0.1 }}
-                    className="group rounded-xl border border-surface-200 p-4 transition-all hover:border-purple-200 hover:shadow-md dark:border-surface-700 dark:hover:border-purple-500/30"
-                  >
-                    <div className="flex items-start justify-between">
-                      <div>
-                        <h4 className="font-semibold text-surface-900 dark:text-white group-hover:text-purple-600">
-                          {job.title}
-                        </h4>
-                        <p className="text-sm text-surface-500">
-                          {job.company} • {job.location}
-                        </p>
-                        <p className="mt-1 text-sm font-medium text-green-600">{job.salary}</p>
-                      </div>
-                      <div className="text-right">
-                        <div className="inline-flex items-center gap-1 rounded-full bg-green-100 px-2 py-1 text-xs font-semibold text-green-700 dark:bg-green-500/20 dark:text-green-400">
-                          {job.matchScore}% {t("common.match")}
+              {jobsLoading ? (
+                <div className="space-y-3">
+                  {[1, 2, 3].map((i) => (
+                    <Skeleton key={i} className="h-20 w-full rounded-xl" />
+                  ))}
+                </div>
+              ) : jobs.length === 0 ? (
+                <p className="py-6 text-center text-sm text-surface-500">
+                  Hozircha ish o'rinlari mavjud emas
+                </p>
+              ) : (
+                <div className="space-y-4">
+                  {jobs.slice(0, 3).map((job, index) => (
+                    <Link key={job.id} href={`/student/jobs`}>
+                      <motion.div
+                        initial={{ opacity: 0, x: 20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: index * 0.1 }}
+                        className="group rounded-xl border border-surface-200 p-4 transition-all hover:border-purple-200 hover:shadow-md dark:border-surface-700 dark:hover:border-purple-500/30 cursor-pointer"
+                      >
+                        <div className="flex items-start justify-between">
+                          <div>
+                            <h4 className="font-semibold text-surface-900 dark:text-white group-hover:text-purple-600">
+                              {job.title}
+                            </h4>
+                            <p className="text-sm text-surface-500">
+                              {job.company?.name || "Kompaniya"} • {job.location}
+                            </p>
+                            {(job.salary_min || job.salary_max) && (
+                              <p className="mt-1 text-sm font-medium text-green-600">
+                                {formatSalaryRange(job.salary_min, job.salary_max)}
+                              </p>
+                            )}
+                          </div>
+                          <Badge variant="secondary" className="text-xs shrink-0">
+                            {job.job_type?.replace("_", " ")}
+                          </Badge>
                         </div>
-                      </div>
-                    </div>
-                    <div className="mt-3 flex flex-wrap gap-1">
-                      {job.tags.map((tag) => (
-                        <Badge key={tag} variant="secondary" className="text-xs">
-                          {tag}
-                        </Badge>
-                      ))}
-                    </div>
-                  </motion.div>
-                ))}
-              </div>
+                        {job.requirements?.skills && job.requirements.skills.length > 0 && (
+                          <div className="mt-3 flex flex-wrap gap-1">
+                            {job.requirements.skills.slice(0, 4).map((tag: string) => (
+                              <Badge key={tag} variant="secondary" className="text-xs">
+                                {tag}
+                              </Badge>
+                            ))}
+                          </div>
+                        )}
+                      </motion.div>
+                    </Link>
+                  ))}
+                </div>
+              )}
             </CardContent>
           </Card>
         </motion.div>

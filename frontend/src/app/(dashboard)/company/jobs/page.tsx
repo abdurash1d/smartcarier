@@ -32,17 +32,27 @@ export default function CompanyJobsPage() {
   const {
     jobs,
     isLoading,
-    fetchJobs,
+    fetchMyJobs,
+    publishJob,
+    closeJob,
+    deleteJob,
   } = useJobs();
   const [activeMenu, setActiveMenu] = useState<string | null>(null);
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
-    fetchJobs();
+    fetchMyJobs();
   }, []);
 
-  const handleAction = async (_action: string, _job: Job) => {
-    // TODO: Wire to real company job actions (publish/close/delete) via API
+  const handleAction = async (action: string, job: Job) => {
     setActiveMenu(null);
+    if (action === "publish") await publishJob(job.id);
+    if (action === "close") await closeJob(job.id);
+    if (action === "delete") {
+      if (confirm(`"${job.title}" vakansiyasini o'chirishni tasdiqlaysizmi?`)) {
+        await deleteJob(job.id);
+      }
+    }
   };
 
   const activeJobs = jobs.filter((j) => j.status === "active");

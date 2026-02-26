@@ -8,7 +8,7 @@
 
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import type { Job } from "@/types/api";
 import { jobApi, getErrorMessage } from "@/lib/api";
 import { toast } from "sonner";
@@ -53,39 +53,46 @@ export function useJobs() {
   });
 
   const [filters, setFilters] = useState<JobFilters>({});
+  // Use a ref so fetchJobs has a stable reference and doesn't cause infinite loops
+  const filtersRef = useRef<JobFilters>({});
 
   // Fetch jobs
   const fetchJobs = useCallback(async (newFilters?: JobFilters, page: number = 1) => {
     setState((prev) => ({ ...prev, isLoading: true, error: null }));
 
     try {
-      // Update filters if provided
-      if (newFilters) {
-        setFilters(newFilters);
+      // Merge and persist filters via ref (avoids recreating the callback)
+      const merged = newFilters !== undefined
+        ? { ...filtersRef.current, ...newFilters }
+        : filtersRef.current;
+
+      if (newFilters !== undefined) {
+        filtersRef.current = merged;
+        setFilters(merged);
       }
 
-      const params: any = {
-        page,
-        ...filters,
-        ...newFilters,
-      };
+      const params: any = { page, ...merged };
 
       const response = await jobApi.list(params);
       const data = response.data as {
+        jobs?: Job[];
         items?: Job[];
         total?: number;
         page?: number;
-        limit?: number;
+        page_size?: number;
+        total_pages?: number;
         pages?: number;
       };
 
+      const jobList = data.jobs || data.items || [];
+
       setState((prev) => ({
         ...prev,
-        jobs: data.items || [],
+        jobs: jobList,
         isLoading: false,
-        totalCount: data.total ?? (data.items?.length || 0),
+        totalCount: data.total ?? jobList.length,
         currentPage: data.page ?? page,
-        totalPages: data.pages ?? 1,
+        totalPages: data.total_pages ?? data.pages ?? 1,
       }));
     } catch (error) {
       const message = getErrorMessage(error);
@@ -96,7 +103,7 @@ export function useJobs() {
       }));
       toast.error(message);
     }
-  }, [filters]);
+  }, []); // stable — no deps, uses filtersRef internally
 
   // Fetch single job
   const fetchJob = useCallback(async (id: string) => {
@@ -126,16 +133,17 @@ export function useJobs() {
 
   // Search jobs
   const searchJobs = useCallback(async (query: string) => {
-    return fetchJobs({ ...filters, search: query });
-  }, [fetchJobs, filters]);
+    return fetchJobs({ ...filtersRef.current, search: query });
+  }, [fetchJobs]);
 
   // Apply filters
   const applyFilters = useCallback(async (newFilters: JobFilters) => {
-    return fetchJobs({ ...filters, ...newFilters });
-  }, [fetchJobs, filters]);
+    return fetchJobs({ ...filtersRef.current, ...newFilters });
+  }, [fetchJobs]);
 
   // Clear filters
   const clearFilters = useCallback(async () => {
+    filtersRef.current = {};
     setFilters({});
     return fetchJobs({});
   }, [fetchJobs]);
@@ -146,8 +154,12 @@ export function useJobs() {
 
     try {
       const response = await jobApi.match(resumeId);
-      const data = response.data as { items?: (Job & { matchScore?: number })[] };
-      const matchedJobs = data.items || [];
+      const data = response.data as {
+        matches?: (Job & { matchScore?: number })[];
+        items?: (Job & { matchScore?: number })[];
+        jobs?: (Job & { matchScore?: number })[];
+      };
+      const matchedJobs = data.matches || data.items || data.jobs || [];
 
       setState((prev) => ({
         ...prev,
@@ -168,35 +180,104 @@ export function useJobs() {
     }
   }, []);
 
-  // Save job
-  const saveJob = useCallback(async (jobId: string) => {
+  // Fetch company's own jobs
+  const fetchMyJobs = useCallback(async (params?: { status?: string }) => {
+    setState((prev) => ({ ...prev, isLoading: true, error: null }));
     try {
-      // In real app: await api.post(`/jobs/${jobId}/save`);
-      console.log("Job saved:", jobId);
+      const response = await jobApi.myJobs(params);
+      const data = response.data as {
+        jobs?: Job[];
+        items?: Job[];
+        total?: number;
+        total_pages?: number;
+        pages?: number;
+      };
+      const jobList = data.jobs || data.items || [];
+      setState((prev) => ({
+        ...prev,
+        jobs: jobList,
+        isLoading: false,
+        totalCount: data.total ?? jobList.length,
+        totalPages: data.total_pages ?? data.pages ?? 1,
+      }));
+      return jobList;
     } catch (error) {
+      const message = getErrorMessage(error);
+      setState((prev) => ({ ...prev, isLoading: false, error: message }));
+      toast.error(message);
+      return [];
+    }
+  }, []);
+
+  // Publish a job
+  const publishJob = useCallback(async (jobId: string) => {
+    try {
+      await jobApi.publish(jobId);
+      setState((prev) => ({
+        ...prev,
+        jobs: prev.jobs.map((j) => j.id === jobId ? { ...j, status: "active" } : j),
+      }));
+      toast.success("Vakansiya nashr etildi");
+    } catch (error) {
+      toast.error(getErrorMessage(error));
       throw error;
     }
   }, []);
 
-  // Unsave job
-  const unsaveJob = useCallback(async (jobId: string) => {
+  // Close a job
+  const closeJob = useCallback(async (jobId: string) => {
     try {
-      // In real app: await api.delete(`/jobs/${jobId}/save`);
-      console.log("Job unsaved:", jobId);
+      await jobApi.close(jobId);
+      setState((prev) => ({
+        ...prev,
+        jobs: prev.jobs.map((j) => j.id === jobId ? { ...j, status: "closed" } : j),
+      }));
+      toast.success("Vakansiya yopildi");
     } catch (error) {
+      toast.error(getErrorMessage(error));
       throw error;
     }
+  }, []);
+
+  // Delete a job
+  const deleteJob = useCallback(async (jobId: string) => {
+    try {
+      await jobApi.delete(jobId);
+      setState((prev) => ({
+        ...prev,
+        jobs: prev.jobs.filter((j) => j.id !== jobId),
+        totalCount: prev.totalCount - 1,
+      }));
+      toast.success("Vakansiya o'chirildi");
+    } catch (error) {
+      toast.error(getErrorMessage(error));
+      throw error;
+    }
+  }, []);
+
+  // Save job
+  const saveJob = useCallback(async (jobId: string) => {
+    console.log("Job saved:", jobId);
+  }, []);
+
+  // Unsave job
+  const unsaveJob = useCallback(async (jobId: string) => {
+    console.log("Job unsaved:", jobId);
   }, []);
 
   return {
     ...state,
     filters,
     fetchJobs,
+    fetchMyJobs,
     fetchJob,
     searchJobs,
     applyFilters,
     clearFilters,
     matchJobs,
+    publishJob,
+    closeJob,
+    deleteJob,
     saveJob,
     unsaveJob,
   };
