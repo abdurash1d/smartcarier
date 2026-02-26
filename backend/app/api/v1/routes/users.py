@@ -472,6 +472,90 @@ async def delete_avatar(
     )
 
 
+# =============================================================================
+# NOTIFICATION PREFERENCES
+# =============================================================================
+
+class NotificationPreferences(BaseModel):
+    email_applications: bool = True
+    email_interviews: bool = True
+    email_jobs: bool = True
+    email_tips: bool = False
+    push_applications: bool = True
+    push_messages: bool = True
+
+
+@router.get("/me/notification-preferences", summary="Get notification preferences")
+async def get_notification_preferences(
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """Get current user's notification preferences."""
+    prefs = current_user.notification_preferences or {}
+    return {
+        "success": True,
+        "data": {
+            "email_applications": prefs.get("email_applications", True),
+            "email_interviews": prefs.get("email_interviews", True),
+            "email_jobs": prefs.get("email_jobs", True),
+            "email_tips": prefs.get("email_tips", False),
+            "push_applications": prefs.get("push_applications", True),
+            "push_messages": prefs.get("push_messages", True),
+        }
+    }
+
+
+@router.put("/me/notification-preferences", summary="Update notification preferences")
+async def update_notification_preferences(
+    prefs: NotificationPreferences,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """Save user's notification preferences."""
+    current_user.notification_preferences = prefs.model_dump()
+    db.commit()
+    return {"success": True, "message": "Bildirishnoma sozlamalari saqlandi"}
+
+
+# =============================================================================
+# PRIVACY SETTINGS
+# =============================================================================
+
+class PrivacySettings(BaseModel):
+    public_profile: bool = True
+    show_email: bool = False
+    show_phone: bool = False
+
+
+@router.get("/me/privacy-settings", summary="Get privacy settings")
+async def get_privacy_settings(
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """Get user's privacy settings."""
+    prefs = current_user.privacy_settings or {}
+    return {
+        "success": True,
+        "data": {
+            "public_profile": prefs.get("public_profile", True),
+            "show_email": prefs.get("show_email", False),
+            "show_phone": prefs.get("show_phone", False),
+        }
+    }
+
+
+@router.put("/me/privacy-settings", summary="Update privacy settings")
+async def update_privacy_settings(
+    settings_data: PrivacySettings,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """Save user's privacy settings."""
+    current_user.privacy_settings = settings_data.model_dump()
+    db.commit()
+    return {"success": True, "message": "Maxfiylik sozlamalari saqlandi"}
+
+
 
 
 

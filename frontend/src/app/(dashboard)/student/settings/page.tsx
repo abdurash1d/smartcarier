@@ -12,7 +12,7 @@
 
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import {
   User,
@@ -39,7 +39,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Avatar } from "@/components/ui/avatar";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { userApi, getErrorMessage } from "@/lib/api";
+import { userApi, api, getErrorMessage } from "@/lib/api";
 import { toast } from "sonner";
 
 // =============================================================================
@@ -100,6 +100,48 @@ export default function SettingsPage() {
     push_applications: true,
     push_messages: true,
   });
+
+  const [privacy, setPrivacy] = useState({
+    public_profile: true,
+    show_email: false,
+    show_phone: false,
+  });
+
+  const [isSavingNotifications, setIsSavingNotifications] = useState(false);
+  const [isSavingPrivacy, setIsSavingPrivacy] = useState(false);
+
+  useEffect(() => {
+    api.get("/users/me/notification-preferences")
+      .then((res) => res.data?.data && setNotifications(res.data.data))
+      .catch(() => {});
+    api.get("/users/me/privacy-settings")
+      .then((res) => res.data?.data && setPrivacy(res.data.data))
+      .catch(() => {});
+  }, []);
+
+  const handleSaveNotifications = async () => {
+    setIsSavingNotifications(true);
+    try {
+      await api.put("/users/me/notification-preferences", notifications);
+      toast.success("Bildirishnoma sozlamalari saqlandi");
+    } catch (error) {
+      toast.error(getErrorMessage(error));
+    } finally {
+      setIsSavingNotifications(false);
+    }
+  };
+
+  const handleSavePrivacy = async () => {
+    setIsSavingPrivacy(true);
+    try {
+      await api.put("/users/me/privacy-settings", privacy);
+      toast.success("Maxfiylik sozlamalari saqlandi");
+    } catch (error) {
+      toast.error(getErrorMessage(error));
+    } finally {
+      setIsSavingPrivacy(false);
+    }
+  };
 
   const handleSaveProfile = async () => {
     setIsSaving(true);
@@ -600,6 +642,21 @@ export default function SettingsPage() {
                 ))}
               </CardContent>
             </Card>
+            {/* Notifications Save Button */}
+            <div className="flex justify-end">
+              <Button
+                onClick={handleSaveNotifications}
+                disabled={isSavingNotifications}
+                className="bg-gradient-to-r from-purple-500 to-indigo-600 gap-2"
+              >
+                {isSavingNotifications ? (
+                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                ) : (
+                  <Save className="h-4 w-4" />
+                )}
+                Saqlash
+              </Button>
+            </div>
           </TabsContent>
 
           {/* Privacy Tab */}
@@ -609,42 +666,27 @@ export default function SettingsPage() {
                 <CardTitle>{t("settingsPage.profileVisibility")}</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="font-medium text-surface-900">{t("settingsPage.publicProfile")}</p>
-                    <p className="text-sm text-surface-500">
-                      {t("settingsPage.publicProfileDesc")}
-                    </p>
+                {[
+                  { key: "public_profile", label: t("settingsPage.publicProfile"), desc: t("settingsPage.publicProfileDesc") },
+                  { key: "show_email", label: t("settingsPage.showEmail"), desc: t("settingsPage.showEmailDesc") },
+                  { key: "show_phone", label: t("settingsPage.showPhone"), desc: t("settingsPage.showPhoneDesc") },
+                ].map((item) => (
+                  <div key={item.key} className="flex items-center justify-between border-b border-surface-100 pb-4 last:border-0 last:pb-0">
+                    <div>
+                      <p className="font-medium text-surface-900">{item.label}</p>
+                      <p className="text-sm text-surface-500">{item.desc}</p>
+                    </div>
+                    <label className="relative inline-flex cursor-pointer items-center">
+                      <input
+                        type="checkbox"
+                        checked={privacy[item.key as keyof typeof privacy]}
+                        onChange={(e) => setPrivacy((p) => ({ ...p, [item.key]: e.target.checked }))}
+                        className="peer sr-only"
+                      />
+                      <div className="peer h-6 w-11 rounded-full bg-surface-200 after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:bg-white after:shadow-sm after:transition-all after:content-[''] peer-checked:bg-purple-600 peer-checked:after:translate-x-full peer-focus:ring-2 peer-focus:ring-purple-300"></div>
+                    </label>
                   </div>
-                  <label className="relative inline-flex cursor-pointer items-center">
-                    <input type="checkbox" defaultChecked className="peer sr-only" />
-                    <div className="peer h-6 w-11 rounded-full bg-surface-200 after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:bg-white after:shadow-sm after:transition-all after:content-[''] peer-checked:bg-purple-600 peer-checked:after:translate-x-full peer-focus:ring-2 peer-focus:ring-purple-300"></div>
-                  </label>
-                </div>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="font-medium text-surface-900">{t("settingsPage.showEmail")}</p>
-                    <p className="text-sm text-surface-500">
-                      {t("settingsPage.showEmailDesc")}
-                    </p>
-                  </div>
-                  <label className="relative inline-flex cursor-pointer items-center">
-                    <input type="checkbox" className="peer sr-only" />
-                    <div className="peer h-6 w-11 rounded-full bg-surface-200 after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:bg-white after:shadow-sm after:transition-all after:content-[''] peer-checked:bg-purple-600 peer-checked:after:translate-x-full peer-focus:ring-2 peer-focus:ring-purple-300"></div>
-                  </label>
-                </div>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="font-medium text-surface-900">{t("settingsPage.showPhone")}</p>
-                    <p className="text-sm text-surface-500">
-                      {t("settingsPage.showPhoneDesc")}
-                    </p>
-                  </div>
-                  <label className="relative inline-flex cursor-pointer items-center">
-                    <input type="checkbox" className="peer sr-only" />
-                    <div className="peer h-6 w-11 rounded-full bg-surface-200 after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:bg-white after:shadow-sm after:transition-all after:content-[''] peer-checked:bg-purple-600 peer-checked:after:translate-x-full peer-focus:ring-2 peer-focus:ring-purple-300"></div>
-                  </label>
-                </div>
+                ))}
               </CardContent>
             </Card>
 
@@ -666,6 +708,22 @@ export default function SettingsPage() {
                 </div>
               </CardContent>
             </Card>
+
+            {/* Privacy Save Button */}
+            <div className="flex justify-end">
+              <Button
+                onClick={handleSavePrivacy}
+                disabled={isSavingPrivacy}
+                className="bg-gradient-to-r from-purple-500 to-indigo-600 gap-2"
+              >
+                {isSavingPrivacy ? (
+                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                ) : (
+                  <Save className="h-4 w-4" />
+                )}
+                Saqlash
+              </Button>
+            </div>
           </TabsContent>
         </Tabs>
       </motion.div>

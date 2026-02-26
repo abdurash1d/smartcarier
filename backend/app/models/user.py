@@ -65,7 +65,7 @@ from typing import Optional, List, Dict, Any, TYPE_CHECKING
 # SQLAlchemy imports
 from sqlalchemy import (
     Column, String, Boolean, DateTime, Enum as SQLEnum,
-    Index, CheckConstraint
+    Index, CheckConstraint, JSON
 )
 from sqlalchemy.orm import relationship, validates
 
@@ -324,7 +324,25 @@ class User(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin):
         nullable=True,
         comment="Stripe customer id (if payments enabled)"
     )
-    
+
+    # =========================================================================
+    # COLUMNS - USER PREFERENCES
+    # =========================================================================
+
+    notification_preferences = Column(
+        JSON,
+        nullable=True,
+        default=None,
+        comment="User's notification preferences (email/push toggles)"
+    )
+
+    privacy_settings = Column(
+        JSON,
+        nullable=True,
+        default=None,
+        comment="User's privacy settings (profile visibility, show email/phone)"
+    )
+
     # =========================================================================
     # COLUMNS - TRACKING
     # =========================================================================

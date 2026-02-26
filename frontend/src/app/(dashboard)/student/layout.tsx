@@ -83,6 +83,11 @@ const getNavigation = (t: (key: string) => string) => [
     icon: BookmarkCheck,
   },
   {
+    name: "Bildirishnomalar",
+    href: "/student/notifications",
+    icon: Bell,
+  },
+  {
     name: t("dashboard.settings.title"),
     href: "/student/settings",
     icon: Settings,
@@ -385,9 +390,11 @@ export default function StudentDashboardLayout({
                         )}
                       </div>
                       <div className="border-t border-surface-200 p-2 dark:border-surface-700">
-                        <Button variant="ghost" size="sm" className="w-full">
-                          Barcha bildirishnomalar
-                        </Button>
+                        <Link href="/student/notifications" onClick={() => setNotificationsOpen(false)}>
+                          <Button variant="ghost" size="sm" className="w-full">
+                            Barcha bildirishnomalar
+                          </Button>
+                        </Link>
                       </div>
                     </motion.div>
                   </>
