@@ -124,8 +124,14 @@ class PaymentService:
     
     def __init__(self):
         """Initialize payment service."""
+        # Stripe
         self.stripe_secret_key = getattr(settings, "STRIPE_SECRET_KEY", "") or ""
         self.stripe_webhook_secret = getattr(settings, "STRIPE_WEBHOOK_SECRET", "") or ""
+        
+        # Payme
+        self.payme_merchant_id = getattr(settings, "PAYME_MERCHANT_ID", "") or ""
+        self.payme_secret_key = getattr(settings, "PAYME_SECRET_KEY", "") or ""
+        self.payme_endpoint = getattr(settings, "PAYME_ENDPOINT", "https://checkout.paycom.uz")
         
         # In-memory payment logs (production: database)
         self._payment_logs: Dict[str, PaymentLog] = {}
@@ -134,6 +140,8 @@ class PaymentService:
         self._processed_payments: Dict[str, str] = {}  # {idempotency_key: payment_id}
         
         logger.info("PaymentService initialized")
+        logger.info(f"Stripe configured: {bool(self.stripe_secret_key)}")
+        logger.info(f"Payme configured: {bool(self.payme_merchant_id)}")
     
     # =========================================================================
     # STRIPE INTEGRATION
@@ -312,6 +320,391 @@ class PaymentService:
             self._payment_logs[error_log.id] = error_log
             
             raise
+    
+    # =========================================================================
+    # PAYME INTEGRATION
+    # =========================================================================
+    
+    async def create_payme_payment(
+        self,
+        db: Optional[Session],
+        user_id: str,
+        user_email: str,
+        amount: int,
+        subscription_tier: SubscriptionTier,
+        subscription_months: int,
+        idempotency_key: str,
+        return_url: str,
+        ip_address: Optional[str] = None,
+        metadata: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
+        """
+        Create Payme payment.
+        
+        Args:
+            user_id: User ID
+            user_email: User email
+            amount: Amount in tiyin (UZS cents)
+            subscription_tier: Subscription tier
+            subscription_months: Number of months
+            idempotency_key: Unique key
+            return_url: URL to return after payment
+            ip_address: Client IP
+            metadata: Additional metadata
+            
+        Returns:
+            Payment URL and payment ID
+        """
+        # Check idempotency
+        if db:
+            existing = db.query(PaymentModel).filter(PaymentModel.idempotency_key == idempotency_key).first()
+            if existing:
+                raise ValueError("Duplicate payment attempt (idempotency_key already used)")
+        else:
+            if idempotency_key in self._processed_payments:
+                raise ValueError("Payment already processed")
+        
+        try:
+            # Create DB record
+            payment_db_id: Optional[str] = None
+            if db:
+                payment = PaymentModel(
+                    provider=PaymentProvider.PAYME.value,
+                    provider_payment_id=None,
+                    status=PaymentStatus.PENDING.value,
+                    user_id=UUID(user_id),
+                    amount=amount,
+                    currency="UZS",
+                    subscription_tier=subscription_tier.value,
+                    subscription_months=subscription_months,
+                    idempotency_key=idempotency_key,
+                    ip_address=ip_address,
+                    user_agent=(metadata or {}).get("user_agent") if metadata else None,
+                )
+                db.add(payment)
+                db.commit()
+                db.refresh(payment)
+                payment_db_id = str(payment.id)
+            
+            # Mock implementation for development
+            if not self.payme_merchant_id:
+                logger.warning("Payme not configured, using mock payment")
+                
+                payment_id = f"payme_mock_{uuid4().hex[:16]}"
+                payment_url = f"{return_url}?payment_id={payment_id}&status=success"
+                
+                payment_log = PaymentLog(
+                    provider=PaymentProvider.PAYME,
+                    provider_payment_id=payment_id,
+                    status=PaymentStatus.PENDING,
+                    user_id=user_id,
+                    user_email=user_email,
+                    amount=amount,
+                    currency="UZS",
+                    subscription_tier=subscription_tier,
+                    subscription_months=subscription_months,
+                    idempotency_key=idempotency_key,
+                    ip_address=ip_address,
+                    metadata=metadata,
+                )
+                
+                self._payment_logs[payment_log.id] = payment_log
+                self._processed_payments[idempotency_key] = payment_log.id
+                
+                if db and payment_db_id:
+                    payment = db.query(PaymentModel).filter(PaymentModel.id == UUID(payment_db_id)).first()
+                    if payment:
+                        payment.provider_payment_id = payment_id
+                        db.commit()
+                
+                logger.info(f"Mock Payme payment created: {payment_id}")
+                
+                return {
+                    "payment_id": payment_db_id or payment_log.id,
+                    "payment_url": payment_url,
+                    "provider": "payme",
+                    "amount": amount,
+                    "currency": "UZS",
+                }
+            
+            # Real Payme implementation
+            import base64
+            
+            # Payme uses base64-encoded merchant ID and account in URL
+            # Format: m={merchant_id};ac.{account_key}={account_value};a={amount};c={return_url}
+            account_data = {
+                "user_id": user_id,
+                "payment_id": payment_db_id or idempotency_key,
+                "subscription_tier": subscription_tier.value,
+                "subscription_months": str(subscription_months),
+            }
+            
+            # Encode account data
+            account_str = ";".join([f"ac.{k}={v}" for k, v in account_data.items()])
+            
+            # Build Payme URL
+            payme_url = (
+                f"{self.payme_endpoint}/"
+                f"?m={self.payme_merchant_id}"
+                f";{account_str}"
+                f";a={amount}"
+                f";c={return_url}"
+            )
+            
+            if db and payment_db_id:
+                payment = db.query(PaymentModel).filter(PaymentModel.id == UUID(payment_db_id)).first()
+                if payment:
+                    payment.provider_payment_id = payment_db_id  # Use our ID for Payme
+                    payment.status = PaymentStatus.PENDING.value
+                    db.commit()
+            
+            logger.info(f"Payme payment created: {payment_db_id}")
+            
+            return {
+                "payment_id": payment_db_id or idempotency_key,
+                "payment_url": payme_url,
+                "provider": "payme",
+                "amount": amount,
+                "currency": "UZS",
+            }
+            
+        except Exception as e:
+            logger.error(f"Failed to create Payme payment: {e}")
+            
+            error_log = PaymentLog(
+                provider=PaymentProvider.PAYME,
+                status=PaymentStatus.FAILED,
+                user_id=user_id,
+                user_email=user_email,
+                amount=amount,
+                currency="UZS",
+                subscription_tier=subscription_tier,
+                subscription_months=subscription_months,
+                idempotency_key=idempotency_key,
+                error_message=str(e),
+                error_code="PAYME_PAYMENT_CREATION_FAILED",
+            )
+            self._payment_logs[error_log.id] = error_log
+            
+            raise
+    
+    async def handle_payme_webhook(
+        self,
+        db: Optional[Session],
+        payload: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        """
+        Handle Payme webhook callback.
+        
+        Payme uses JSON-RPC 2.0 protocol.
+        
+        Methods:
+        - CheckPerformTransaction: Check if transaction can be performed
+        - CreateTransaction: Create transaction
+        - PerformTransaction: Perform transaction (complete payment)
+        - CancelTransaction: Cancel transaction
+        - CheckTransaction: Check transaction status
+        
+        Args:
+            payload: Webhook payload (JSON-RPC request)
+            
+        Returns:
+            JSON-RPC response
+        """
+        try:
+            method = payload.get("method")
+            params = payload.get("params", {})
+            
+            logger.info(f"Payme webhook received: {method}")
+            
+            # Authenticate request (check password from Authorization header)
+            # This should be done in the endpoint, not here
+            
+            # Handle different methods
+            if method == "CheckPerformTransaction":
+                return await self._payme_check_perform_transaction(db, params)
+            
+            elif method == "CreateTransaction":
+                return await self._payme_create_transaction(db, params)
+            
+            elif method == "PerformTransaction":
+                return await self._payme_perform_transaction(db, params)
+            
+            elif method == "CancelTransaction":
+                return await self._payme_cancel_transaction(db, params)
+            
+            elif method == "CheckTransaction":
+                return await self._payme_check_transaction(db, params)
+            
+            else:
+                logger.warning(f"Unknown Payme method: {method}")
+                return {
+                    "error": {
+                        "code": -32601,
+                        "message": "Method not found",
+                    }
+                }
+                
+        except Exception as e:
+            logger.exception(f"Payme webhook error: {e}")
+            return {
+                "error": {
+                    "code": -32400,
+                    "message": str(e),
+                }
+            }
+    
+    async def _payme_check_perform_transaction(self, db: Optional[Session], params: Dict[str, Any]) -> Dict[str, Any]:
+        """Check if transaction can be performed."""
+        account = params.get("account", {})
+        amount = params.get("amount", 0)
+        
+        user_id = account.get("user_id")
+        payment_id = account.get("payment_id")
+        
+        # Validate amount and user
+        if not user_id:
+            return {"error": {"code": -31050, "message": "User not found"}}
+        
+        # Check user exists
+        if db:
+            user = db.query(User).filter(User.id == UUID(user_id), User.is_deleted == False).first()
+            if not user:
+                return {"error": {"code": -31050, "message": "User not found"}}
+        
+        # Success - allow transaction
+        return {"result": {"allow": True}}
+    
+    async def _payme_create_transaction(self, db: Optional[Session], params: Dict[str, Any]) -> Dict[str, Any]:
+        """Create transaction."""
+        transaction_id = params.get("id")
+        account = params.get("account", {})
+        amount = params.get("amount", 0)
+        time = params.get("time")
+        
+        payment_id = account.get("payment_id")
+        
+        # Update payment status to PROCESSING
+        if db and payment_id:
+            payment = db.query(PaymentModel).filter(PaymentModel.id == UUID(payment_id)).first()
+            if payment:
+                payment.status = PaymentStatus.PROCESSING.value
+                payment.provider_payment_id = str(transaction_id)
+                db.commit()
+        
+        # Return transaction details
+        return {
+            "result": {
+                "create_time": time,
+                "transaction": str(transaction_id),
+                "state": 1,  # 1 = created
+            }
+        }
+    
+    async def _payme_perform_transaction(self, db: Optional[Session], params: Dict[str, Any]) -> Dict[str, Any]:
+        """Perform transaction (complete payment)."""
+        transaction_id = params.get("id")
+        
+        # Find payment by provider_payment_id
+        if db:
+            payment = db.query(PaymentModel).filter(
+                PaymentModel.provider_payment_id == str(transaction_id)
+            ).first()
+            
+            if payment:
+                # Update payment status
+                payment.status = PaymentStatus.COMPLETED.value
+                db.add(payment)
+                
+                # Update user subscription
+                user = db.query(User).filter(User.id == payment.user_id, User.is_deleted == False).first()
+                if user:
+                    now = datetime.now(timezone.utc)
+                    base = getattr(user, "subscription_expires_at", None)
+                    if base and base > now:
+                        user.subscription_expires_at = base + timedelta(days=30 * payment.subscription_months)
+                    else:
+                        user.subscription_expires_at = now + timedelta(days=30 * payment.subscription_months)
+                    user.subscription_tier = payment.subscription_tier
+                    db.add(user)
+                
+                db.commit()
+                
+                logger.info(f"Payme payment completed: {transaction_id} for user {payment.user_id}")
+        
+        # Return success
+        return {
+            "result": {
+                "transaction": str(transaction_id),
+                "perform_time": int(datetime.now(timezone.utc).timestamp() * 1000),
+                "state": 2,  # 2 = completed
+            }
+        }
+    
+    async def _payme_cancel_transaction(self, db: Optional[Session], params: Dict[str, Any]) -> Dict[str, Any]:
+        """Cancel transaction."""
+        transaction_id = params.get("id")
+        reason = params.get("reason")
+        
+        if db:
+            payment = db.query(PaymentModel).filter(
+                PaymentModel.provider_payment_id == str(transaction_id)
+            ).first()
+            
+            if payment:
+                payment.status = PaymentStatus.CANCELLED.value
+                payment.error_message = f"Cancelled by Payme. Reason: {reason}"
+                db.commit()
+                
+                logger.info(f"Payme payment cancelled: {transaction_id}")
+        
+        return {
+            "result": {
+                "transaction": str(transaction_id),
+                "cancel_time": int(datetime.now(timezone.utc).timestamp() * 1000),
+                "state": -1,  # -1 = cancelled
+            }
+        }
+    
+    async def _payme_check_transaction(self, db: Optional[Session], params: Dict[str, Any]) -> Dict[str, Any]:
+        """Check transaction status."""
+        transaction_id = params.get("id")
+        
+        if db:
+            payment = db.query(PaymentModel).filter(
+                PaymentModel.provider_payment_id == str(transaction_id)
+            ).first()
+            
+            if payment:
+                # Map payment status to Payme state
+                state_map = {
+                    PaymentStatus.PENDING.value: 0,
+                    PaymentStatus.PROCESSING.value: 1,
+                    PaymentStatus.COMPLETED.value: 2,
+                    PaymentStatus.CANCELLED.value: -1,
+                    PaymentStatus.FAILED.value: -2,
+                }
+                
+                state = state_map.get(payment.status, 0)
+                
+                return {
+                    "result": {
+                        "create_time": int(payment.created_at.timestamp() * 1000) if payment.created_at else 0,
+                        "perform_time": 0 if state != 2 else int(payment.updated_at.timestamp() * 1000) if payment.updated_at else 0,
+                        "cancel_time": 0,
+                        "transaction": str(transaction_id),
+                        "state": state,
+                        "reason": None,
+                    }
+                }
+        
+        # Transaction not found
+        return {
+            "error": {
+                "code": -31003,
+                "message": "Transaction not found",
+            }
+        }
     
     async def handle_stripe_webhook(
         self,
@@ -558,52 +951,78 @@ payment_service = PaymentService()
 
 SUBSCRIPTION_PRICING = {
     SubscriptionTier.PREMIUM: {
-        "monthly": 999,  # $9.99 in cents
-        "quarterly": 2499,  # $24.99
-        "yearly": 8999,  # $89.99
+        "monthly": 400,  # $4.00 in cents
+        "yearly": 4000,  # $40.00 (save 2 months!)
+        "monthly_uzs": 1000000,  # 1,000,000 UZS (~$91 at 11,000 rate)
+        "yearly_uzs": 10000000,  # 10,000,000 UZS (~$909)
         "features": [
             "Unlimited AI resume generation",
+            "Unlimited AI university search",
+            "Unlimited motivation letters",
+            "Auto-apply to 50 jobs/month",
             "Priority job matching",
-            "Advanced analytics",
+            "Advanced analytics dashboard",
             "Premium templates",
-            "Email support",
+            "Email & chat support",
         ],
     },
     SubscriptionTier.ENTERPRISE: {
-        "monthly": 4999,  # $49.99
+        "price": "custom",  # Kelishuv asosida
+        "contact": "enterprise@smartcareer.uz",
         "features": [
             "Everything in Premium",
+            "Unlimited auto-apply",
+            "Team management (up to 50 users)",
             "Custom branding",
             "API access",
-            "Dedicated support",
-            "Team management",
+            "Dedicated account manager",
+            "Priority support (24/7)",
+            "SLA guarantee",
+            "Custom integrations",
         ],
     },
 }
 
 
-def get_subscription_price(tier: SubscriptionTier, months: int = 1) -> int:
+def get_subscription_price(tier: SubscriptionTier, months: int = 1, currency: str = "USD") -> int:
     """
-    Get subscription price in cents.
+    Get subscription price in cents (USD) or tiyin (UZS).
     
     Args:
         tier: Subscription tier
-        months: Number of months (1, 3, or 12)
+        months: Number of months (1 or 12)
+        currency: "USD" or "UZS"
         
     Returns:
-        Price in cents
+        Price in cents (USD) or tiyin (UZS)
     """
     pricing = SUBSCRIPTION_PRICING.get(tier, {})
     
-    if months == 1:
-        return pricing.get("monthly", 0)
-    elif months == 3:
-        return pricing.get("quarterly", pricing.get("monthly", 0) * 3)
-    elif months == 12:
-        return pricing.get("yearly", pricing.get("monthly", 0) * 12)
-    else:
-        # Custom duration
-        return pricing.get("monthly", 0) * months
+    # Enterprise is custom pricing
+    if tier == SubscriptionTier.ENTERPRISE:
+        return 0
+    
+    # USD pricing
+    if currency == "USD":
+        if months == 1:
+            return pricing.get("monthly", 0)
+        elif months == 12:
+            return pricing.get("yearly", pricing.get("monthly", 0) * 12)
+        else:
+            # Custom duration (multiply monthly)
+            return pricing.get("monthly", 0) * months
+    
+    # UZS pricing (for Payme/Click)
+    elif currency == "UZS":
+        if months == 1:
+            return pricing.get("monthly_uzs", 0)
+        elif months == 12:
+            return pricing.get("yearly_uzs", pricing.get("monthly_uzs", 0) * 12)
+        else:
+            # Custom duration
+            return pricing.get("monthly_uzs", 0) * months
+    
+    return 0
 
 
 

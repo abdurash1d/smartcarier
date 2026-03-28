@@ -66,112 +66,9 @@ import { Avatar } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn, formatSalaryRange } from "@/lib/utils";
 import type { Job, Resume } from "@/types/api";
-
-// =============================================================================
-// MOCK DATA
-// =============================================================================
-
-const mockJob: Job & { matchScore?: number } = {
-  id: "job-1",
-  company_id: "company-1",
-  title: "Senior Backend Developer",
-  description: "We are looking for an experienced Backend Developer...",
-  requirements: {
-    skills: ["Python", "FastAPI", "PostgreSQL", "Docker", "AWS"],
-    experience: "5+ years",
-    education: "Bachelor's in Computer Science",
-  },
-  salary_min: 3000,
-  salary_max: 5000,
-  location: "Tashkent",
-  job_type: "full_time",
-  experience_level: "senior",
-  status: "active",
-  applications_count: 45,
-  views_count: 892,
-  created_at: "2024-01-15T10:00:00Z",
-  updated_at: "2024-01-15T10:00:00Z",
-  company: {
-    name: "EPAM Systems",
-    logo_url: "/logos/epam.png",
-  },
-  matchScore: 95,
-};
-
-const mockResumes: (Resume & { matchScore?: number })[] = [
-  {
-    id: "resume-1",
-    user_id: "user-1",
-    title: "Senior Software Engineer Resume",
-    content: {
-      personal_info: {
-        name: "John Doe",
-        email: "john@example.com",
-        phone: "+998901234567",
-        professional_title: "Senior Software Engineer",
-      },
-      skills: {
-        technical: ["Python", "FastAPI", "PostgreSQL", "Docker", "AWS", "React"],
-        soft: ["Leadership", "Communication", "Problem Solving"],
-      },
-    },
-    ai_generated: true,
-    status: "published",
-    view_count: 45,
-    ats_score: 92,
-    created_at: "2024-01-15T10:00:00Z",
-    updated_at: "2024-01-20T14:30:00Z",
-    matchScore: 95,
-  },
-  {
-    id: "resume-2",
-    user_id: "user-1",
-    title: "Full Stack Developer Resume",
-    content: {
-      personal_info: {
-        name: "John Doe",
-        email: "john@example.com",
-        phone: "+998901234567",
-        professional_title: "Full Stack Developer",
-      },
-      skills: {
-        technical: ["React", "Node.js", "TypeScript", "MongoDB"],
-        soft: ["Teamwork", "Adaptability"],
-      },
-    },
-    ai_generated: true,
-    status: "published",
-    view_count: 28,
-    ats_score: 85,
-    created_at: "2024-01-10T08:00:00Z",
-    updated_at: "2024-01-18T09:00:00Z",
-    matchScore: 72,
-  },
-  {
-    id: "resume-3",
-    user_id: "user-1",
-    title: "Backend Developer Resume",
-    content: {
-      personal_info: {
-        name: "John Doe",
-        email: "john@example.com",
-        phone: "+998901234567",
-        professional_title: "Backend Developer",
-      },
-      skills: {
-        technical: ["Java", "Spring Boot", "MySQL"],
-        soft: ["Attention to Detail"],
-      },
-    },
-    ai_generated: false,
-    status: "published",
-    view_count: 15,
-    ats_score: 78,
-    created_at: "2024-01-05T12:00:00Z",
-    updated_at: "2024-01-16T16:00:00Z",
-    matchScore: 58,
-  },
-];
+import { useJobs } from "@/hooks/useJobs";
+import { useResume } from "@/hooks/useResume";
+import { useApplications } from "@/hooks/useApplications";
 
 const additionalQuestions = [
   {
@@ -199,7 +96,7 @@ const additionalQuestions = [
 // STEP CONFIGURATION
 // =============================================================================
 
-const steps = [
+const steps: { id: number; title: string; icon: React.ComponentType<any> }[] = [
   { id: 1, title: "Select Resume", icon: FileText },
   { id: 2, title: "Cover Letter", icon: PenLine },
   { id: 3, title: "Questions", icon: HelpCircle },
@@ -215,7 +112,7 @@ function StepIndicator({
   currentStep,
   onStepClick,
 }: {
-  steps: typeof steps;
+  steps: { id: number; title: string; icon: React.ComponentType<any> }[];
   currentStep: number;
   onStepClick: (step: number) => void;
 }) {
@@ -957,9 +854,13 @@ export default function ApplyPage() {
   const params = useParams();
   const jobId = params.id as string;
 
+  const { fetchJob, currentJob, isLoading: jobLoading } = useJobs();
+  const { resumes, fetchResumes, isLoading: resumesLoading } = useResume();
+  const { applyToJob } = useApplications();
+
   const [isLoading, setIsLoading] = useState(true);
   const [job, setJob] = useState<(Job & { matchScore?: number }) | null>(null);
-  const [resumes, setResumes] = useState<(Resume & { matchScore?: number })[]>([]);
+  const [resumesState, setResumesState] = useState<(Resume & { matchScore?: number })[]>([]);
   const [currentStep, setCurrentStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
@@ -971,27 +872,39 @@ export default function ApplyPage() {
   const [answers, setAnswers] = useState<Record<string, string>>({});
 
   // Load job and resumes
+  // Load job + resumes once on mount
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     const loadData = async () => {
       setIsLoading(true);
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-      setJob(mockJob);
-      setResumes(mockResumes);
-      // Auto-select best matching resume
-      if (mockResumes.length > 0) {
-        const bestMatch = mockResumes.reduce((best, current) =>
-          (current.matchScore || 0) > (best.matchScore || 0) ? current : best
-        );
-        setSelectedResumeId(bestMatch.id);
+      const [jobResult, resumeResult] = await Promise.allSettled([
+        fetchJob(jobId),
+        fetchResumes(),
+      ]);
+
+      // Use resolved values directly to avoid stale closure deps
+      if (jobResult.status === "fulfilled" && jobResult.value) {
+        setJob(jobResult.value as Job & { matchScore?: number });
       }
       setIsLoading(false);
     };
     loadData();
   }, [jobId]);
 
+  // Sync resumes from hook to local state once loaded
+  useEffect(() => {
+    if (resumes.length > 0 && resumesState.length === 0) {
+      setResumesState(resumes as (Resume & { matchScore?: number })[]);
+      const bestMatch = (resumes as (Resume & { matchScore?: number })[]).reduce(
+        (best, current) =>
+          (current.matchScore || 0) > (best.matchScore || 0) ? current : best
+      );
+      setSelectedResumeId(bestMatch.id);
+    }
+  }, [resumes, resumesState.length]);
+
   // Get selected resume
-  const selectedResume = resumes.find((r) => r.id === selectedResumeId) || null;
+  const selectedResume = resumesState.find((r) => r.id === selectedResumeId) || null;
 
   // Validate current step
   const isStepValid = () => {
@@ -1040,10 +953,20 @@ ${selectedResume.content.personal_info?.name || "John Doe"}`;
   // Submit application
   const handleSubmit = async () => {
     setIsSubmitting(true);
-    // Simulate API call
-    await new Promise((resolve) => setTimeout(resolve, 2000));
-    setIsSubmitting(false);
-    setIsSubmitted(true);
+    try {
+      if (!job || !selectedResumeId) {
+        throw new Error("Please select a resume before submitting.");
+      }
+      await applyToJob({
+        job_id: job.id,
+        resume_id: selectedResumeId,
+        cover_letter: coverLetter || undefined,
+      });
+      setIsSubmitting(false);
+      setIsSubmitted(true);
+    } catch (error) {
+      setIsSubmitting(false);
+    }
   };
 
   // Navigation

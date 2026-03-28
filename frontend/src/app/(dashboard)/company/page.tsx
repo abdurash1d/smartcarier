@@ -41,111 +41,15 @@ import {
   MessageSquare,
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
+import { useJobs } from "@/hooks/useJobs";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
+import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
+import type { Job } from "@/types/api";
 
-// =============================================================================
-// MOCK DATA - Replace with real API calls
-// =============================================================================
-
-const mockStats = {
-  activeJobs: 5,
-  totalApplications: 127,
-  newApplications: 23,
-  interviewScheduled: 8,
-  hiredThisMonth: 3,
-  averageTimeToHire: 14,
-};
-
-const mockRecentApplications = [
-  {
-    id: "1",
-    candidateName: "Aziz Karimov",
-    position: "Senior Software Engineer",
-    appliedDate: "2024-01-15",
-    status: "reviewing",
-    matchScore: 92,
-    avatar: null,
-  },
-  {
-    id: "2",
-    candidateName: "Dilnoza Rahimova",
-    position: "Product Manager",
-    appliedDate: "2024-01-14",
-    status: "interview",
-    matchScore: 87,
-    avatar: null,
-  },
-  {
-    id: "3",
-    candidateName: "Jasur Toshmatov",
-    position: "Senior Software Engineer",
-    appliedDate: "2024-01-14",
-    status: "new",
-    matchScore: 78,
-    avatar: null,
-  },
-  {
-    id: "4",
-    candidateName: "Malika Usmanova",
-    position: "UX Designer",
-    appliedDate: "2024-01-13",
-    status: "offered",
-    matchScore: 95,
-    avatar: null,
-  },
-];
-
-const mockActiveJobs = [
-  {
-    id: "1",
-    title: "Senior Software Engineer",
-    applications: 45,
-    views: 230,
-    daysActive: 7,
-    status: "active",
-  },
-  {
-    id: "2",
-    title: "Product Manager",
-    applications: 32,
-    views: 180,
-    daysActive: 14,
-    status: "active",
-  },
-  {
-    id: "3",
-    title: "UX Designer",
-    applications: 28,
-    views: 150,
-    daysActive: 5,
-    status: "active",
-  },
-];
-
-const mockAIRecommendations = [
-  {
-    id: "1",
-    name: "Bobur Aliyev",
-    title: "Full Stack Developer",
-    matchScore: 96,
-    skills: ["React", "Node.js", "Python", "AWS"],
-    experience: "5 years",
-    reason: "Perfect skill match for Senior Software Engineer role",
-  },
-  {
-    id: "2",
-    name: "Nodira Qodirova",
-    title: "Product Lead",
-    matchScore: 91,
-    skills: ["Product Strategy", "Agile", "Data Analysis"],
-    experience: "7 years",
-    reason: "Strong leadership experience matches PM requirements",
-  },
-];
 
 // =============================================================================
 // COMPONENTS
@@ -212,13 +116,19 @@ const StatusBadge = ({ status }: { status: string }) => {
 
 export default function CompanyDashboardPage() {
   const { user } = useAuth();
-  const [isLoading, setIsLoading] = useState(true);
+  const { jobs, isLoading: jobsLoading, fetchMyJobs } = useJobs();
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
-    // Simulate data loading
-    const timer = setTimeout(() => setIsLoading(false), 500);
-    return () => clearTimeout(timer);
+    fetchMyJobs();
   }, []);
+
+  const isLoading = jobsLoading;
+
+  // Compute stats from real job data
+  const activeJobs = jobs.filter((j) => j.status === "active");
+  const totalApplications = jobs.reduce((s, j) => s + (j.applications_count ?? 0), 0);
+  const totalViews = jobs.reduce((s, j) => s + (j.views_count ?? 0), 0);
 
   const fadeInUp = {
     initial: { opacity: 0, y: 20 },
@@ -257,27 +167,26 @@ export default function CompanyDashboardPage() {
       >
         <StatsCard
           title="Faol vakansiyalar"
-          value={mockStats.activeJobs}
+          value={isLoading ? "—" : activeJobs.length}
           icon={Briefcase}
           color="bg-blue-100 dark:bg-blue-500/20 text-blue-600"
         />
         <StatsCard
           title="Jami arizalar"
-          value={mockStats.totalApplications}
-          change="+23 bu hafta"
+          value={isLoading ? "—" : totalApplications}
           icon={FileText}
           color="bg-purple-100 dark:bg-purple-500/20 text-purple-600"
         />
         <StatsCard
-          title="Suhbatga chaqirilgan"
-          value={mockStats.interviewScheduled}
+          title="Jami vakansiyalar"
+          value={isLoading ? "—" : jobs.length}
           icon={Calendar}
           color="bg-cyan-100 dark:bg-cyan-500/20 text-cyan-600"
         />
         <StatsCard
-          title="Bu oy ishga olindi"
-          value={mockStats.hiredThisMonth}
-          icon={UserCheck}
+          title="Jami ko'rishlar"
+          value={isLoading ? "—" : totalViews}
+          icon={Eye}
           color="bg-green-100 dark:bg-green-500/20 text-green-600"
         />
       </motion.div>
@@ -304,46 +213,58 @@ export default function CompanyDashboardPage() {
               </Link>
             </CardHeader>
             <CardContent>
-              <div className="space-y-4">
-                {mockRecentApplications.map((app, index) => (
-                  <motion.div
-                    key={app.id}
-                    initial={{ opacity: 0, x: -20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: 0.1 * index }}
-                    className="flex items-center justify-between rounded-xl border border-surface-200 p-4 transition-all hover:border-purple-200 hover:bg-purple-50/50 dark:border-surface-700 dark:hover:border-purple-500/30 dark:hover:bg-purple-500/5"
-                  >
-                    <div className="flex items-center gap-4">
-                      {/* Avatar */}
-                      <div className="flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br from-purple-500 to-indigo-600 text-lg font-bold text-white">
-                        {app.candidateName.split(" ").map((n) => n[0]).join("")}
-                      </div>
-                      <div>
-                        <p className="font-semibold text-surface-900 dark:text-white">
-                          {app.candidateName}
-                        </p>
-                        <p className="text-sm text-surface-500">{app.position}</p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-4">
-                      {/* Match Score */}
-                      <div className="text-right">
-                        <div className="flex items-center gap-1 text-sm font-medium text-green-600">
-                          <Sparkles className="h-4 w-4" />
-                          {app.matchScore}% mos
+              {isLoading ? (
+                <div className="space-y-3">
+                  {[1,2,3].map(i => <Skeleton key={i} className="h-16 w-full rounded-xl" />)}
+                </div>
+              ) : jobs.length === 0 ? (
+                <div className="py-8 text-center">
+                  <Users className="mx-auto h-10 w-10 text-surface-400" />
+                  <p className="mt-2 text-sm text-surface-500">Hozircha arizalar yo'q</p>
+                  <Link href="/company/jobs/new">
+                    <Button size="sm" className="mt-4" variant="outline">Yangi vakansiya yaratish</Button>
+                  </Link>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {jobs.slice(0, 4).map((job: Job, index: number) => (
+                    <motion.div
+                      key={job.id}
+                      initial={{ opacity: 0, x: -20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: 0.1 * index }}
+                      className="flex items-center justify-between rounded-xl border border-surface-200 p-4 transition-all hover:border-purple-200 hover:bg-purple-50/50 dark:border-surface-700 dark:hover:border-purple-500/30 dark:hover:bg-purple-500/5"
+                    >
+                      <div className="flex items-center gap-4">
+                        <div className="flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br from-purple-500 to-indigo-600 text-lg font-bold text-white">
+                          <Briefcase className="h-5 w-5" />
                         </div>
-                        <p className="text-xs text-surface-400">AI tahlil</p>
+                        <div>
+                          <p className="font-semibold text-surface-900 dark:text-white">
+                            {job.title}
+                          </p>
+                          <p className="text-sm text-surface-500">{job.location} • {job.job_type?.replace("_", " ")}</p>
+                        </div>
                       </div>
-                      <StatusBadge status={app.status} />
-                      <Link href={`/company/applicants/${app.id}`}>
-                        <Button variant="ghost" size="sm">
-                          <ChevronRight className="h-4 w-4" />
-                        </Button>
-                      </Link>
-                    </div>
-                  </motion.div>
-                ))}
-              </div>
+                      <div className="flex items-center gap-4">
+                        <div className="text-right">
+                          <div className="flex items-center gap-1 text-sm font-medium text-blue-600">
+                            <Users className="h-4 w-4" />
+                            {job.applications_count ?? 0} ariza
+                          </div>
+                          <p className="text-xs text-surface-400">{job.views_count ?? 0} ko'rishlar</p>
+                        </div>
+                        <StatusBadge status={job.status} />
+                        <Link href={`/company/jobs`}>
+                          <Button variant="ghost" size="sm">
+                            <ChevronRight className="h-4 w-4" />
+                          </Button>
+                        </Link>
+                      </div>
+                    </motion.div>
+                  ))}
+                </div>
+              )}
             </CardContent>
           </Card>
         </motion.div>
@@ -362,32 +283,44 @@ export default function CompanyDashboardPage() {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              {mockActiveJobs.map((job) => (
-                <Link key={job.id} href={`/company/jobs/${job.id}`}>
-                  <div className="rounded-xl border border-surface-200 p-4 transition-all hover:border-blue-200 hover:bg-blue-50/50 dark:border-surface-700 dark:hover:border-blue-500/30">
-                    <p className="font-semibold text-surface-900 dark:text-white">
-                      {job.title}
-                    </p>
-                    <div className="mt-2 flex items-center gap-4 text-sm text-surface-500">
-                      <span className="flex items-center gap-1">
-                        <Users className="h-4 w-4" />
-                        {job.applications}
-                      </span>
-                      <span className="flex items-center gap-1">
-                        <Eye className="h-4 w-4" />
-                        {job.views}
-                      </span>
-                    </div>
-                    <div className="mt-2">
-                      <div className="flex items-center justify-between text-xs text-surface-400 mb-1">
-                        <span>Arizalar</span>
-                        <span>{job.applications}/50</span>
+              {isLoading ? (
+                <div className="space-y-3">
+                  {[1,2,3].map(i => <Skeleton key={i} className="h-20 w-full rounded-xl" />)}
+                </div>
+              ) : activeJobs.length === 0 ? (
+                <div className="py-4 text-center">
+                  <p className="text-sm text-surface-500">Faol vakansiya yo'q</p>
+                </div>
+              ) : (
+                activeJobs.slice(0, 4).map((job: Job) => (
+                  <Link key={job.id} href={`/company/jobs`}>
+                    <div className="rounded-xl border border-surface-200 p-4 transition-all hover:border-blue-200 hover:bg-blue-50/50 dark:border-surface-700 dark:hover:border-blue-500/30">
+                      <p className="font-semibold text-surface-900 dark:text-white">
+                        {job.title}
+                      </p>
+                      <div className="mt-2 flex items-center gap-4 text-sm text-surface-500">
+                        <span className="flex items-center gap-1">
+                          <Users className="h-4 w-4" />
+                          {job.applications_count ?? 0}
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <Eye className="h-4 w-4" />
+                          {job.views_count ?? 0}
+                        </span>
                       </div>
-                      <Progress value={(job.applications / 50) * 100} className="h-1" />
+                      {(job.applications_count ?? 0) > 0 && (
+                        <div className="mt-2">
+                          <div className="flex items-center justify-between text-xs text-surface-400 mb-1">
+                            <span>Arizalar</span>
+                            <span>{job.applications_count ?? 0}/50</span>
+                          </div>
+                          <Progress value={((job.applications_count ?? 0) / 50) * 100} className="h-1" />
+                        </div>
+                      )}
                     </div>
-                  </div>
-                </Link>
-              ))}
+                  </Link>
+                ))
+              )}
               <Link href="/company/jobs">
                 <Button variant="outline" className="w-full">
                   Barchasi ko'rish
@@ -398,78 +331,33 @@ export default function CompanyDashboardPage() {
         </motion.div>
       </div>
 
-      {/* AI Recommendations */}
+      {/* Post Job Banner */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.4 }}
       >
-        <Card className="bg-gradient-to-br from-purple-50 to-indigo-50 dark:from-purple-900/20 dark:to-indigo-900/20">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Sparkles className="h-5 w-5 text-purple-500" />
-              AI tavsiyalari
-              <Badge className="ml-2 bg-purple-500 text-white">Yangi</Badge>
-            </CardTitle>
-            <p className="text-sm text-surface-500">
-              AI tomonidan tanlangan eng mos nomzodlar
-            </p>
-          </CardHeader>
-          <CardContent>
-            <div className="grid gap-4 md:grid-cols-2">
-              {mockAIRecommendations.map((candidate, index) => (
-                <motion.div
-                  key={candidate.id}
-                  initial={{ opacity: 0, scale: 0.95 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  transition={{ delay: 0.1 * index }}
-                  className="rounded-xl border border-purple-200 bg-white p-4 shadow-sm dark:border-purple-500/30 dark:bg-surface-800"
-                >
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br from-purple-500 to-indigo-600 text-lg font-bold text-white">
-                        {candidate.name.split(" ").map((n) => n[0]).join("")}
-                      </div>
-                      <div>
-                        <p className="font-semibold text-surface-900 dark:text-white">
-                          {candidate.name}
-                        </p>
-                        <p className="text-sm text-surface-500">{candidate.title}</p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-1 rounded-full bg-green-100 px-2 py-1 text-sm font-medium text-green-700">
-                      <Star className="h-4 w-4 fill-current" />
-                      {candidate.matchScore}%
-                    </div>
-                  </div>
-                  <p className="mt-3 text-sm text-surface-500">
-                    <Sparkles className="mr-1 inline h-3 w-3 text-purple-500" />
-                    {candidate.reason}
-                  </p>
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    {candidate.skills.slice(0, 3).map((skill) => (
-                      <Badge key={skill} variant="secondary" className="text-xs">
-                        {skill}
-                      </Badge>
-                    ))}
-                    {candidate.skills.length > 3 && (
-                      <Badge variant="secondary" className="text-xs">
-                        +{candidate.skills.length - 3}
-                      </Badge>
-                    )}
-                  </div>
-                  <div className="mt-4 flex gap-2">
-                    <Button size="sm" variant="gradient" className="flex-1">
-                      <Mail className="mr-2 h-4 w-4" />
-                      Bog'lanish
-                    </Button>
-                    <Button size="sm" variant="outline">
-                      Profil
-                    </Button>
-                  </div>
-                </motion.div>
-              ))}
+        <Card className="bg-gradient-to-br from-purple-50 to-indigo-50 dark:from-purple-900/20 dark:to-indigo-900/20 border-purple-200 dark:border-purple-500/30">
+          <CardContent className="flex flex-col gap-4 p-6 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-center gap-4">
+              <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-purple-100 dark:bg-purple-500/20">
+                <Sparkles className="h-7 w-7 text-purple-600" />
+              </div>
+              <div>
+                <h3 className="font-display text-lg font-semibold text-surface-900 dark:text-white">
+                  Eng yaxshi nomzodlarni toping
+                </h3>
+                <p className="text-sm text-surface-500">
+                  Yangi vakansiya yarating va AI yordamida eng mos nomzodlarni toping
+                </p>
+              </div>
             </div>
+            <Link href="/company/jobs/new">
+              <Button variant="gradient">
+                <PlusCircle className="mr-2 h-4 w-4" />
+                Vakansiya yaratish
+              </Button>
+            </Link>
           </CardContent>
         </Card>
       </motion.div>

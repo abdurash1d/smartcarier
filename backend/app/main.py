@@ -33,17 +33,50 @@ VERSION: 1.0.0
 import logging
 from contextlib import asynccontextmanager
 from typing import Any, Dict
+from datetime import datetime
 
-from fastapi import FastAPI, Request, status
+from fastapi import FastAPI, Request, status, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
 from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy import text
+from sqlalchemy.orm import Session
 
 # Local imports
 from app.config import settings, print_config_summary
 from app.api.v1 import api_router
-from app.database import check_database_connection
+from app.database import check_database_connection, get_db
+
+# =============================================================================
+# SENTRY INTEGRATION (Error Monitoring)
+# =============================================================================
+
+# Initialize Sentry for production error tracking
+if settings.SENTRY_DSN and not settings.DEBUG:
+    try:
+        import sentry_sdk
+        from sentry_sdk.integrations.fastapi import FastApiIntegration
+        from sentry_sdk.integrations.sqlalchemy import SqlalchemyIntegration
+        
+        sentry_sdk.init(
+            dsn=settings.SENTRY_DSN,
+            environment=settings.sentry_environment,
+            traces_sample_rate=0.1,  # 10% of transactions for performance monitoring
+            profiles_sample_rate=0.1,  # 10% of profiles
+            integrations=[
+                FastApiIntegration(),
+                SqlalchemyIntegration(),
+            ],
+            send_default_pii=False,  # Don't send personally identifiable information
+            attach_stacktrace=True,
+            before_send=lambda event, hint: event if not settings.DEBUG else None,
+        )
+        logger.info("Sentry error monitoring initialized")
+    except ImportError:
+        logger.warning("Sentry SDK not installed. Run: pip install sentry-sdk[fastapi]")
+    except Exception as e:
+        logger.warning(f"Failed to initialize Sentry: {e}")
 
 # =============================================================================
 # LOGGING CONFIGURATION
@@ -162,6 +195,42 @@ def create_application() -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+    
+    # =========================================================================
+    # GZIP COMPRESSION MIDDLEWARE (Performance)
+    # =========================================================================
+    
+    from fastapi.middleware.gzip import GZipMiddleware
+    application.add_middleware(GZipMiddleware, minimum_size=1000)  # Compress responses > 1KB
+    logger.info("GZip compression enabled (minimum_size=1KB)")
+    
+    # =========================================================================
+    # SECURITY HEADERS MIDDLEWARE (Production)
+    # =========================================================================
+    
+    @application.middleware("http")
+    async def add_security_headers(request: Request, call_next):
+        """
+        Add security headers to all responses in production.
+        
+        Headers:
+        - X-Content-Type-Options: Prevent MIME type sniffing
+        - X-Frame-Options: Prevent clickjacking
+        - X-XSS-Protection: Enable XSS filter
+        - Strict-Transport-Security: Force HTTPS
+        - Referrer-Policy: Control referrer information
+        """
+        response = await call_next(request)
+        
+        if not settings.DEBUG:
+            response.headers["X-Content-Type-Options"] = "nosniff"
+            response.headers["X-Frame-Options"] = "DENY"
+            response.headers["X-XSS-Protection"] = "1; mode=block"
+            response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+            response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+            response.headers["Content-Security-Policy"] = "default-src 'self'"
+        
+        return response
     
     # =========================================================================
     # INCLUDE ROUTERS
@@ -316,25 +385,75 @@ async def root():
 @app.get(
     "/health",
     tags=["Health"],
-    summary="Health check",
+    summary="Production health check",
     response_model=Dict[str, Any]
 )
-async def health_check():
+async def health_check(db: Session = Depends(get_db)):
     """
-    Health check endpoint.
+    Comprehensive health check endpoint for production monitoring.
+    
+    Checks:
+    - Database connection
+    - AI service configuration
+    - Redis connection (if enabled)
+    - Application status
     
     Returns:
         - status: "healthy" or "unhealthy"
         - database: connection status
+        - ai_service: configuration status
+        - redis: connection status
         - version: app version
-    """
-    db_healthy = check_database_connection()
+        - timestamp: current server time
+        - environment: production/development
     
-    return {
-        "status": "healthy" if db_healthy else "unhealthy",
-        "database": "connected" if db_healthy else "disconnected",
+    Status Codes:
+        - 200: All systems healthy
+        - 503: Service unavailable (database down)
+    """
+    health_status = {
+        "status": "healthy",
         "version": settings.APP_VERSION,
+        "environment": settings.sentry_environment,
+        "timestamp": datetime.utcnow().isoformat(),
     }
+    
+    # Check database connection
+    try:
+        db.execute(text("SELECT 1"))
+        health_status["database"] = "connected"
+    except Exception as e:
+        logger.error(f"Health check - Database error: {e}")
+        health_status["database"] = "disconnected"
+        health_status["status"] = "unhealthy"
+    
+    # Check AI service configuration
+    ai_configured = bool(settings.GEMINI_API_KEY or settings.OPENAI_API_KEY)
+    health_status["ai_service"] = {
+        "provider": settings.AI_PROVIDER,
+        "configured": ai_configured,
+        "model": settings.GEMINI_MODEL if settings.AI_PROVIDER == "gemini" else settings.OPENAI_MODEL
+    }
+    
+    # Check Redis (if enabled)
+    if settings.REDIS_ENABLED:
+        try:
+            from app.core.redis_client import redis_client
+            await redis_client.ping()
+            health_status["redis"] = "connected"
+        except:
+            health_status["redis"] = "disconnected"
+    else:
+        health_status["redis"] = "disabled"
+    
+    # Return 503 if unhealthy
+    if health_status["status"] == "unhealthy":
+        return JSONResponse(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            content=health_status
+        )
+    
+    return health_status
 
 
 @app.get(

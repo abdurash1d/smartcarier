@@ -22,6 +22,9 @@ export interface User {
   is_verified: boolean;
   avatar_url?: string;
   company_name?: string;
+  company_website?: string;
+  bio?: string;
+  location?: string;
   created_at: string;
   updated_at?: string;
   last_login?: string;
@@ -299,4 +302,159 @@ export interface ApiError {
     message: string;
     details?: Record<string, string[]>;
   };
+}
+
+// =============================================================================
+// UNIVERSITY TYPES
+// =============================================================================
+
+export interface University {
+  id: string;
+  name: string;
+  short_name?: string;
+  country: string;
+  city: string;
+  world_ranking?: number;
+  country_ranking?: number;
+  programs?: string[];
+  description?: string;
+  website_url?: string;
+  logo_url?: string;
+  requirements?: {
+    ielts?: number;
+    toefl?: number;
+    gpa?: number;
+    gre?: boolean;
+  };
+  acceptance_rate?: string;
+  tuition_min?: number;
+  tuition_max?: number;
+  tuition_currency?: string;
+  tuition_note?: string;
+  application_deadline_fall?: string;
+  application_deadline_spring?: string;
+  application_deadline_summer?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Scholarship {
+  id: string;
+  name: string;
+  description?: string;
+  country: string;
+  amount_info?: {
+    amount?: number;
+    currency?: string;
+    type?: string;
+    monthly_stipend?: number;
+  };
+  coverage?: string[];
+  requirements?: string[];
+  eligibility_criteria?: string;
+  application_deadline: string;
+  website_url?: string;
+  application_url?: string;
+  university_id?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export type UniversityApplicationStatus = 
+  | "draft"
+  | "in_progress"
+  | "submitted"
+  | "under_review"
+  | "interview_scheduled"
+  | "accepted"
+  | "rejected"
+  | "waitlisted"
+  | "withdrawn";
+
+export interface UniversityApplication {
+  id: string;
+  user_id: string;
+  university_id: string;
+  program: string;
+  intake_semester?: string;
+  intake_year?: number;
+  status: UniversityApplicationStatus;
+  documents?: Record<string, any>;
+  documents_completed: number;
+  documents_total: number;
+  submitted_at?: string;
+  deadline?: string;
+  notes?: string;
+  created_at: string;
+  updated_at: string;
+  university?: {
+    id: string;
+    name: string;
+    country: string;
+    city: string;
+  };
+}
+
+export interface MotivationLetter {
+  id: string;
+  application_id: string;
+  title?: string;
+  content: string;
+  ai_generated: boolean;
+  word_count?: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface UniversitySearchParams {
+  search?: string;
+  country?: string;
+  city?: string;
+  min_ranking?: number;
+  max_ranking?: number;
+  programs?: string[];
+  page?: number;
+  limit?: number;
+  sort_by?: "world_ranking" | "name" | "country";
+  sort_order?: "asc" | "desc";
+}
+
+export interface UniversityAISearchRequest {
+  student_profile: {
+    gpa?: number;
+    ielts?: number;
+    toefl?: number;
+    experience?: string[];
+    interests?: string[];
+    achievements?: string[];
+  };
+  preferred_countries?: string[];
+  preferred_programs?: string[];
+  budget_min?: number;
+  budget_max?: number;
+  max_results?: number;
+}
+
+export interface PaginatedUniversityResponse {
+  items: University[];
+  total: number;
+  page: number;
+  limit: number;
+  pages: number;
+}
+
+export interface PaginatedScholarshipResponse {
+  items: Scholarship[];
+  total: number;
+  page: number;
+  limit: number;
+  pages: number;
+}
+
+export interface PaginatedUniversityApplicationResponse {
+  items: UniversityApplication[];
+  total: number;
+  page: number;
+  limit: number;
+  pages: number;
 }

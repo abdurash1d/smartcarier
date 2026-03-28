@@ -10,6 +10,8 @@
 
 import { useCallback, useState } from "react";
 import type { Resume } from "@/types/api";
+import { resumeApi, getErrorMessage } from "@/lib/api";
+import { toast } from "sonner";
 
 // =============================================================================
 // TYPES
@@ -69,22 +71,22 @@ export function useResume() {
     setState((prev) => ({ ...prev, isLoading: true, error: null }));
 
     try {
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 500));
+      const response = await resumeApi.list();
+      const data = response.data as { resumes?: Resume[] };
 
-      // In real app: const response = await api.get('/resumes');
-      
       setState((prev) => ({
         ...prev,
-        resumes: [],
+        resumes: data.resumes || [],
         isLoading: false,
       }));
     } catch (error) {
+      const message = getErrorMessage(error);
       setState((prev) => ({
         ...prev,
         isLoading: false,
-        error: "Failed to fetch resumes",
+        error: message,
       }));
+      toast.error(message);
     }
   }, []);
 
@@ -93,22 +95,23 @@ export function useResume() {
     setState((prev) => ({ ...prev, isLoading: true, error: null }));
 
     try {
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 500));
+      const response = await resumeApi.get(id);
+      const resume = response.data as Resume;
 
-      // In real app: const response = await api.get(`/resumes/${id}`);
-      
       setState((prev) => ({
         ...prev,
-        currentResume: null,
+        currentResume: resume,
         isLoading: false,
       }));
+      return resume;
     } catch (error) {
+      const message = getErrorMessage(error);
       setState((prev) => ({
         ...prev,
         isLoading: false,
-        error: "Failed to fetch resume",
+        error: message,
       }));
+      toast.error(message);
     }
   }, []);
 
@@ -117,22 +120,8 @@ export function useResume() {
     setState((prev) => ({ ...prev, isLoading: true, error: null }));
 
     try {
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 500));
-
-      // In real app: const response = await api.post('/resumes', data);
-      
-      const newResume: Resume = {
-        id: `resume-${Date.now()}`,
-        user_id: "user-1",
-        title: data.title,
-        content: data.content,
-        ai_generated: false,
-        status: "draft",
-        view_count: 0,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      };
+      const response = await resumeApi.create(data);
+      const newResume = response.data as Resume;
 
       setState((prev) => ({
         ...prev,
@@ -141,13 +130,16 @@ export function useResume() {
         isLoading: false,
       }));
 
+      toast.success("Resume created successfully");
       return newResume;
     } catch (error) {
+      const message = getErrorMessage(error);
       setState((prev) => ({
         ...prev,
         isLoading: false,
-        error: "Failed to create resume",
+        error: message,
       }));
+      toast.error(message);
       throw error;
     }
   }, []);
@@ -157,33 +149,18 @@ export function useResume() {
     setState((prev) => ({ ...prev, isGenerating: true, error: null }));
 
     try {
-      // Simulate AI generation (takes longer)
-      await new Promise((resolve) => setTimeout(resolve, 3000));
-
-      // In real app: const response = await api.post('/resumes/generate-ai', data);
-      
-      const newResume: Resume = {
-        id: `resume-${Date.now()}`,
-        user_id: "user-1",
-        title: `${data.user_data.name} - ${data.template || "Modern"} Resume`,
-        content: {
-          personal_info: {
-            name: data.user_data.name,
-            email: data.user_data.email,
-            phone: data.user_data.phone,
-          },
-          summary: "AI-generated professional summary...",
-          experience: data.user_data.experience,
-          education: data.user_data.education,
-          skills: data.user_data.skills,
-        },
-        ai_generated: true,
-        status: "draft",
-        view_count: 0,
-        ats_score: 92,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
+      const response = await resumeApi.generateAI(data as any);
+      const result = response.data as {
+        success: boolean;
+        message?: string;
+        resume?: Resume;
       };
+
+      if (!result.success || !result.resume) {
+        throw new Error(result.message || "Failed to generate resume with AI");
+      }
+
+      const newResume = result.resume;
 
       setState((prev) => ({
         ...prev,
@@ -192,13 +169,16 @@ export function useResume() {
         isGenerating: false,
       }));
 
+      toast.success("AI resume generated successfully");
       return newResume;
     } catch (error) {
+      const message = getErrorMessage(error);
       setState((prev) => ({
         ...prev,
         isGenerating: false,
-        error: "Failed to generate resume",
+        error: message,
       }));
+      toast.error(message);
       throw error;
     }
   }, []);
@@ -208,28 +188,30 @@ export function useResume() {
     setState((prev) => ({ ...prev, isLoading: true, error: null }));
 
     try {
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 500));
+      const response = await resumeApi.update(id, data);
+      const updated = response.data as Resume;
 
-      // In real app: const response = await api.put(`/resumes/${id}`, data);
-      
       setState((prev) => ({
         ...prev,
         resumes: prev.resumes.map((r) =>
-          r.id === id ? { ...r, ...data, updated_at: new Date().toISOString() } : r
+          r.id === id ? updated : r
         ),
         currentResume:
           prev.currentResume?.id === id
-            ? { ...prev.currentResume, ...data, updated_at: new Date().toISOString() }
+            ? updated
             : prev.currentResume,
         isLoading: false,
       }));
+      toast.success("Resume updated");
+      return updated;
     } catch (error) {
+      const message = getErrorMessage(error);
       setState((prev) => ({
         ...prev,
         isLoading: false,
-        error: "Failed to update resume",
+        error: message,
       }));
+      toast.error(message);
       throw error;
     }
   }, []);
@@ -239,63 +221,112 @@ export function useResume() {
     setState((prev) => ({ ...prev, isLoading: true, error: null }));
 
     try {
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 500));
+      await resumeApi.delete(id);
 
-      // In real app: await api.delete(`/resumes/${id}`);
-      
       setState((prev) => ({
         ...prev,
         resumes: prev.resumes.filter((r) => r.id !== id),
         currentResume: prev.currentResume?.id === id ? null : prev.currentResume,
         isLoading: false,
       }));
+      toast.success("Resume deleted");
     } catch (error) {
+      const message = getErrorMessage(error);
       setState((prev) => ({
         ...prev,
         isLoading: false,
-        error: "Failed to delete resume",
+        error: message,
       }));
+      toast.error(message);
       throw error;
     }
   }, []);
 
   // Publish resume
   const publishResume = useCallback(async (id: string) => {
-    return updateResume(id, { status: "published" });
-  }, [updateResume]);
+    setState((prev) => ({ ...prev, isLoading: true, error: null }));
+
+    try {
+      const response = await resumeApi.publish(id);
+      const updated = response.data as Resume;
+
+      setState((prev) => ({
+        ...prev,
+        resumes: prev.resumes.map((r) => (r.id === id ? updated : r)),
+        currentResume: prev.currentResume?.id === id ? updated : prev.currentResume,
+        isLoading: false,
+      }));
+
+      toast.success("Resume published");
+      return updated;
+    } catch (error) {
+      const message = getErrorMessage(error);
+      setState((prev) => ({
+        ...prev,
+        isLoading: false,
+        error: message,
+      }));
+      toast.error(message);
+      throw error;
+    }
+  }, []);
 
   // Archive resume
   const archiveResume = useCallback(async (id: string) => {
-    return updateResume(id, { status: "archived" });
-  }, [updateResume]);
+    setState((prev) => ({ ...prev, isLoading: true, error: null }));
+
+    try {
+      const response = await resumeApi.archive(id);
+      const updated = response.data as Resume;
+
+      setState((prev) => ({
+        ...prev,
+        resumes: prev.resumes.map((r) => (r.id === id ? updated : r)),
+        currentResume: prev.currentResume?.id === id ? updated : prev.currentResume,
+        isLoading: false,
+      }));
+
+      toast.success("Resume archived");
+      return updated;
+    } catch (error) {
+      const message = getErrorMessage(error);
+      setState((prev) => ({
+        ...prev,
+        isLoading: false,
+        error: message,
+      }));
+      toast.error(message);
+      throw error;
+    }
+  }, []);
 
   // Download resume as PDF
   const downloadResume = useCallback(async (id: string) => {
     setState((prev) => ({ ...prev, isLoading: true, error: null }));
 
     try {
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-
-      // In real app: Download the PDF
-      // const blob = await api.get(`/resumes/${id}/download`, { responseType: 'blob' });
-      // const url = window.URL.createObjectURL(blob);
-      // const a = document.createElement('a');
-      // a.href = url;
-      // a.download = 'resume.pdf';
-      // a.click();
+      const response = await resumeApi.download(id);
+      const blob = response.data as Blob;
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "resume.pdf";
+      a.click();
+      window.URL.revokeObjectURL(url);
 
       setState((prev) => ({
         ...prev,
         isLoading: false,
       }));
+      toast.success("Resume PDF download started");
     } catch (error) {
+      const message = getErrorMessage(error);
       setState((prev) => ({
         ...prev,
         isLoading: false,
-        error: "Failed to download resume",
+        error: message,
       }));
+      toast.error(message);
       throw error;
     }
   }, []);

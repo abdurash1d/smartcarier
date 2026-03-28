@@ -60,8 +60,8 @@ from uuid import UUID, uuid4
 # JWT handling
 from jose import jwt, JWTError, ExpiredSignatureError
 
-# Password hashing
-from passlib.context import CryptContext
+# Password hashing - use bcrypt directly (passlib 1.7.4 is incompatible with bcrypt 4.x)
+import bcrypt as _bcrypt
 
 # Redis for token blacklist (optional, can use in-memory for dev)
 from app.core.redis_client import get_redis
@@ -79,52 +79,51 @@ logger = logging.getLogger(__name__)
 # PASSWORD HASHING
 # =============================================================================
 
-# Password context with bcrypt
-# WHY bcrypt?
-#   - Industry standard
-#   - Resistant to GPU attacks
-#   - Automatic salt generation
-#   - Configurable work factor
-pwd_context = CryptContext(
-    schemes=["bcrypt"],
-    deprecated="auto",
-    bcrypt__rounds=12  # 2^12 iterations
-)
+# NOTE: passlib 1.7.4 is incompatible with bcrypt 4.x (truncate_error bug).
+# We bypass passlib entirely and call bcrypt directly for hashing/verification.
+# This ensures correct behavior regardless of bcrypt version.
+
+_BCRYPT_ROUNDS = 12
+
+
+def _truncate_password(password: str) -> bytes:
+    """Encode and truncate password to 72 bytes for bcrypt."""
+    encoded = password.encode('utf-8')
+    return encoded[:72]
 
 
 def get_password_hash(password: str) -> str:
     """
-    Hash a plain text password.
-    
-    Uses bcrypt with automatic salt generation.
+    Hash a plain text password using bcrypt.
     
     Args:
-        password: Plain text password
+        password: Plain text password (max 72 bytes used)
         
     Returns:
-        Hashed password string
-        
-    Example:
-        hash = get_password_hash("SecurePass123!")
-        # Returns: "$2b$12$..."
+        Hashed password string (bcrypt format)
     """
-    return pwd_context.hash(password)
+    password_bytes = _truncate_password(password)
+    salt = _bcrypt.gensalt(rounds=_BCRYPT_ROUNDS)
+    return _bcrypt.hashpw(password_bytes, salt).decode('utf-8')
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     """
-    Verify a password against its hash.
-    
-    Uses constant-time comparison to prevent timing attacks.
+    Verify a password against its bcrypt hash.
     
     Args:
         plain_password: Password to verify
-        hashed_password: Stored hash
+        hashed_password: Stored bcrypt hash
         
     Returns:
         True if password matches, False otherwise
     """
-    return pwd_context.verify(plain_password, hashed_password)
+    try:
+        plain_bytes = _truncate_password(plain_password)
+        hash_bytes = hashed_password.encode('utf-8') if isinstance(hashed_password, str) else hashed_password
+        return _bcrypt.checkpw(plain_bytes, hash_bytes)
+    except Exception:
+        return False
 
 
 # =============================================================================

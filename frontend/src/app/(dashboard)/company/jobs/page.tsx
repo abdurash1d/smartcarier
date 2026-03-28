@@ -24,13 +24,13 @@ import { useJobs } from "@/hooks/useJobs";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { CardSkeleton } from "@/components/ui/skeleton";
+import { SkeletonCard } from "@/components/ui/skeleton";
 import { formatRelativeTime, formatSalaryRange } from "@/lib/utils";
 import type { Job } from "@/types/api";
 
 export default function CompanyJobsPage() {
   const {
-    myJobs,
+    jobs,
     isLoading,
     fetchMyJobs,
     publishJob,
@@ -39,32 +39,27 @@ export default function CompanyJobsPage() {
   } = useJobs();
   const [activeMenu, setActiveMenu] = useState<string | null>(null);
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     fetchMyJobs();
   }, []);
 
   const handleAction = async (action: string, job: Job) => {
     setActiveMenu(null);
-    switch (action) {
-      case "publish":
-        await publishJob(job.id);
-        break;
-      case "close":
-        await closeJob(job.id);
-        break;
-      case "delete":
-        if (confirm("Are you sure you want to delete this job posting?")) {
-          await deleteJob(job.id);
-        }
-        break;
+    if (action === "publish") await publishJob(job.id);
+    if (action === "close") await closeJob(job.id);
+    if (action === "delete") {
+      if (confirm(`"${job.title}" vakansiyasini o'chirishni tasdiqlaysizmi?`)) {
+        await deleteJob(job.id);
+      }
     }
   };
 
-  const activeJobs = myJobs.filter((j) => j.status === "active");
-  const draftJobs = myJobs.filter((j) => j.status === "draft");
-  const closedJobs = myJobs.filter((j) => j.status === "closed");
-  const totalApplications = myJobs.reduce((sum, j) => sum + j.applications_count, 0);
-  const totalViews = myJobs.reduce((sum, j) => sum + j.views_count, 0);
+  const activeJobs = jobs.filter((j) => j.status === "active");
+  const draftJobs = jobs.filter((j) => j.status === "draft");
+  const closedJobs = jobs.filter((j) => j.status === "closed");
+  const totalApplications = jobs.reduce((sum, j) => sum + (j.applications_count ?? 0), 0);
+  const totalViews = jobs.reduce((sum, j) => sum + (j.views_count ?? 0), 0);
 
   return (
     <div className="space-y-6">
@@ -154,10 +149,10 @@ export default function CompanyJobsPage() {
       {isLoading ? (
         <div className="space-y-4">
           {[1, 2, 3].map((i) => (
-            <CardSkeleton key={i} />
+            <SkeletonCard key={i} />
           ))}
         </div>
-      ) : myJobs.length === 0 ? (
+      ) : jobs.length === 0 ? (
         <Card className="py-12">
           <CardContent className="flex flex-col items-center justify-center text-center">
             <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-surface-100 dark:bg-surface-800">
@@ -179,7 +174,7 @@ export default function CompanyJobsPage() {
         </Card>
       ) : (
         <div className="space-y-4">
-          {myJobs.map((job) => (
+          {jobs.map((job) => (
             <Card key={job.id}>
               <CardContent className="p-5">
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -207,7 +202,7 @@ export default function CompanyJobsPage() {
                       <span>{job.location}</span>
                       <span>{job.job_type.replace("_", " ")}</span>
                       <span>{job.experience_level}</span>
-                      {job.is_salary_visible && (
+                      {job.salary_min !== undefined && job.salary_max !== undefined && (
                         <span>{formatSalaryRange(job.salary_min, job.salary_max)}</span>
                       )}
                     </div>

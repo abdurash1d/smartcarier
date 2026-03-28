@@ -45,7 +45,7 @@ from app.core.dependencies import (
     get_optional_current_user,
     PaginationParams
 )
-from app.models import User, Job, JobStatus, UserRole, Resume, Application, ApplicationStatus
+from app.models import User, Job, JobStatus, UserRole, Resume, Application, ApplicationStatus, SavedJob
 from app.schemas.job import (
     JobCreate,
     JobUpdate,
@@ -1243,3 +1243,103 @@ def _calculate_match_score(
     score = min(score, 100)
     
     return score, skill_matches, missing_skills, reasons
+
+
+# =============================================================================
+# SAVED JOBS ENDPOINTS
+# =============================================================================
+
+@router.post("/{job_id}/save", summary="Save a job")
+async def save_job(
+    job_id: UUID,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db),
+):
+    """Save (bookmark) a job for later."""
+    job = db.query(Job).filter(Job.id == job_id, Job.is_deleted == False).first()
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    existing = db.query(SavedJob).filter(
+        SavedJob.user_id == current_user.id,
+        SavedJob.job_id == job_id,
+    ).first()
+
+    if existing:
+        raise HTTPException(status_code=400, detail="Job already saved")
+
+    saved = SavedJob(user_id=current_user.id, job_id=job_id)
+    db.add(saved)
+    db.commit()
+    return {"success": True, "message": "Job saved successfully"}
+
+
+@router.delete("/{job_id}/save", summary="Unsave a job")
+async def unsave_job(
+    job_id: UUID,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db),
+):
+    """Remove a job from saved list."""
+    saved = db.query(SavedJob).filter(
+        SavedJob.user_id == current_user.id,
+        SavedJob.job_id == job_id,
+    ).first()
+
+    if not saved:
+        raise HTTPException(status_code=404, detail="Saved job not found")
+
+    db.delete(saved)
+    db.commit()
+    return {"success": True, "message": "Job removed from saved list"}
+
+
+@router.get("/saved", summary="Get saved jobs")
+async def get_saved_jobs(
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db),
+    page: int = Query(1, ge=1),
+    limit: int = Query(20, ge=1, le=100),
+):
+    """Get all saved (bookmarked) jobs for current user."""
+    query = (
+        db.query(SavedJob)
+        .filter(SavedJob.user_id == current_user.id)
+        .order_by(SavedJob.created_at.desc())
+    )
+    total = query.count()
+    saved_jobs = query.offset((page - 1) * limit).limit(limit).all()
+
+    jobs_data = []
+    for saved in saved_jobs:
+        job = saved.job
+        if job and not job.is_deleted:
+            company = job.company
+            jobs_data.append({
+                "id": str(job.id),
+                "title": job.title,
+                "description": job.description[:200] + "..." if len(job.description) > 200 else job.description,
+                "location": job.location,
+                "job_type": job.job_type,
+                "experience_level": job.experience_level,
+                "salary_min": job.salary_min,
+                "salary_max": job.salary_max,
+                "status": job.status,
+                "applications_count": job.applications_count,
+                "views_count": job.views_count,
+                "created_at": job.created_at.isoformat() if job.created_at else None,
+                "company": {
+                    "name": company.company_name or company.full_name if company else "Unknown",
+                    "logo_url": company.avatar_url if company else None,
+                } if company else None,
+                "saved_at": saved.created_at.isoformat() if saved.created_at else None,
+            })
+
+    return {
+        "success": True,
+        "data": jobs_data,
+        "total": total,
+        "page": page,
+        "limit": limit,
+        "pages": (total + limit - 1) // limit,
+    }

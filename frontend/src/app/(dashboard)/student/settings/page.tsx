@@ -12,7 +12,7 @@
 
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import {
   User,
@@ -39,6 +39,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Avatar } from "@/components/ui/avatar";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { userApi, api, getErrorMessage } from "@/lib/api";
+import { toast } from "sonner";
 
 // =============================================================================
 // ANIMATION VARIANTS
@@ -63,23 +65,25 @@ const itemVariants = {
 
 export default function SettingsPage() {
   const { t } = useTranslation();
-  const { user, updateUser, isLoading } = useAuth();
+  const { user, updateUser, changePassword, isLoading } = useAuth();
   const [activeTab, setActiveTab] = useState("profile");
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
+  const avatarInputRef = useState<HTMLInputElement | null>(null);
 
-  // Form states
+  // Form states - initialize from real user data
   const [profile, setProfile] = useState({
     full_name: user?.full_name || "",
     email: user?.email || "",
     phone: user?.phone || "",
-    location: "Tashkent, Uzbekistan",
-    bio: "Passionate software developer with 5+ years of experience...",
-    linkedin: "https://linkedin.com/in/johndoe",
-    github: "https://github.com/johndoe",
-    website: "https://johndoe.dev",
+    location: user?.location || "",
+    bio: user?.bio || "",
+    linkedin: "",
+    github: "",
+    website: "",
   });
 
   const [passwords, setPasswords] = useState({
@@ -97,14 +101,96 @@ export default function SettingsPage() {
     push_messages: true,
   });
 
+  const [privacy, setPrivacy] = useState({
+    public_profile: true,
+    show_email: false,
+    show_phone: false,
+  });
+
+  const [isSavingNotifications, setIsSavingNotifications] = useState(false);
+  const [isSavingPrivacy, setIsSavingPrivacy] = useState(false);
+
+  useEffect(() => {
+    api.get("/users/me/notification-preferences")
+      .then((res) => res.data?.data && setNotifications(res.data.data))
+      .catch(() => {});
+    api.get("/users/me/privacy-settings")
+      .then((res) => res.data?.data && setPrivacy(res.data.data))
+      .catch(() => {});
+  }, []);
+
+  const handleSaveNotifications = async () => {
+    setIsSavingNotifications(true);
+    try {
+      await api.put("/users/me/notification-preferences", notifications);
+      toast.success("Bildirishnoma sozlamalari saqlandi");
+    } catch (error) {
+      toast.error(getErrorMessage(error));
+    } finally {
+      setIsSavingNotifications(false);
+    }
+  };
+
+  const handleSavePrivacy = async () => {
+    setIsSavingPrivacy(true);
+    try {
+      await api.put("/users/me/privacy-settings", privacy);
+      toast.success("Maxfiylik sozlamalari saqlandi");
+    } catch (error) {
+      toast.error(getErrorMessage(error));
+    } finally {
+      setIsSavingPrivacy(false);
+    }
+  };
+
   const handleSaveProfile = async () => {
     setIsSaving(true);
     try {
-      await updateUser({ full_name: profile.full_name });
+      await updateUser({
+        full_name: profile.full_name,
+        phone: profile.phone,
+        bio: (profile as any).bio,
+        location: (profile as any).location,
+      });
       setSaveSuccess(true);
+      toast.success(t("settingsPage.saved"));
       setTimeout(() => setSaveSuccess(false), 3000);
+    } catch (error) {
+      toast.error(getErrorMessage(error));
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleChangePassword = async () => {
+    if (passwords.new !== passwords.confirm) {
+      toast.error("Yangi parollar mos kelmaydi");
+      return;
+    }
+    if (passwords.new.length < 8) {
+      toast.error("Yangi parol kamida 8 ta belgi bo'lishi kerak");
+      return;
+    }
+    setIsChangingPassword(true);
+    try {
+      await changePassword(passwords.current, passwords.new);
+      toast.success("Parol muvaffaqiyatli yangilandi");
+      setPasswords({ current: "", new: "", confirm: "" });
+    } catch (error) {
+      toast.error(getErrorMessage(error));
+    } finally {
+      setIsChangingPassword(false);
+    }
+  };
+
+  const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      await userApi.uploadAvatar(file);
+      toast.success("Rasm yangilandi");
+    } catch (error) {
+      toast.error(getErrorMessage(error));
     }
   };
 
@@ -160,9 +246,15 @@ export default function SettingsPage() {
                       fallback={user?.full_name?.charAt(0)}
                       size="xl"
                     />
-                    <button className="absolute bottom-0 right-0 flex h-8 w-8 items-center justify-center rounded-full bg-purple-500 text-white shadow-lg hover:bg-purple-600">
+                    <label className="absolute bottom-0 right-0 flex h-8 w-8 cursor-pointer items-center justify-center rounded-full bg-purple-500 text-white shadow-lg hover:bg-purple-600">
                       <Camera className="h-4 w-4" />
-                    </button>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="sr-only"
+                        onChange={handleAvatarUpload}
+                      />
+                    </label>
                   </div>
                   <div className="text-center sm:text-left">
                     <h3 className="font-display text-lg font-semibold text-surface-900">
@@ -172,12 +264,12 @@ export default function SettingsPage() {
                       {t("settingsPage.photoDescription")}
                     </p>
                     <div className="mt-3 flex gap-2 justify-center sm:justify-start">
-                      <Button variant="outline" size="sm">
-                        {t("settingsPage.uploadPhoto")}
-                      </Button>
-                      <Button variant="ghost" size="sm" className="text-red-600">
-                        {t("settingsPage.remove")}
-                      </Button>
+                      <label className="cursor-pointer">
+                        <span className="inline-flex items-center gap-1 rounded-md border border-surface-300 px-3 py-1.5 text-sm font-medium text-surface-700 hover:bg-surface-50">
+                          {t("settingsPage.uploadPhoto")}
+                        </span>
+                        <input type="file" accept="image/*" className="sr-only" onChange={handleAvatarUpload} />
+                      </label>
                     </div>
                   </div>
                 </div>
@@ -398,7 +490,14 @@ export default function SettingsPage() {
                     icon={<Lock className="h-4 w-4" />}
                   />
                 </div>
-                <Button className="bg-gradient-to-r from-purple-500 to-indigo-600">
+                <Button
+                  onClick={handleChangePassword}
+                  disabled={isChangingPassword || !passwords.current || !passwords.new}
+                  className="bg-gradient-to-r from-purple-500 to-indigo-600"
+                >
+                  {isChangingPassword ? (
+                    <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent mr-2" />
+                  ) : null}
                   {t("settingsPage.updatePassword")}
                 </Button>
               </CardContent>
@@ -543,6 +642,21 @@ export default function SettingsPage() {
                 ))}
               </CardContent>
             </Card>
+            {/* Notifications Save Button */}
+            <div className="flex justify-end">
+              <Button
+                onClick={handleSaveNotifications}
+                disabled={isSavingNotifications}
+                className="bg-gradient-to-r from-purple-500 to-indigo-600 gap-2"
+              >
+                {isSavingNotifications ? (
+                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                ) : (
+                  <Save className="h-4 w-4" />
+                )}
+                Saqlash
+              </Button>
+            </div>
           </TabsContent>
 
           {/* Privacy Tab */}
@@ -552,42 +666,27 @@ export default function SettingsPage() {
                 <CardTitle>{t("settingsPage.profileVisibility")}</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="font-medium text-surface-900">{t("settingsPage.publicProfile")}</p>
-                    <p className="text-sm text-surface-500">
-                      {t("settingsPage.publicProfileDesc")}
-                    </p>
+                {[
+                  { key: "public_profile", label: t("settingsPage.publicProfile"), desc: t("settingsPage.publicProfileDesc") },
+                  { key: "show_email", label: t("settingsPage.showEmail"), desc: t("settingsPage.showEmailDesc") },
+                  { key: "show_phone", label: t("settingsPage.showPhone"), desc: t("settingsPage.showPhoneDesc") },
+                ].map((item) => (
+                  <div key={item.key} className="flex items-center justify-between border-b border-surface-100 pb-4 last:border-0 last:pb-0">
+                    <div>
+                      <p className="font-medium text-surface-900">{item.label}</p>
+                      <p className="text-sm text-surface-500">{item.desc}</p>
+                    </div>
+                    <label className="relative inline-flex cursor-pointer items-center">
+                      <input
+                        type="checkbox"
+                        checked={privacy[item.key as keyof typeof privacy]}
+                        onChange={(e) => setPrivacy((p) => ({ ...p, [item.key]: e.target.checked }))}
+                        className="peer sr-only"
+                      />
+                      <div className="peer h-6 w-11 rounded-full bg-surface-200 after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:bg-white after:shadow-sm after:transition-all after:content-[''] peer-checked:bg-purple-600 peer-checked:after:translate-x-full peer-focus:ring-2 peer-focus:ring-purple-300"></div>
+                    </label>
                   </div>
-                  <label className="relative inline-flex cursor-pointer items-center">
-                    <input type="checkbox" defaultChecked className="peer sr-only" />
-                    <div className="peer h-6 w-11 rounded-full bg-surface-200 after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:bg-white after:shadow-sm after:transition-all after:content-[''] peer-checked:bg-purple-600 peer-checked:after:translate-x-full peer-focus:ring-2 peer-focus:ring-purple-300"></div>
-                  </label>
-                </div>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="font-medium text-surface-900">{t("settingsPage.showEmail")}</p>
-                    <p className="text-sm text-surface-500">
-                      {t("settingsPage.showEmailDesc")}
-                    </p>
-                  </div>
-                  <label className="relative inline-flex cursor-pointer items-center">
-                    <input type="checkbox" className="peer sr-only" />
-                    <div className="peer h-6 w-11 rounded-full bg-surface-200 after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:bg-white after:shadow-sm after:transition-all after:content-[''] peer-checked:bg-purple-600 peer-checked:after:translate-x-full peer-focus:ring-2 peer-focus:ring-purple-300"></div>
-                  </label>
-                </div>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="font-medium text-surface-900">{t("settingsPage.showPhone")}</p>
-                    <p className="text-sm text-surface-500">
-                      {t("settingsPage.showPhoneDesc")}
-                    </p>
-                  </div>
-                  <label className="relative inline-flex cursor-pointer items-center">
-                    <input type="checkbox" className="peer sr-only" />
-                    <div className="peer h-6 w-11 rounded-full bg-surface-200 after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:bg-white after:shadow-sm after:transition-all after:content-[''] peer-checked:bg-purple-600 peer-checked:after:translate-x-full peer-focus:ring-2 peer-focus:ring-purple-300"></div>
-                  </label>
-                </div>
+                ))}
               </CardContent>
             </Card>
 
@@ -609,6 +708,22 @@ export default function SettingsPage() {
                 </div>
               </CardContent>
             </Card>
+
+            {/* Privacy Save Button */}
+            <div className="flex justify-end">
+              <Button
+                onClick={handleSavePrivacy}
+                disabled={isSavingPrivacy}
+                className="bg-gradient-to-r from-purple-500 to-indigo-600 gap-2"
+              >
+                {isSavingPrivacy ? (
+                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                ) : (
+                  <Save className="h-4 w-4" />
+                )}
+                Saqlash
+              </Button>
+            </div>
           </TabsContent>
         </Tabs>
       </motion.div>

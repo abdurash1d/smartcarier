@@ -130,6 +130,7 @@ from app.models.job import (
     JobType,                # Enum: full_time, part_time, remote, etc.
     ExperienceLevel,        # Enum: junior, mid, senior, lead
     JobStatus,              # Enum: draft, active, closed, filled
+    SavedJob,               # Bookmarked jobs by students
 )
 
 from app.models.application import (
@@ -142,6 +143,31 @@ from app.models.payment import (
     PaymentProvider,        # STRIPE
     PaymentStatus,          # PENDING, COMPLETED, FAILED, ...
     SubscriptionTier,       # FREE, PREMIUM, ENTERPRISE
+)
+
+from app.models.university import (
+    University,            # University model
+)
+
+from app.models.scholarship import (
+    Scholarship,           # Scholarship/Grant model
+)
+
+from app.models.university_application import (
+    UniversityApplication,  # University application model
+    UniversityApplicationStatus,  # Enum: draft, submitted, accepted, etc.
+)
+
+from app.models.motivation_letter import (
+    MotivationLetter,     # AI-generated motivation letter model
+)
+
+from app.models.notification import (
+    Notification,          # User notifications
+)
+
+from app.models.saved_search import (
+    SavedSearch,          # Saved search filters
 )
 
 # =============================================================================
@@ -176,6 +202,7 @@ __all__ = [
     "JobType",             # FULL_TIME, PART_TIME, REMOTE, HYBRID, etc.
     "ExperienceLevel",     # INTERN, JUNIOR, MID, SENIOR, LEAD, EXECUTIVE
     "JobStatus",           # DRAFT, ACTIVE, PAUSED, CLOSED, FILLED
+    "SavedJob",            # Student bookmarked jobs
     
     # -------------------------------------------------------------------------
     # Application Model & Enums
@@ -190,6 +217,21 @@ __all__ = [
     "PaymentProvider",
     "PaymentStatus",
     "SubscriptionTier",
+    
+    # -------------------------------------------------------------------------
+    # University Models & Enums
+    # -------------------------------------------------------------------------
+    "University",              # University model
+    "Scholarship",            # Scholarship/Grant model
+    "UniversityApplication",   # University application model
+    "UniversityApplicationStatus",  # Enum: draft, submitted, accepted, etc.
+    "MotivationLetter",       # AI-generated motivation letter model
+    
+    # -------------------------------------------------------------------------
+    # User Experience Models
+    # -------------------------------------------------------------------------
+    "Notification",           # User notifications
+    "SavedSearch",           # Saved search filters
 ]
 
 # =============================================================================

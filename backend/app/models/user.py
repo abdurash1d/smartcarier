@@ -65,17 +65,9 @@ from typing import Optional, List, Dict, Any, TYPE_CHECKING
 # SQLAlchemy imports
 from sqlalchemy import (
     Column, String, Boolean, DateTime, Enum as SQLEnum,
-    Index, CheckConstraint
+    Index, CheckConstraint, JSON
 )
 from sqlalchemy.orm import relationship, validates
-
-# Password hashing
-# WHY bcrypt?
-#   - Industry standard for password hashing
-#   - Intentionally slow (resistant to brute force)
-#   - Built-in salt generation
-#   - Configurable work factor (rounds)
-from passlib.context import CryptContext
 
 # Local imports
 from app.models.base import Base, UUIDMixin, TimestampMixin, SoftDeleteMixin, utc_now
@@ -86,22 +78,6 @@ if TYPE_CHECKING:
     from app.models.job import Job
     from app.models.application import Application
     from app.models.payment import Payment
-
-
-# =============================================================================
-# PASSWORD HASHING CONFIGURATION
-# =============================================================================
-
-# Create password context with bcrypt
-# WHY a context object?
-#   - Handles multiple algorithms (for migrations)
-#   - Automatic deprecation of old hashes
-#   - Can upgrade hashes on verification
-pwd_context = CryptContext(
-    schemes=["bcrypt"],      # Use bcrypt algorithm
-    deprecated="auto",       # Auto-deprecate old schemes
-    bcrypt__rounds=12        # Work factor (2^12 iterations)
-)
 
 
 # =============================================================================
@@ -348,7 +324,25 @@ class User(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin):
         nullable=True,
         comment="Stripe customer id (if payments enabled)"
     )
-    
+
+    # =========================================================================
+    # COLUMNS - USER PREFERENCES
+    # =========================================================================
+
+    notification_preferences = Column(
+        JSON,
+        nullable=True,
+        default=None,
+        comment="User's notification preferences (email/push toggles)"
+    )
+
+    privacy_settings = Column(
+        JSON,
+        nullable=True,
+        default=None,
+        comment="User's privacy settings (profile visibility, show email/phone)"
+    )
+
     # =========================================================================
     # COLUMNS - TRACKING
     # =========================================================================
@@ -404,6 +398,30 @@ class User(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin):
         lazy="dynamic",
     )
     
+    # Notifications (user alerts)
+    notifications = relationship(
+        "Notification",
+        back_populates="user",
+        cascade="all, delete-orphan",
+        lazy="dynamic",
+    )
+    
+    # Saved Searches (quick access to frequent searches)
+    saved_searches = relationship(
+        "SavedSearch",
+        back_populates="user",
+        cascade="all, delete-orphan",
+        lazy="dynamic",
+    )
+
+    # Saved Jobs (bookmarked jobs)
+    saved_jobs = relationship(
+        "SavedJob",
+        back_populates="user",
+        cascade="all, delete-orphan",
+        lazy="dynamic",
+    )
+    
     # =========================================================================
     # PASSWORD METHODS
     # =========================================================================
@@ -426,23 +444,19 @@ class User(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin):
         EXAMPLE:
             user.set_password("SecurePass123!")
         """
-        # Step 1: Validate password strength
+        from app.core.security import get_password_hash, _truncate_password
+        
+        # Step 1: Validate password strength (before truncation)
         self._validate_password_strength(password)
         
-        # Step 2: Hash the password using bcrypt
-        # This generates a random salt automatically
-        self.password_hash = pwd_context.hash(password)
+        # Step 2: Hash using the shared helper (includes 72-byte truncation)
+        self.password_hash = get_password_hash(password)
     
     def verify_password(self, password: str) -> bool:
         """
         Verify a password against the stored hash.
         
         Uses constant-time comparison to prevent timing attacks.
-        
-        WHAT IS A TIMING ATTACK?
-            Attackers measure how long password comparison takes.
-            Normal string comparison returns early on mismatch.
-            Constant-time comparison always takes the same time.
         
         Args:
             password: Plain text password to verify
@@ -454,7 +468,8 @@ class User(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin):
             if user.verify_password("SecurePass123!"):
                 print("Login successful!")
         """
-        return pwd_context.verify(password, self.password_hash)
+        from app.core.security import verify_password as _verify_password
+        return _verify_password(password, self.password_hash)
     
     @staticmethod
     def _validate_password_strength(password: str) -> None:

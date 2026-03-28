@@ -45,6 +45,7 @@ import {
 } from "lucide-react";
 import { useTranslation } from "@/hooks/useTranslation";
 import { LanguageSwitcher } from "@/components/ui/language-switcher";
+import { ThemeToggle } from "@/components/ui/theme-toggle";
 
 // =============================================================================
 // ANIMATION VARIANTS
@@ -159,7 +160,7 @@ const pricingPlans = [
   },
   {
     name: "Pro",
-    price: "29",
+    price: "4",
     description: "For serious job seekers",
     features: [
       "Unlimited AI resumes",
@@ -363,6 +364,9 @@ export default function LandingPage() {
 
             {/* Language Switcher + Auth Buttons */}
             <div className="flex items-center gap-3">
+              {/* Dark Mode Toggle */}
+              <ThemeToggle />
+              
               {/* Language Switcher */}
               <LanguageSwitcher variant="minimal" />
               
@@ -534,43 +538,52 @@ export default function LandingPage() {
               {/* Content mockup */}
               <div className="grid gap-4 p-4 md:grid-cols-3">
                 {/* Sidebar */}
-                <div className="space-y-3 rounded-xl bg-white/10 p-4">
-                  <div className="h-4 w-24 rounded bg-white/20" />
-                  <div className="space-y-2">
-                    {[1, 2, 3, 4].map((i) => (
-                      <div
-                        key={i}
-                        className={`flex items-center gap-2 rounded-lg p-2 ${
-                          i === 1 ? "bg-white/20" : ""
-                        }`}
-                      >
-                        <div className={`h-4 w-4 rounded ${i === 1 ? "bg-amber-400" : "bg-white/30"}`} />
-                        <div className="h-3 w-16 rounded bg-white/30" />
-                      </div>
-                    ))}
-                  </div>
+                <div className="space-y-2 rounded-xl bg-white/10 p-4">
+                  <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-white/40">Menyu</p>
+                  {[
+                    { icon: "🏠", label: "Dashboard", active: true },
+                    { icon: "📄", label: "Resumelar", active: false },
+                    { icon: "💼", label: "Ishlar", active: false },
+                    { icon: "📋", label: "Arizalar", active: false },
+                    { icon: "⚙️", label: "Sozlamalar", active: false },
+                  ].map((item) => (
+                    <div
+                      key={item.label}
+                      className={`flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm ${
+                        item.active ? "bg-white/20 text-white" : "text-white/60"
+                      }`}
+                    >
+                      <span>{item.icon}</span>
+                      <span>{item.label}</span>
+                    </div>
+                  ))}
                 </div>
 
                 {/* Main content */}
-                <div className="col-span-2 space-y-4 rounded-xl bg-white/10 p-4">
+                <div className="col-span-2 space-y-3 rounded-xl bg-white/10 p-4">
                   <div className="flex items-center justify-between">
-                    <div className="h-6 w-32 rounded bg-white/20" />
-                    <div className="h-8 w-24 rounded-lg bg-gradient-to-r from-cyan-400 to-blue-500" />
+                    <p className="text-sm font-semibold text-white">Tavsiya etilgan ishlar</p>
+                    <span className="rounded-full bg-gradient-to-r from-cyan-400 to-blue-500 px-3 py-0.5 text-xs font-semibold text-white">AI moslik</span>
                   </div>
-                  <div className="grid gap-4 md:grid-cols-2">
-                    {[1, 2, 3, 4].map((i) => (
-                      <div key={i} className="rounded-lg border border-white/10 bg-white/5 p-4">
-                        <div className="mb-3 flex items-center gap-3">
-                          <div className="h-10 w-10 rounded-lg bg-gradient-to-br from-purple-400 to-indigo-500" />
-                          <div className="space-y-1">
-                            <div className="h-4 w-24 rounded bg-white/20" />
-                            <div className="h-3 w-16 rounded bg-white/15" />
+                  <div className="grid gap-3 md:grid-cols-2">
+                    {[
+                      { title: "Frontend Developer", company: "EPAM Systems", salary: "$1200–1800", match: "98%", color: "from-purple-400 to-indigo-500" },
+                      { title: "React Engineer", company: "Click.uz", salary: "$900–1400", match: "94%", color: "from-cyan-400 to-blue-500" },
+                      { title: "UI/UX Designer", company: "Uzum Market", salary: "$800–1200", match: "91%", color: "from-pink-400 to-rose-500" },
+                      { title: "Data Analyst", company: "Payme", salary: "$1000–1500", match: "87%", color: "from-amber-400 to-orange-500" },
+                    ].map((job) => (
+                      <div key={job.title} className="rounded-lg border border-white/10 bg-white/5 p-3">
+                        <div className="mb-2 flex items-center gap-2.5">
+                          <div className={`flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-gradient-to-br ${job.color} text-xs font-bold text-white`}>
+                            {job.company[0]}
                           </div>
+                          <div>
+                            <p className="text-xs font-semibold text-white">{job.title}</p>
+                            <p className="text-xs text-white/50">{job.company}</p>
+                          </div>
+                          <span className="ml-auto rounded-full bg-green-400/20 px-1.5 py-0.5 text-xs font-bold text-green-400">{job.match}</span>
                         </div>
-                        <div className="space-y-2">
-                          <div className="h-3 w-full rounded bg-white/15" />
-                          <div className="h-3 w-3/4 rounded bg-white/10" />
-                        </div>
+                        <p className="text-xs text-white/40">{job.salary}/oy</p>
                       </div>
                     ))}
                   </div>

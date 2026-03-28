@@ -28,6 +28,8 @@ import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { UserAvatar } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
+import { ThemeToggle } from "@/components/ui/theme-toggle";
+import { NotificationBell } from "@/components/NotificationBell";
 
 interface NavItem {
   name: string;
@@ -182,11 +184,11 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
 
           {/* Right side actions */}
           <div className="flex items-center gap-3">
+            {/* Dark Mode Toggle */}
+            <ThemeToggle />
+            
             {/* Notifications */}
-            <button className="relative rounded-lg p-2 text-surface-500 hover:bg-surface-100 dark:hover:bg-surface-800">
-              <Bell className="h-5 w-5" />
-              <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-brand-500" />
-            </button>
+            <NotificationBell />
 
             {/* User menu */}
             <div className="relative">
