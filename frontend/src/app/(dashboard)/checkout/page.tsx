@@ -8,7 +8,7 @@
  * Payment checkout for premium subscriptions
  */
 
-import { useState, useEffect } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -61,6 +61,21 @@ const FEATURES = [
 // =============================================================================
 
 export default function CheckoutPage() {
+  // `useSearchParams()` requires a Suspense boundary during prerender/static export.
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center text-surface-500">
+          Loading checkout...
+        </div>
+      }
+    >
+      <CheckoutPageInner />
+    </Suspense>
+  );
+}
+
+function CheckoutPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { user, isAuthenticated } = useAuthStore();

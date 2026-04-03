@@ -5,7 +5,7 @@
  * Verifies user email address via token
  */
 
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
 import { CheckCircle, XCircle, Loader2 } from 'lucide-react';
@@ -15,6 +15,21 @@ import { ThemeToggle } from '@/components/ui/theme-toggle';
 import Link from 'next/link';
 
 export default function VerifyEmailPage() {
+  // `useSearchParams()` requires a Suspense boundary during prerender/static export.
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center text-surface-500">
+          Loading...
+        </div>
+      }
+    >
+      <VerifyEmailPageInner />
+    </Suspense>
+  );
+}
+
+function VerifyEmailPageInner() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const token = searchParams.get('token');

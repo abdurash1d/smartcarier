@@ -15,7 +15,7 @@
 
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useForm } from "react-hook-form";
@@ -72,6 +72,22 @@ const fadeIn = {
 // =============================================================================
 
 export default function LoginPage() {
+  // `useSearchParams()` requires a Suspense boundary during prerender/static export.
+  // Wrapping keeps `next build` from failing while still allowing client-side query usage.
+  return (
+    <Suspense
+      fallback={
+        <div className="mx-auto w-full max-w-md p-6 text-center text-surface-500">
+          Loading...
+        </div>
+      }
+    >
+      <LoginPageInner />
+    </Suspense>
+  );
+}
+
+function LoginPageInner() {
   const searchParams = useSearchParams();
   const sessionExpired = searchParams.get("session_expired") === "true";
   const registered = searchParams.get("registered") === "true";
