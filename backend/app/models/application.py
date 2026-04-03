@@ -97,7 +97,7 @@ from sqlalchemy import (
     Column, String, Text, DateTime, ForeignKey,
     Index, UniqueConstraint
 )
-from sqlalchemy.dialects.postgresql import UUID
+from app.models.types import GUID
 from sqlalchemy.orm import relationship, validates
 
 # Local imports
@@ -224,7 +224,7 @@ class Application(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin):
     # =========================================================================
     
     job_id = Column(
-        UUID(as_uuid=True),
+        GUID(),
         ForeignKey('jobs.id', ondelete='CASCADE'),
         nullable=False,
         index=True,
@@ -232,7 +232,7 @@ class Application(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin):
     )
     
     user_id = Column(
-        UUID(as_uuid=True),
+        GUID(),
         ForeignKey('users.id', ondelete='CASCADE'),
         nullable=False,
         index=True,
@@ -240,7 +240,7 @@ class Application(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin):
     )
     
     resume_id = Column(
-        UUID(as_uuid=True),
+        GUID(),
         ForeignKey('resumes.id', ondelete='SET NULL'),
         nullable=True,  # NULL if resume was deleted
         comment="Resume used (SET NULL: keep app if resume deleted)"

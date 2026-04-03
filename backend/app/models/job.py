@@ -67,7 +67,7 @@ from sqlalchemy import (
     Column, String, Text, Integer, Boolean, DateTime,
     ForeignKey, Index, CheckConstraint
 )
-from sqlalchemy.dialects.postgresql import UUID
+from app.models.types import GUID
 from sqlalchemy import JSON
 from sqlalchemy.orm import relationship, validates
 
@@ -261,7 +261,7 @@ class Job(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin):
     # =========================================================================
     
     company_id = Column(
-        UUID(as_uuid=True),
+        GUID(),
         ForeignKey('users.id', ondelete='CASCADE'),
         nullable=False,
         index=True,
@@ -635,12 +635,12 @@ class SavedJob(Base, UUIDMixin, TimestampMixin):
 
     # Foreign keys
     user_id = Column(
-        UUID(as_uuid=True),
+        GUID(),
         ForeignKey("users.id", ondelete="CASCADE"),
         nullable=False,
     )
     job_id = Column(
-        UUID(as_uuid=True),
+        GUID(),
         ForeignKey("jobs.id", ondelete="CASCADE"),
         nullable=False,
     )

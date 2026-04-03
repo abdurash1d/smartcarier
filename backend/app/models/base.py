@@ -52,9 +52,10 @@ from typing import Any, Optional
 
 # SQLAlchemy imports
 from sqlalchemy import Column, DateTime, Boolean, func, event
-from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import declarative_base, declared_attr
 from sqlalchemy.ext.hybrid import hybrid_property
+
+from app.models.types import GUID
 
 # =============================================================================
 # DECLARATIVE BASE
@@ -150,7 +151,7 @@ class UUIDMixin:
             (not uuid.uuid4()) so a NEW UUID is generated for each row.
         """
         return Column(
-            UUID(as_uuid=True),          # PostgreSQL native UUID type
+            GUID(),                      # PostgreSQL UUID, SQLite CHAR(36)
             primary_key=True,            # This is the primary key
             default=uuid.uuid4,          # Generate UUID in Python
             nullable=False,              # Cannot be NULL

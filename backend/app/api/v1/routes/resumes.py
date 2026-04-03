@@ -1220,11 +1220,11 @@ async def download_resume_pdf(
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
-    """Stream the resume as a PDF for download."""
+    """Return a URL pointing to the real streaming PDF endpoint."""
 
     try:
-        resume_uuid = UUID(resume_id)
-    except ValueError:
+        resume_uuid = resume_id if isinstance(resume_id, UUID) else UUID(str(resume_id))
+    except (ValueError, TypeError, AttributeError):
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Resume not found"
@@ -1241,16 +1241,19 @@ async def download_resume_pdf(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Resume not found"
         )
-    
-    pdf_bytes = _generate_pdf(resume)
-    safe_title = re.sub(r"[^A-Za-z0-9._-]+", "_", resume.title).strip("_") or f"resume_{resume.id}"
 
-    return StreamingResponse(
-        iter([pdf_bytes]),
-        media_type="application/pdf",
-        headers={
-            "Content-Disposition": f'inline; filename="{safe_title}.pdf"'
-        },
+    pdf_url = f"/api/v1/resumes/{resume.id}/pdf"
+    resume.pdf_url = pdf_url
+    db.commit()
+    db.refresh(resume)
+
+    expires_at = datetime.now(timezone.utc) + timedelta(hours=1)
+
+    return PDFDownloadResponse(
+        success=True,
+        message="PDF is ready for download",
+        pdf_url=pdf_url,
+        download_expires_at=expires_at,
     )
 
 
@@ -1334,8 +1337,8 @@ async def get_resume_analytics(
     """Get analytics for a resume."""
 
     try:
-        resume_uuid = UUID(resume_id)
-    except ValueError:
+        resume_uuid = resume_id if isinstance(resume_id, UUID) else UUID(str(resume_id))
+    except (ValueError, TypeError, AttributeError):
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Resume not found"

@@ -27,6 +27,7 @@ from app.models.base import Base
 from app.models import User, UserRole, Job, Resume, Application
 from app.core.dependencies import get_db
 from app.core.security import create_access_token
+from app.core.rate_limiter import rate_limiter
 from app.config import settings
 
 
@@ -102,6 +103,25 @@ def client(test_db):
         yield test_client
     
     app.dependency_overrides.clear()
+
+
+# =============================================================================
+# GLOBAL STATE RESET FIXTURES
+# =============================================================================
+
+@pytest.fixture(autouse=True)
+def _reset_rate_limiter_state():
+    """
+    Tests share a single in-memory RateLimiter instance.
+    Reset between tests to avoid cross-test interference (e.g. login 429s).
+    """
+    rate_limiter._storage.clear()
+    rate_limiter._failed_logins.clear()
+    rate_limiter._locked_accounts.clear()
+    yield
+    rate_limiter._storage.clear()
+    rate_limiter._failed_logins.clear()
+    rate_limiter._locked_accounts.clear()
 
 
 # =============================================================================
@@ -350,7 +370,7 @@ def sample_job_data() -> dict:
     """Sample job data for testing."""
     return {
         "title": "Backend Developer",
-        "description": "We are looking for a backend developer",
+        "description": "We are looking for a backend developer to build reliable APIs and services.",
         "requirements": ["Python", "FastAPI", "PostgreSQL"],
         "responsibilities": ["Develop APIs", "Write tests"],
         "salary_min": 2000,

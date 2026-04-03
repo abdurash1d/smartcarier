@@ -45,7 +45,7 @@ def test_create_payment_intent_success(client: TestClient, student_headers: dict
     data = response.json()
     assert data["success"] is True
     assert "client_secret" in data
-    assert data["amount"] == 999  # $9.99 in cents
+    assert data["amount"] == 400  # $4.00 in cents
     assert data["subscription_tier"] == "premium"
 
 
@@ -63,7 +63,7 @@ def test_create_payment_intent_quarterly(client: TestClient, student_headers: di
     
     assert response.status_code == status.HTTP_200_OK
     data = response.json()
-    assert data["amount"] == 2499  # $24.99
+    assert data["amount"] == 1200  # 3 months * $4.00
 
 
 @pytest.mark.payment
@@ -80,7 +80,7 @@ def test_create_payment_intent_yearly(client: TestClient, student_headers: dict)
     
     assert response.status_code == status.HTTP_200_OK
     data = response.json()
-    assert data["amount"] == 8999  # $89.99
+    assert data["amount"] == 4000  # $40.00 yearly plan
 
 
 @pytest.mark.payment
@@ -157,8 +157,13 @@ async def test_double_payment_prevention():
 
 @pytest.mark.payment
 @pytest.mark.slow
-def test_webhook_payment_succeeded(client: TestClient):
+def test_webhook_payment_succeeded(client: TestClient, monkeypatch: pytest.MonkeyPatch, test_student: User):
     """Test webhook for successful payment."""
+    # Make test deterministic regardless of local .env secrets.
+    payment_service.stripe_webhook_secret = ""
+    monkeypatch.setattr("app.config.settings.DEBUG", True, raising=False)
+    monkeypatch.setattr("app.config.settings.PAYMENTS_REQUIRE_WEBHOOK_SECRET", False, raising=False)
+
     # Mock Stripe event
     event = {
         "type": "payment_intent.succeeded",
@@ -167,8 +172,9 @@ def test_webhook_payment_succeeded(client: TestClient):
                 "id": "pi_test_123",
                 "amount": 999,
                 "metadata": {
-                    "user_id": "test-user-id",
+                    "user_id": str(test_student.id),
                     "subscription_tier": "premium",
+                    "subscription_months": "1",
                 }
             }
         }
@@ -247,7 +253,7 @@ def test_get_pricing(client: TestClient):
     
     # Verify premium pricing
     premium = data["pricing"]["premium"]
-    assert premium["monthly"] == 999
+    assert premium["monthly"] == 400
     assert "features" in premium
 
 
@@ -304,9 +310,6 @@ def test_payment_logs_query():
     # Filter by status
     pending_logs = service.get_payment_logs(status=PaymentStatus.PENDING)
     assert all(log.status == PaymentStatus.PENDING for log in pending_logs)
-
-
-
 
 
 

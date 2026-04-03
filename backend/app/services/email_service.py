@@ -534,8 +534,8 @@ class EmailService:
                     <p>Hisobingizga yangi kirish aniqlandi:</p>
                     <div class="info-box">
                         <p><strong>🕐 Vaqt:</strong> {context.get('login_time', 'Hozirgina')}</p>
-                        <p><strong>🌐 IP manzil:</strong> {context.get('ip_address', 'Noma\'lum')}</p>
-                        <p><strong>💻 Qurilma:</strong> {context.get('user_agent', 'Noma\'lum')[:50]}...</p>
+                        <p><strong>🌐 IP manzil:</strong> {context.get("ip_address", "Noma'lum")}</p>
+                        <p><strong>💻 Qurilma:</strong> {context.get("user_agent", "Noma'lum")[:50]}...</p>
                     </div>
                     <div class="warning-box">
                         <strong>⚠️ Bu siz emasmidingiz?</strong> <a href="{context.get('security_url', '#')}">Xavfsizlik sozlamalarini tekshiring</a>
