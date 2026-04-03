@@ -29,10 +29,11 @@ async function parseApiError(res: Response): Promise<string> {
 
 export function useRequireAuth(requiredRole?: "student" | "company" | "admin") {
   const router = useRouter();
-  const { isAuthenticated, user } = useAuthStore();
+  const { isAuthenticated, user, hasHydrated } = useAuthStore();
 
   // Lightweight client-side gate (server-side protection is still on API).
   useEffect(() => {
+    if (!hasHydrated) return;
     if (!isAuthenticated) {
       router.replace("/login?session_expired=true");
       return;
@@ -41,9 +42,9 @@ export function useRequireAuth(requiredRole?: "student" | "company" | "admin") {
       const roleRoot = user.role === "company" ? "/company" : user.role === "admin" ? "/admin" : "/student";
       router.replace(roleRoot);
     }
-  }, [isAuthenticated, requiredRole, router, user?.role]);
+  }, [hasHydrated, isAuthenticated, requiredRole, router, user?.role]);
 
-  return { isLoading: false, isAuthorized: !!isAuthenticated };
+  return { isLoading: !hasHydrated, isAuthorized: hasHydrated && !!isAuthenticated };
 }
 
 export function useAuth() {

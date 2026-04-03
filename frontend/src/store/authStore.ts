@@ -43,12 +43,14 @@ interface AuthState {
   accessToken: string | null;
   refreshToken: string | null;
   isAuthenticated: boolean;
+  hasHydrated: boolean;
   isLoading: boolean;
   error: string | null;
   
   // Actions
   setUser: (user: User | null) => void;
   setTokens: (accessToken: string, refreshToken: string) => void;
+  setHasHydrated: (value: boolean) => void;
   login: (email: string, password: string) => Promise<void>;
   register: (data: RegisterData) => Promise<void>;
   logout: () => Promise<void>;
@@ -79,6 +81,7 @@ export const useAuthStore = create<AuthState>()(
       accessToken: null,
       refreshToken: null,
       isAuthenticated: false,
+      hasHydrated: false,
       isLoading: false,
       error: null,
 
@@ -95,6 +98,12 @@ export const useAuthStore = create<AuthState>()(
           state.accessToken = accessToken;
           state.refreshToken = refreshToken;
           state.isAuthenticated = true;
+        }),
+
+      // Persist hydration gate (prevents redirect-to-login flashes on refresh).
+      setHasHydrated: (value) =>
+        set((state) => {
+          state.hasHydrated = value;
         }),
 
       // Login
@@ -298,6 +307,10 @@ export const useAuthStore = create<AuthState>()(
         refreshToken: state.refreshToken,
         isAuthenticated: state.isAuthenticated,
       }),
+      onRehydrateStorage: () => (state) => {
+        // Mark store as hydrated once persisted state is loaded.
+        state?.setHasHydrated(true);
+      },
     }
   )
 );

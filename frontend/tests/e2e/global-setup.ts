@@ -2,7 +2,10 @@ import { request } from '@playwright/test';
 
 type Json = Record<string, any>;
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+// In the app we commonly use NEXT_PUBLIC_API_URL as ".../api/v1".
+// For seeding, we need the backend origin (no "/api/v1" suffix).
+const RAW_API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+const API_URL = RAW_API_URL.replace(/\/api\/v1\/?$/, '');
 
 async function postJson(ctx: any, path: string, body?: Json, headers?: Record<string, string>) {
   return await ctx.post(`${API_URL}${path}`, {
@@ -24,15 +27,37 @@ async function ensureRegistered(ctx: any, payload: Json) {
 }
 
 async function login(ctx: any, email: string, password: string): Promise<string> {
-  const res = await postJson(ctx, '/api/v1/auth/login', { email, password });
-  if (res.status() !== 200) {
+  const maxAttempts = 6;
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    const res = await postJson(ctx, '/api/v1/auth/login', { email, password });
+    if (res.status() === 200) {
+      const data = (await res.json()) as Json;
+      const token = data?.access_token as string | undefined;
+      if (!token) throw new Error('Login response missing access_token');
+      return token;
+    }
+
+    // In local runs, the backend may have rate limiting enabled.
+    // Retry politely on 429 to avoid flaky E2E setups.
+    if (res.status() === 429 && attempt < maxAttempts) {
+      const retryAfterHeader = res.headers()['retry-after'];
+      let waitSeconds = retryAfterHeader ? parseInt(String(retryAfterHeader), 10) : NaN;
+
+      if (!Number.isFinite(waitSeconds)) {
+        const text = await res.text();
+        const m = text.match(/try again in\\s+(\\d+)\\s+seconds/i);
+        waitSeconds = m ? parseInt(m[1], 10) : 3;
+      }
+
+      await new Promise((r) => setTimeout(r, Math.max(1, waitSeconds) * 1000));
+      continue;
+    }
+
     const text = await res.text();
     throw new Error(`Login failed (${res.status()}): ${text}`);
   }
-  const data = (await res.json()) as Json;
-  const token = data?.access_token as string | undefined;
-  if (!token) throw new Error('Login response missing access_token');
-  return token;
+
+  throw new Error('Login failed: exceeded retry attempts');
 }
 
 async function createJob(ctx: any, token: string, job: Json): Promise<string> {
@@ -93,6 +118,8 @@ export default async function globalSetup() {
   // Fixed seed accounts used by Playwright specs.
   const studentEmail = 'john@example.com';
   const studentPassword = 'Student123!';
+  const negativeStudentEmail = 'negative.student@example.com';
+  const negativeStudentPassword = 'Student123!';
   const companyEmail = 'acme.hr@example.com';
   const companyPassword = 'Company123!';
 
@@ -101,6 +128,15 @@ export default async function globalSetup() {
     password: studentPassword,
     full_name: 'John Doe',
     phone: '+998901234567',
+    role: 'student',
+  });
+
+  // Separate student account used for negative auth scenarios (wrong password attempts).
+  await ensureRegistered(ctx, {
+    email: negativeStudentEmail,
+    password: negativeStudentPassword,
+    full_name: 'Negative Student',
+    phone: '+998901111999',
     role: 'student',
   });
 
@@ -166,4 +202,3 @@ export default async function globalSetup() {
 
   await ctx.dispose();
 }
-

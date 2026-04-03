@@ -122,7 +122,8 @@ jobs:
         working-directory: ./frontend
         run: npm run build
         env:
-          NEXT_PUBLIC_API_URL: http://localhost:8000
+          # Frontend code expects API base to include "/api/v1".
+          NEXT_PUBLIC_API_URL: http://localhost:8000/api/v1
 
   # ===========================================================================
   # E2E TESTS
@@ -178,6 +179,9 @@ jobs:
           DATABASE_URL: postgresql://test:test@localhost:5432/smartcareer_test
           JWT_SECRET_KEY: test-jwt-secret
           SECRET_KEY: test-secret
+          # E2E hits auth endpoints many times across projects (chromium/firefox/webkit/mobile).
+          # Disable rate limiting in CI to avoid flaky lockouts.
+          RATE_LIMIT_ENABLED: "false"
       
       - name: Install frontend dependencies
         working-directory: ./frontend
@@ -191,7 +195,8 @@ jobs:
         working-directory: ./frontend
         run: npm run test:e2e
         env:
-          NEXT_PUBLIC_API_URL: http://localhost:8000
+          # Frontend code expects API base to include "/api/v1".
+          NEXT_PUBLIC_API_URL: http://localhost:8000/api/v1
       
       - name: Upload Playwright report
         uses: actions/upload-artifact@v3
