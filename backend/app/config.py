@@ -21,10 +21,46 @@ HOW IT WORKS:
 """
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from pydantic import field_validator
+from pydantic import ValidationInfo, field_validator
 from functools import lru_cache
-from typing import List, Union
-import os
+from typing import Any, List
+
+
+_BOOL_TRUE_VALUES = {"1", "true", "t", "yes", "y", "on", "enabled", "enable"}
+_BOOL_FALSE_VALUES = {"0", "false", "f", "no", "n", "off", "disabled", "disable"}
+_DEBUG_TRUE_VALUES = {"dev", "development", "debug", "local"}
+_DEBUG_FALSE_VALUES = {"prod", "production", "release", "live"}
+
+
+def _normalize_bool_value(value: Any, *, field_name: str, default: bool) -> bool:
+    """
+    Coerce loose environment values into booleans without raising validation errors.
+
+    This accepts common boolean strings plus a few environment labels used in
+    deployment setups (for example, DEBUG=release -> False).
+    """
+    if isinstance(value, bool):
+        return value
+
+    if isinstance(value, int) and not isinstance(value, bool):
+        if value in (0, 1):
+            return bool(value)
+
+    if isinstance(value, str):
+        normalized = value.strip().lower()
+
+        if normalized in _BOOL_TRUE_VALUES:
+            return True
+        if normalized in _BOOL_FALSE_VALUES:
+            return False
+
+        if field_name == "DEBUG":
+            if normalized in _DEBUG_TRUE_VALUES:
+                return True
+            if normalized in _DEBUG_FALSE_VALUES:
+                return False
+
+    return default
 
 
 class Settings(BaseSettings):
@@ -240,6 +276,22 @@ class Settings(BaseSettings):
         case_sensitive=True,
         extra="ignore",
     )
+
+    @field_validator(
+        "DEBUG",
+        "REDIS_ENABLED",
+        "RATE_LIMIT_USE_REDIS",
+        "TOKEN_BLACKLIST_USE_REDIS",
+        "SMTP_USE_TLS",
+        "OAUTH_ENABLED",
+        "PAYMENTS_REQUIRE_WEBHOOK_SECRET",
+        mode="before",
+    )
+    @classmethod
+    def _normalize_bool_fields(cls, value: Any, info: ValidationInfo) -> bool:
+        """Normalize loose env values before Pydantic's bool parsing runs."""
+        default = bool(cls.model_fields[info.field_name].default)
+        return _normalize_bool_value(value, field_name=info.field_name, default=default)
 
 
 @lru_cache()

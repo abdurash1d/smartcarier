@@ -38,7 +38,7 @@ class SavedSearch(Base):
     
     # Search data
     name = Column(String(200), nullable=False)
-    search_type = Column(String(50), nullable=False)  # jobs, universities, scholarships
+    search_type = Column(String(50), nullable=False)  # jobs
     filters = Column(JSON, nullable=False)  # Saved filter parameters
     
     # Timestamps

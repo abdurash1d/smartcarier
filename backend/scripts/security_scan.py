@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+ #!/usr/bin/env python3
 """
 Security Scan Script
 Checks for common security vulnerabilities

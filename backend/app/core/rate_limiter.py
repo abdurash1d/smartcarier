@@ -368,25 +368,28 @@ def check_rate_limit_dependency(
     return dependency
 
 
-def check_login_rate_limit(request: Request):
+def check_login_rate_limit(request: Request, identifier: Optional[str] = None):
     """
     Specific rate limiter for login endpoint.
     
     Stricter limits to prevent brute-force attacks.
     """
     client_ip = request.client.host if request.client else "unknown"
+    rate_key = f"login:{client_ip}"
+    if identifier:
+        rate_key = f"login:{client_ip}:{identifier.lower()}"
 
     # 5 login attempts per minute per IP
     if settings.RATE_LIMIT_USE_REDIS and get_redis():
         is_allowed, retry_after = redis_rate_limiter.check_rate_limit(
-            identifier=client_ip,
+            identifier=rate_key,
             max_requests=5,
             window_seconds=60,
             key_prefix="login_ip",
         )
     else:
         is_allowed, retry_after = rate_limiter.check_rate_limit(
-            identifier=f"login:{client_ip}",
+            identifier=rate_key,
             max_requests=5,
             window_seconds=60
         )
@@ -439,7 +442,6 @@ def is_account_locked(email: str) -> Tuple[bool, Optional[int]]:
     if settings.RATE_LIMIT_USE_REDIS and get_redis():
         return redis_rate_limiter.is_account_locked(email.lower())
     return rate_limiter.is_account_locked(email.lower())
-
 
 
 

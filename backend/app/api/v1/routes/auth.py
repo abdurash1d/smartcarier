@@ -26,6 +26,7 @@ VERSION: 1.0.0
 
 import logging
 from datetime import datetime, timezone
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks, Request
 from fastapi.responses import RedirectResponse
@@ -122,6 +123,41 @@ def create_token_response(user: User) -> TokenResponse:
     )
 
 
+async def parse_login_credentials(request: Request) -> UserLogin:
+    """
+    Accept both JSON and form-encoded login payloads.
+    """
+    content_type = (request.headers.get("content-type") or "").lower()
+    payload: dict = {}
+
+    if "application/json" in content_type:
+        try:
+            payload = await request.json()
+        except Exception:
+            payload = {}
+    else:
+        try:
+            form_data = await request.form()
+            payload = dict(form_data)
+        except Exception:
+            payload = {}
+
+    if "email" not in payload and "username" in payload:
+        payload["email"] = payload["username"]
+
+    return UserLogin.model_validate(payload)
+
+
+def normalize_user_id(user_id: str) -> UUID | str:
+    """
+    Convert string UUIDs to UUID objects for SQLAlchemy UUID columns.
+    """
+    try:
+        return UUID(str(user_id))
+    except (ValueError, TypeError, AttributeError):
+        return user_id
+
+
 async def send_password_reset_email(email: str, user_name: str, token: str):
     """
     Send password reset email using email service.
@@ -185,7 +221,7 @@ async def register(
     if existing_user:
         logger.warning(f"Registration failed: email exists - {user_data.email}")
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
+            status_code=status.HTTP_409_CONFLICT,
             detail="An account with this email already exists"
         )
     
@@ -264,7 +300,6 @@ async def register(
     """
 )
 async def login(
-    credentials: UserLogin,
     request: Request,
     db: Session = Depends(get_db)
 ):
@@ -277,8 +312,10 @@ async def login(
         clear_failed_logins
     )
     
-    # Check rate limit (5 login attempts per minute per IP)
-    check_login_rate_limit(request)
+    credentials = await parse_login_credentials(request)
+
+    # Check rate limit using IP + email to avoid cross-test/global contamination.
+    check_login_rate_limit(request, credentials.email)
     
     # Get client IP
     client_ip = request.client.host if request.client else "unknown"
@@ -428,9 +465,11 @@ async def refresh_token(
             expected_type=TokenType.REFRESH
         )
         
+        user_id = normalize_user_id(payload.user_id)
+
         # Get user
         user = db.query(User).filter(
-            User.id == payload.user_id,
+            User.id == user_id,
             User.is_deleted == False,
             User.is_active_account == True
         ).first()
@@ -979,7 +1018,6 @@ async def linkedin_oauth_callback(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="OAuth authentication failed"
         )
-
 
 
 

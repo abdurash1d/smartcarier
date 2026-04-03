@@ -7,7 +7,7 @@ Save and manage search filters.
 """
 
 import logging
-from typing import List
+from typing import List, Literal
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -32,7 +32,7 @@ from pydantic import BaseModel
 
 class SavedSearchCreate(BaseModel):
     name: str
-    search_type: str  # jobs, universities, scholarships
+    search_type: Literal["jobs"] = "jobs"
     filters: dict
 
 
@@ -64,14 +64,14 @@ class SavedSearchListResponse(BaseModel):
 
 @router.get("", response_model=SavedSearchListResponse)
 async def list_saved_searches(
-    search_type: str | None = None,
+    search_type: Literal["jobs"] | None = None,
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
     """
     Get user's saved searches.
     
-    - Can filter by search_type (jobs, universities, scholarships)
+    - Can filter by search_type (jobs)
     - Ordered by most recently used
     """
     query = db.query(SavedSearch).filter(SavedSearch.user_id == current_user.id)

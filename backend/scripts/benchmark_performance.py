@@ -151,12 +151,8 @@ class PerformanceBenchmark:
         print(f"{BOLD}2. JOBS API (50 requests, 5 concurrent){RESET}")
         self.load_test("/api/v1/jobs", num_requests=50, concurrent=5)
         
-        # Test universities list (medium load)
-        print(f"{BOLD}3. UNIVERSITIES API (50 requests, 5 concurrent){RESET}")
-        self.load_test("/api/v1/universities", num_requests=50, concurrent=5)
-        
         # Stress test health (high concurrency)
-        print(f"{BOLD}4. STRESS TEST (200 requests, 20 concurrent){RESET}")
+        print(f"{BOLD}3. STRESS TEST (200 requests, 20 concurrent){RESET}")
         self.load_test("/health", num_requests=200, concurrent=20)
     
     def generate_report(self):

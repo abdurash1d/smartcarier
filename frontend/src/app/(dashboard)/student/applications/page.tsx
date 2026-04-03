@@ -109,6 +109,43 @@ const itemVariants = {
   visible: { opacity: 1, y: 0 },
 };
 
+type ApplicationInterviewPreview = {
+  status: string;
+  interview_at?: string;
+  interview_type?: string;
+  meeting_link?: string;
+  job?: {
+    title?: string;
+    company?: { name?: string };
+  };
+};
+
+function formatInterviewTypeLabel(interviewType?: string) {
+  if (!interviewType) {
+    return "Format belgilanmagan";
+  }
+
+  const normalized = interviewType.trim().toLowerCase();
+  if (normalized === "video") return "Video intervyu";
+  if (normalized === "phone") return "Telefon intervyu";
+  if (normalized === "in-person" || normalized === "in person") return "Shaxsan intervyu";
+
+  return interviewType;
+}
+
+function getUpcomingInterviewApplication(applications: ApplicationInterviewPreview[]) {
+  const now = Date.now();
+
+  return applications
+    .filter((app) => app.status === "interview" && app.interview_at)
+    .map((app) => ({
+      ...app,
+      interviewTimestamp: new Date(app.interview_at as string).getTime(),
+    }))
+    .filter((app) => !Number.isNaN(app.interviewTimestamp) && app.interviewTimestamp >= now)
+    .sort((a, b) => a.interviewTimestamp - b.interviewTimestamp)[0] || null;
+}
+
 // =============================================================================
 // MAIN COMPONENT
 // =============================================================================
@@ -124,6 +161,9 @@ export default function ApplicationsPage() {
   useEffect(() => {
     fetchMyApplications();
   }, [fetchMyApplications]);
+
+  const upcomingInterview = getUpcomingInterviewApplication(applications);
+  const upcomingInterviewCompanyName = upcomingInterview?.job?.company?.name || "Kompaniya";
 
   // Filter applications
   const filteredApplications = applications
@@ -229,9 +269,7 @@ export default function ApplicationsPage() {
       </motion.div>
 
       {/* Upcoming Interview Alert */}
-      {applications.some(
-        (a) => a.status === "interview" && a.interview_at
-      ) && (
+      {upcomingInterview && (
         <motion.div variants={itemVariants}>
           <Card className="border-purple-200 bg-gradient-to-r from-purple-50 to-indigo-50">
             <CardContent className="flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-between">
@@ -244,11 +282,35 @@ export default function ApplicationsPage() {
                     {t("applicationsPage.upcomingInterview")}
                   </h3>
                   <p className="text-sm text-surface-600">
-                    Senior Backend Developer at EPAM Systems
+                    {upcomingInterview?.job?.title ?? "Intervyu"} at {upcomingInterviewCompanyName}
                   </p>
                   <p className="text-xs text-surface-500">
-                    {t("applicationsPage.tomorrowAt")} 10:00
+                    {formatDate(upcomingInterview.interview_at as string)}
                   </p>
+                  {upcomingInterview?.interview_type || upcomingInterview?.meeting_link ? (
+                    <div className="mt-2 flex flex-wrap items-center gap-2">
+                      <Badge variant="secondary" className="bg-white/80 text-surface-700">
+                        {formatInterviewTypeLabel(upcomingInterview.interview_type)}
+                      </Badge>
+                      {upcomingInterview?.meeting_link ? (
+                        <Button
+                          asChild
+                          variant="outline"
+                          size="sm"
+                          className="h-8 rounded-full border-purple-200 bg-white px-3 text-purple-700 hover:bg-purple-50"
+                        >
+                          <a
+                            href={upcomingInterview.meeting_link}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                          >
+                            <ExternalLink className="mr-2 h-3.5 w-3.5" />
+                            Meeting link
+                          </a>
+                        </Button>
+                      ) : null}
+                    </div>
+                  ) : null}
                 </div>
               </div>
               <div className="flex gap-2">
@@ -372,10 +434,32 @@ export default function ApplicationsPage() {
                               {t("applicationsPage.applied")} {formatRelativeTime(application.applied_at)}
                             </span>
                             {application.interview_at && (
-                              <span className="flex items-center gap-1 text-purple-600">
-                                <Calendar className="h-4 w-4" />
-                                {t("applicationsPage.interview")}: {formatDate(application.interview_at)}
-                              </span>
+                              <>
+                                <span className="flex items-center gap-1 text-purple-600">
+                                  <Calendar className="h-4 w-4" />
+                                  {t("applicationsPage.interview")}: {formatDate(application.interview_at)}
+                                </span>
+                                <Badge variant="secondary" className="bg-purple-100 text-purple-700">
+                                  {formatInterviewTypeLabel(application.interview_type)}
+                                </Badge>
+                              </>
+                            )}
+                            {application.status === "interview" && application.meeting_link && (
+                              <Button
+                                asChild
+                                variant="outline"
+                                size="sm"
+                                className="h-8 rounded-full border-purple-200 bg-white px-3 text-purple-700 hover:bg-purple-50"
+                              >
+                                <a
+                                  href={application.meeting_link}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                >
+                                  <ExternalLink className="mr-2 h-3.5 w-3.5" />
+                                  Meeting link
+                                </a>
+                              </Button>
                             )}
                           </div>
                         </div>

@@ -170,8 +170,7 @@ class DeploymentValidator:
                 tables = inspector.get_table_names()
                 
                 expected_tables = [
-                    'users', 'jobs', 'resumes', 'applications',
-                    'universities', 'scholarships'
+                    'users', 'jobs', 'resumes', 'applications'
                 ]
                 
                 missing_tables = [t for t in expected_tables if t not in tables]

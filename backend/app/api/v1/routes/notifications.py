@@ -193,3 +193,5 @@ def create_notification(
     db.commit()
     logger.info(f"Notification created for user {user_id}: {title}")
     return notification
+
+    

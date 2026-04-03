@@ -44,7 +44,6 @@ import { useTranslation } from "@/hooks/useTranslation";
 import { useAuthStore } from "@/store/authStore";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { LanguageSwitcher } from "@/components/ui/language-switcher";
 import { cn } from "@/lib/utils";
 
 // =============================================================================
@@ -406,9 +405,6 @@ export default function RegisterPage() {
       className="mx-auto w-full max-w-md"
     >
       {/* Language Switcher */}
-      <div className="absolute top-4 right-4">
-        <LanguageSwitcher variant="minimal" />
-      </div>
 
       {/* Header */}
       <motion.div

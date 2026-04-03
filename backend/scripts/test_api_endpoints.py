@@ -216,45 +216,9 @@ class APITester:
             expected_status=200
         )
     
-    def test_universities(self):
-        """Test university endpoints"""
-        self.section("4. UNIVERSITIES API")
-        
-        self.test(
-            "List Universities",
-            "GET",
-            "/api/v1/universities",
-            expected_status=200,
-            check_response=lambda r: "universities" in r
-        )
-        
-        self.test(
-            "List Scholarships",
-            "GET",
-            "/api/v1/scholarships",
-            expected_status=200,
-            check_response=lambda r: "scholarships" in r
-        )
-        
-        # AI search (requires auth)
-        if self.auth_token:
-            self.test(
-                "AI University Search",
-                "POST",
-                "/api/v1/universities/ai-search",
-                expected_status=200,
-                data={
-                    "query": "I want to study computer science",
-                    "preferences": {
-                        "countries": ["USA"],
-                        "budget": 50000
-                    }
-                }
-            )
-    
     def test_resumes(self):
         """Test resume endpoints"""
-        self.section("5. RESUMES API")
+        self.section("4. RESUMES API")
         
         if not self.auth_token:
             print(f"{YELLOW}  Skipped - requires authentication{RESET}")
@@ -284,7 +248,7 @@ class APITester:
     
     def test_performance(self):
         """Test API performance"""
-        self.section("6. PERFORMANCE")
+        self.section("5. PERFORMANCE")
         
         # Average response time
         if self.results:
@@ -370,7 +334,6 @@ class APITester:
         self.test_health()
         self.test_auth()
         self.test_jobs()
-        self.test_universities()
         self.test_resumes()
         self.test_performance()
         

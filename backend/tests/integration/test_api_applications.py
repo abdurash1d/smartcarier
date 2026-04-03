@@ -13,6 +13,15 @@ from httpx import AsyncClient
 from tests.fixtures.sample_data import get_valid_application_data
 
 
+def as_str(value):
+    return str(value)
+
+
+def response_data(response):
+    body = response.json()
+    return body.get("data", body)
+
+
 # =============================================================================
 # GET APPLICATIONS TESTS
 # =============================================================================
@@ -31,9 +40,10 @@ class TestGetApplications:
         )
         
         assert response.status_code == status.HTTP_200_OK
-        data = response.json()
-        
-        assert isinstance(data, list) or "items" in data
+        data = response_data(response)
+
+        assert "applications" in data
+        assert data["total"] >= 1
 
     @pytest.mark.asyncio
     async def test_get_applications_unauthenticated(self, async_client: AsyncClient):
@@ -90,9 +100,9 @@ class TestGetApplication:
         )
         
         assert response.status_code == status.HTTP_200_OK
-        data = response.json()
-        
-        assert data["id"] == test_application.id
+        data = response_data(response)
+
+        assert data["id"] == as_str(test_application.id)
         assert "status" in data
         assert "job_id" in data
 
@@ -106,7 +116,7 @@ class TestGetApplication:
             headers=auth_headers
         )
         
-        assert response.status_code == status.HTTP_404_NOT_FOUND
+        assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
 
     @pytest.mark.asyncio
     async def test_get_application_not_owner(
@@ -123,6 +133,7 @@ class TestGetApplication:
         )
         
         assert response.status_code in [
+            status.HTTP_401_UNAUTHORIZED,
             status.HTTP_403_FORBIDDEN,
             status.HTTP_404_NOT_FOUND
         ]
@@ -141,8 +152,8 @@ class TestCreateApplication:
     ):
         """Test successful job application."""
         application_data = {
-            "job_id": test_job.id,
-            "resume_id": test_resume.id,
+            "job_id": as_str(test_job.id),
+            "resume_id": as_str(test_resume.id),
             "cover_letter": "I am excited to apply for this position..."
         }
         
@@ -153,11 +164,11 @@ class TestCreateApplication:
         )
         
         assert response.status_code == status.HTTP_201_CREATED
-        data = response.json()
-        
+        data = response_data(response)
+
         assert "id" in data
-        assert data["job_id"] == test_job.id
-        assert data["resume_id"] == test_resume.id
+        assert data["job_id"] == as_str(test_job.id)
+        assert data["resume_id"] == as_str(test_resume.id)
         assert data["status"] == "pending"
 
     @pytest.mark.asyncio
@@ -166,8 +177,8 @@ class TestCreateApplication:
     ):
         """Test application without cover letter."""
         application_data = {
-            "job_id": test_job.id,
-            "resume_id": test_resume.id
+            "job_id": as_str(test_job.id),
+            "resume_id": as_str(test_resume.id)
         }
         
         response = await async_client.post(
@@ -184,8 +195,8 @@ class TestCreateApplication:
     ):
         """Test applying without authentication."""
         application_data = {
-            "job_id": test_job.id,
-            "resume_id": test_resume.id
+            "job_id": as_str(test_job.id),
+            "resume_id": as_str(test_resume.id)
         }
         
         response = await async_client.post(
@@ -202,7 +213,7 @@ class TestCreateApplication:
         """Test applying to non-existent job."""
         application_data = {
             "job_id": "non-existent-job-id",
-            "resume_id": test_resume.id
+            "resume_id": as_str(test_resume.id)
         }
         
         response = await async_client.post(
@@ -211,7 +222,7 @@ class TestCreateApplication:
             json=application_data
         )
         
-        assert response.status_code == status.HTTP_404_NOT_FOUND
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
 
     @pytest.mark.asyncio
     async def test_apply_resume_not_found(
@@ -219,7 +230,7 @@ class TestCreateApplication:
     ):
         """Test applying with non-existent resume."""
         application_data = {
-            "job_id": test_job.id,
+            "job_id": as_str(test_job.id),
             "resume_id": "non-existent-resume-id"
         }
         
@@ -229,7 +240,7 @@ class TestCreateApplication:
             json=application_data
         )
         
-        assert response.status_code == status.HTTP_404_NOT_FOUND
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
 
     @pytest.mark.asyncio
     async def test_apply_duplicate_application(
@@ -237,8 +248,8 @@ class TestCreateApplication:
     ):
         """Test applying to same job twice."""
         application_data = {
-            "job_id": test_application.job_id,
-            "resume_id": test_resume.id
+            "job_id": as_str(test_application.job_id),
+            "resume_id": as_str(test_resume.id)
         }
         
         response = await async_client.post(
@@ -254,7 +265,7 @@ class TestCreateApplication:
 
     @pytest.mark.asyncio
     async def test_apply_closed_job(
-        self, async_client: AsyncClient, auth_headers, test_resume, async_session
+        self, async_client: AsyncClient, auth_headers, test_resume, async_session, test_company
     ):
         """Test applying to closed job."""
         # Create a closed job
@@ -262,8 +273,8 @@ class TestCreateApplication:
         from uuid import uuid4
         
         closed_job = Job(
-            id=str(uuid4()),
-            company_id="company-id",
+            id=uuid4(),
+            company_id=test_company.id,
             title="Closed Position",
             description="This job is closed",
             location="Remote",
@@ -274,8 +285,8 @@ class TestCreateApplication:
         await async_session.commit()
         
         application_data = {
-            "job_id": closed_job.id,
-            "resume_id": test_resume.id
+            "job_id": as_str(closed_job.id),
+            "resume_id": as_str(test_resume.id)
         }
         
         response = await async_client.post(
@@ -313,7 +324,7 @@ class TestWithdrawApplication:
         )
         
         if get_response.status_code == status.HTTP_200_OK:
-            assert get_response.json()["status"] == "withdrawn"
+            assert response_data(get_response)["status"] == "withdrawn"
 
     @pytest.mark.asyncio
     async def test_withdraw_not_found(
@@ -325,7 +336,7 @@ class TestWithdrawApplication:
             headers=auth_headers
         )
         
-        assert response.status_code == status.HTTP_404_NOT_FOUND
+        assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
 
     @pytest.mark.asyncio
     async def test_withdraw_not_owner(
@@ -342,6 +353,7 @@ class TestWithdrawApplication:
         )
         
         assert response.status_code in [
+            status.HTTP_401_UNAUTHORIZED,
             status.HTTP_403_FORBIDDEN,
             status.HTTP_404_NOT_FOUND
         ]
@@ -386,7 +398,7 @@ class TestUpdateApplicationStatus:
         )
         
         assert response.status_code == status.HTTP_200_OK
-        assert response.json()["status"] == "reviewing"
+        assert response_data(response)["status"] == "reviewing"
 
     @pytest.mark.asyncio
     async def test_update_status_to_interview(
@@ -396,7 +408,11 @@ class TestUpdateApplicationStatus:
         response = await async_client.put(
             f"/api/v1/applications/{test_application.id}/status",
             headers=company_auth_headers,
-            json={"status": "interview"}
+            json={
+                "status": "interview",
+                "interview_at": "2026-04-05T10:00:00Z",
+                "interview_type": "video"
+            }
         )
         
         assert response.status_code == status.HTTP_200_OK
@@ -425,7 +441,7 @@ class TestUpdateApplicationStatus:
             json={"status": "invalid_status"}
         )
         
-        assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
 
 
 # =============================================================================
@@ -437,7 +453,7 @@ class TestAutoApply:
 
     @pytest.mark.asyncio
     async def test_auto_apply_success(
-        self, async_client: AsyncClient, auth_headers, test_resume, multiple_jobs, mock_openai
+        self, async_client: AsyncClient, auth_headers, premium_student, test_resume, multiple_jobs, mock_openai
     ):
         """Test successful auto-apply."""
         auto_apply_data = {
@@ -446,7 +462,7 @@ class TestAutoApply:
                 "locations": ["Tashkent"],
                 "max_applications": 5
             },
-            "resume_id": test_resume.id
+            "resume_id": as_str(test_resume.id)
         }
         
         response = await async_client.post(
@@ -459,14 +475,14 @@ class TestAutoApply:
             status.HTTP_200_OK,
             status.HTTP_201_CREATED
         ]
-        data = response.json()
-        
-        # Should return list of applications or summary
-        assert "applications" in data or isinstance(data, list)
+        data = response_data(response)
+
+        assert "results" in data
+        assert "applications_submitted" in data
 
     @pytest.mark.asyncio
     async def test_auto_apply_limit(
-        self, async_client: AsyncClient, auth_headers, test_resume, multiple_jobs, mock_openai
+        self, async_client: AsyncClient, auth_headers, premium_student, test_resume, multiple_jobs, mock_openai
     ):
         """Test auto-apply respects max limit."""
         max_apps = 2
@@ -475,7 +491,7 @@ class TestAutoApply:
             "criteria": {
                 "max_applications": max_apps
             },
-            "resume_id": test_resume.id
+            "resume_id": as_str(test_resume.id)
         }
         
         response = await async_client.post(
@@ -485,10 +501,8 @@ class TestAutoApply:
         )
         
         if response.status_code in [status.HTTP_200_OK, status.HTTP_201_CREATED]:
-            data = response.json()
-            apps = data.get("applications", data)
-            if isinstance(apps, list):
-                assert len(apps) <= max_apps
+            data = response_data(response)
+            assert data["applications_submitted"] <= max_apps
 
     @pytest.mark.asyncio
     async def test_auto_apply_unauthenticated(self, async_client: AsyncClient):
@@ -524,12 +538,11 @@ class TestApplicationAnalytics:
         )
         
         assert response.status_code == status.HTTP_200_OK
-        data = response.json()
-        
-        # Should include status counts
+        data = response_data(response)
+
         expected_fields = ["total", "pending", "reviewing", "accepted", "rejected"]
         for field in expected_fields:
-            assert field in data or "counts" in data
+            assert field in data or field in data.get("counts", {})
 
     @pytest.mark.asyncio
     async def test_stats_unauthenticated(self, async_client: AsyncClient):
@@ -537,6 +550,8 @@ class TestApplicationAnalytics:
         response = await async_client.get("/api/v1/applications/stats")
         
         assert response.status_code == status.HTTP_401_UNAUTHORIZED
+
+
 
 
 

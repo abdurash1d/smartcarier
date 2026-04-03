@@ -67,10 +67,15 @@ def is_subscription_active(user: User) -> bool:
     # Check expiration date
     if user.subscription_expires_at is None:
         return False
-    
+
     # Check if expired
     now = datetime.now(timezone.utc)
-    return user.subscription_expires_at > now
+    expires_at = user.subscription_expires_at
+    if expires_at.tzinfo is None:
+        expires_at = expires_at.replace(tzinfo=timezone.utc)
+    else:
+        expires_at = expires_at.astimezone(timezone.utc)
+    return expires_at > now
 
 
 def get_user_subscription_info(user: User) -> dict:
@@ -90,7 +95,14 @@ def get_user_subscription_info(user: User) -> dict:
         "is_active": is_active,
         "expires_at": user.subscription_expires_at.isoformat() if user.subscription_expires_at else None,
         "days_remaining": (
-            (user.subscription_expires_at - datetime.now(timezone.utc)).days
+            (
+                (
+                    user.subscription_expires_at.replace(tzinfo=timezone.utc)
+                    if user.subscription_expires_at.tzinfo is None
+                    else user.subscription_expires_at.astimezone(timezone.utc)
+                )
+                - datetime.now(timezone.utc)
+            ).days
             if user.subscription_expires_at
             else 0
         ),
@@ -253,16 +265,6 @@ FEATURE_LIMITS = {
         "premium": 50,
         "enterprise": None,  # unlimited
     },
-    "ai_university_search": {
-        "free": 3,
-        "premium": None,  # unlimited
-        "enterprise": None,  # unlimited
-    },
-    "motivation_letters": {
-        "free": 1,
-        "premium": None,  # unlimited
-        "enterprise": None,  # unlimited
-    },
     "auto_apply": {
         "free": 0,  # not available
         "premium": 50,
@@ -306,8 +308,6 @@ def get_user_features(user: User) -> dict:
     return {
         # AI Features
         "unlimited_ai_resumes": is_active,
-        "unlimited_university_search": is_active,
-        "unlimited_motivation_letters": is_active,
         "ai_cover_letters": is_active,
         
         # Job Features

@@ -7,6 +7,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   Users,
   Search,
@@ -39,15 +40,16 @@ import { SkeletonTable } from "@/components/ui/skeleton";
 import { formatRelativeTime, cn } from "@/lib/utils";
 import { jobApi, applicationApi, getErrorMessage } from "@/lib/api";
 import { toast } from "sonner";
-import type { ApplicationStatus } from "@/types/api";
+import type { KnownApplicationStatus } from "@/types/api";
 
 export default function CompanyApplicantsPage() {
+  const router = useRouter();
   const { jobs, fetchMyJobs } = useJobs();
   const [isLoading, setIsLoading] = useState(false);
   const [applications, setApplications] = useState<any[]>([]);
   const [selectedJob, setSelectedJob] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [statusFilter, setStatusFilter] = useState<KnownApplicationStatus | "all">("all");
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
@@ -90,11 +92,18 @@ export default function CompanyApplicantsPage() {
     return matchesSearch && matchesStatus;
   });
 
-  const handleStatusChange = async (applicationId: string, newStatus: string) => {
+  const handleStatusChange = async (applicationId: string, newStatus: KnownApplicationStatus) => {
+    if (newStatus === "interview") {
+      toast.info("Intervyu sana va vaqtini belgilash uchun candidate detail sahifasi ochildi.");
+      router.push(`/company/applicants/${applicationId}`);
+      return;
+    }
+
     try {
-      await applicationApi.updateStatus(applicationId, newStatus);
+      const response = await applicationApi.updateStatus(applicationId, { status: newStatus });
+      const updatedApplication = response.data?.data || response.data;
       setApplications((prev) =>
-        prev.map((a) => (a.id === applicationId ? { ...a, status: newStatus } : a))
+        prev.map((a) => (a.id === applicationId ? { ...a, ...updatedApplication, status: newStatus } : a))
       );
       toast.success("Holat yangilandi");
     } catch (error) {
@@ -145,7 +154,7 @@ export default function CompanyApplicantsPage() {
             </Select>
 
             {/* Status filter */}
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <Select value={statusFilter} onValueChange={(value) => setStatusFilter(value as KnownApplicationStatus | "all")}>
               <SelectTrigger className="w-full sm:w-48">
                 <SelectValue placeholder="All Statuses" />
               </SelectTrigger>
@@ -157,6 +166,7 @@ export default function CompanyApplicantsPage() {
                 <SelectItem value="interview">Interview</SelectItem>
                 <SelectItem value="accepted">Accepted</SelectItem>
                 <SelectItem value="rejected">Rejected</SelectItem>
+                <SelectItem value="withdrawn">Withdrawn</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -236,7 +246,7 @@ export default function CompanyApplicantsPage() {
                     <Select
                       value={application.status}
                       onValueChange={(value) =>
-                        handleStatusChange(application.id, value)
+                        handleStatusChange(application.id, value as KnownApplicationStatus)
                       }
                     >
                       <SelectTrigger className="w-36">
@@ -246,9 +256,10 @@ export default function CompanyApplicantsPage() {
                         <SelectItem value="pending">Pending</SelectItem>
                         <SelectItem value="reviewing">Reviewing</SelectItem>
                         <SelectItem value="shortlisted">Shortlisted</SelectItem>
-                        <SelectItem value="interview">Interview</SelectItem>
+                        <SelectItem value="interview">Interview - detailda belgilang</SelectItem>
                         <SelectItem value="accepted">Accepted</SelectItem>
                         <SelectItem value="rejected">Rejected</SelectItem>
+                        <SelectItem value="withdrawn">Withdrawn</SelectItem>
                       </SelectContent>
                     </Select>
 
@@ -268,9 +279,6 @@ export default function CompanyApplicantsPage() {
     </div>
   );
 }
-
-
-
 
 
 

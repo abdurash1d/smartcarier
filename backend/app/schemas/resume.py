@@ -26,6 +26,8 @@ class ResumeStatusEnum(str, Enum):
 class ResumeToneEnum(str, Enum):
     """AI generation tone options."""
     PROFESSIONAL = "professional"
+    CONFIDENT = "confident"
+    ENTHUSIASTIC = "enthusiastic"
     CREATIVE = "creative"
     TECHNICAL = "technical"
     EXECUTIVE = "executive"

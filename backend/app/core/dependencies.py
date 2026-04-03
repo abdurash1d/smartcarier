@@ -85,8 +85,8 @@ logger = logging.getLogger(__name__)
 # =============================================================================
 
 # HTTPBearer extracts token from "Authorization: Bearer <token>" header
-# auto_error=True returns 401 if header is missing
-oauth2_scheme = HTTPBearer(auto_error=True)
+# We handle missing/invalid tokens ourselves so the API returns consistent 401s.
+oauth2_scheme = HTTPBearer(auto_error=False)
 
 # For optional authentication (some routes work with or without auth)
 oauth2_scheme_optional = HTTPBearer(auto_error=False)
@@ -123,7 +123,7 @@ def get_db() -> Generator[Session, None, None]:
 # =============================================================================
 
 def get_token_payload(
-    credentials: HTTPAuthorizationCredentials = Depends(oauth2_scheme)
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(oauth2_scheme)
 ) -> TokenPayload:
     """
     Extract and verify JWT token from Authorization header.
@@ -131,6 +131,13 @@ def get_token_payload(
     Raises:
         HTTPException 401: If token is invalid, expired, or revoked
     """
+    if not credentials:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Not authenticated",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
     token = credentials.credentials
     
     try:
@@ -395,7 +402,9 @@ class PaginationParams:
     def __init__(
         self,
         page: int = 1,
-        page_size: int = 20
+        page_size: int = 20,
+        # Backward-compatible alias used by older clients/tests.
+        limit: int | None = None,
     ):
         """
         Initialize pagination.
@@ -408,6 +417,10 @@ class PaginationParams:
         if page < 1:
             page = 1
         
+        # Backward compatibility: accept ?limit= as alias for page_size.
+        if limit is not None:
+            page_size = limit
+
         # Validate page_size
         if page_size < 1:
             page_size = 20

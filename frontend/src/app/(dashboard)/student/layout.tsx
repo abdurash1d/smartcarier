@@ -30,8 +30,6 @@ import {
   X,
   Sparkles,
   HelpCircle,
-  Moon,
-  Sun,
   ChevronRight,
   BookmarkCheck,
 } from "lucide-react";
@@ -44,6 +42,7 @@ import { Input } from "@/components/ui/input";
 import { Avatar } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { LanguageSwitcher } from "@/components/ui/language-switcher";
+import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { cn } from "@/lib/utils";
 
 // =============================================================================
@@ -121,7 +120,6 @@ export default function StudentDashboardLayout({
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  const [isDark, setIsDark] = useState(false);
   const [notifications, setNotifications] = useState<any[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
 
@@ -308,12 +306,7 @@ export default function StudentDashboardLayout({
             <LanguageSwitcher variant="minimal" />
 
             {/* Theme Toggle */}
-            <button
-              onClick={() => setIsDark(!isDark)}
-              className="rounded-lg p-2 text-surface-500 hover:bg-surface-100 dark:hover:bg-surface-700"
-            >
-              {isDark ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
-            </button>
+            <ThemeToggle />
 
             {/* Notifications */}
             <div className="relative">

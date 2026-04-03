@@ -29,19 +29,66 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
-import { applicationApi, resumeApi } from "@/lib/api";
+import { applicationApi } from "@/lib/api";
 import { formatDate, formatRelativeTime, cn } from "@/lib/utils";
-import type { Application } from "@/types/api";
+import type { Application, KnownApplicationStatus } from "@/types/api";
 import { toast } from "sonner";
 
-const statusConfig: Record<string, { label: string; color: string; icon: any }> = {
+type InterviewFormat = "video" | "phone" | "in-person";
+
+const statusConfig: Record<KnownApplicationStatus, { label: string; color: string; icon: any }> = {
   pending: { label: "Kutilmoqda", color: "bg-yellow-100 text-yellow-700", icon: Clock },
   reviewing: { label: "Ko'rib chiqilmoqda", color: "bg-blue-100 text-blue-700", icon: Eye },
+  shortlisted: { label: "Saralangan", color: "bg-amber-100 text-amber-700", icon: Award },
   interview: { label: "Intervyu", color: "bg-purple-100 text-purple-700", icon: User },
   accepted: { label: "Qabul qilindi", color: "bg-green-100 text-green-700", icon: CheckCircle },
   rejected: { label: "Rad etildi", color: "bg-red-100 text-red-700", icon: XCircle },
+  withdrawn: { label: "Bekor qilingan", color: "bg-surface-100 text-surface-600", icon: XCircle },
 };
+
+const statusActions: KnownApplicationStatus[] = [
+  "pending",
+  "reviewing",
+  "shortlisted",
+  "accepted",
+  "rejected",
+];
+
+const interviewFormatLabels: Record<
+  InterviewFormat,
+  { label: string; helper: string }
+> = {
+  video: {
+    label: "Video",
+    helper: "Zoom, Meet yoki boshqa online havola ishlatiladi.",
+  },
+  phone: {
+    label: "Phone",
+    helper: "Telefon orqali intervyu uchun havola kerak emas.",
+  },
+  "in-person": {
+    label: "In-person",
+    helper: "Ofis yoki boshqa manzilda uchrashuv belgilanadi.",
+  },
+};
+
+function toDatetimeLocalValue(value?: string) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+
+  const year = date.getFullYear();
+  const month = `${date.getMonth() + 1}`.padStart(2, "0");
+  const day = `${date.getDate()}`.padStart(2, "0");
+  const hours = `${date.getHours()}`.padStart(2, "0");
+  const minutes = `${date.getMinutes()}`.padStart(2, "0");
+
+  return `${year}-${month}-${day}T${hours}:${minutes}`;
+}
 
 export default function ApplicantDetailPage() {
   const router = useRouter();
@@ -52,6 +99,10 @@ export default function ApplicantDetailPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isUpdating, setIsUpdating] = useState(false);
+  const [interviewDateTime, setInterviewDateTime] = useState("");
+  const [interviewFormat, setInterviewFormat] = useState<InterviewFormat>("video");
+  const [meetingLink, setMeetingLink] = useState("");
+  const [interviewNotes, setInterviewNotes] = useState("");
 
   useEffect(() => {
     const fetchApplication = async () => {
@@ -68,14 +119,76 @@ export default function ApplicantDetailPage() {
     if (appId) fetchApplication();
   }, [appId]);
 
-  const handleStatusChange = async (newStatus: string) => {
+  useEffect(() => {
+    setInterviewDateTime(toDatetimeLocalValue(application?.interview_at));
+    setInterviewFormat((application?.interview_type as InterviewFormat) || "video");
+    setMeetingLink(application?.meeting_link || "");
+    setInterviewNotes(application?.notes || "");
+  }, [
+    application?.id,
+    application?.interview_at,
+    application?.interview_type,
+    application?.meeting_link,
+    application?.notes,
+  ]);
+
+  const handleStatusChange = async (newStatus: KnownApplicationStatus) => {
     setIsUpdating(true);
     try {
-      await applicationApi.updateStatus(appId, newStatus);
-      setApplication((prev) => prev ? { ...prev, status: newStatus as any } : prev);
+      const response = await applicationApi.updateStatus(appId, { status: newStatus });
+      const updatedApplication = response.data?.data || response.data;
+      setApplication((prev) =>
+        updatedApplication
+          ? { ...prev, ...updatedApplication }
+          : prev
+      );
       toast.success(`Holat "${statusConfig[newStatus]?.label}" ga o'zgartirildi.`);
-    } catch {
-      toast.error("Holatni o'zgartirishda xatolik.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Holatni o'zgartirishda xatolik.");
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  const handleInterviewSchedule = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    if (!interviewDateTime) {
+      toast.error("Intervyu sana va vaqtini kiriting.");
+      return;
+    }
+
+    const interviewAt = new Date(interviewDateTime);
+    if (Number.isNaN(interviewAt.getTime())) {
+      toast.error("Intervyu sanasi noto'g'ri.");
+      return;
+    }
+
+    setIsUpdating(true);
+    try {
+      const normalizedMeetingLink = meetingLink.trim();
+      const payload = {
+        status: "interview" as const,
+        interview_at: interviewAt.toISOString(),
+        interview_type: interviewFormat,
+        meeting_link: interviewFormat === "video" && normalizedMeetingLink ? normalizedMeetingLink : undefined,
+        notes: interviewNotes.trim() || undefined,
+      };
+
+      const response = await applicationApi.updateStatus(appId, payload);
+      const updatedApplication = response.data?.data || response.data;
+      setApplication((prev) =>
+        updatedApplication
+          ? { ...prev, ...updatedApplication }
+          : prev
+      );
+      setInterviewDateTime(toDatetimeLocalValue(updatedApplication?.interview_at || payload.interview_at));
+      setInterviewFormat((updatedApplication?.interview_type as InterviewFormat) || interviewFormat);
+      setMeetingLink(updatedApplication?.meeting_link || payload.meeting_link || "");
+      setInterviewNotes(updatedApplication?.notes || payload.notes || "");
+      toast.success("Intervyu muvaffaqiyatli belgilandi.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Intervyuni belgilashda xatolik.");
     } finally {
       setIsUpdating(false);
     }
@@ -114,8 +227,9 @@ export default function ApplicantDetailPage() {
   const applicant = application.applicant;
   const resume = application.resume;
   const job = application.job;
-  const status = statusConfig[application.status] || statusConfig.pending;
+  const status = statusConfig[application.status as KnownApplicationStatus] || statusConfig.pending;
   const StatusIcon = status.icon;
+  const isVideoInterview = interviewFormat === "video";
 
   return (
     <div className="mx-auto max-w-4xl space-y-6 p-4 md:p-6">
@@ -174,7 +288,8 @@ export default function ApplicantDetailPage() {
           >
             <h3 className="mb-3 font-semibold text-surface-900">Holat o'zgartirish</h3>
             <div className="space-y-2">
-              {Object.entries(statusConfig).map(([key, cfg]) => {
+              {statusActions.map((key) => {
+                const cfg = statusConfig[key];
                 const Icon = cfg.icon;
                 return (
                   <button
@@ -202,6 +317,141 @@ export default function ApplicantDetailPage() {
 
         {/* Right: Details */}
         <div className="lg:col-span-2 space-y-4">
+          {/* Interview scheduling */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.05 }}
+            className="rounded-2xl border border-surface-200 bg-white p-5 shadow-sm"
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h3 className="flex items-center gap-2 font-semibold text-surface-900">
+                  <Calendar className="h-5 w-5 text-purple-500" />
+                  Intervyu jadvali
+                </h3>
+                <p className="mt-1 text-sm text-surface-500">
+                  Intervyu statusi faqat sana, vaqt va ixtiyoriy izoh bilan belgilanishi kerak.
+                </p>
+              </div>
+              {application.status === "interview" && (
+                <Badge className="bg-purple-100 text-purple-700">Intervyu faol</Badge>
+              )}
+            </div>
+
+            {application.interview_at && (
+              <div className="mt-4 rounded-xl border border-purple-100 bg-purple-50 p-3 text-sm text-surface-700">
+                <p className="font-medium text-surface-900">Joriy intervyu vaqti</p>
+                <p className="mt-1">{formatDate(application.interview_at)}</p>
+                <p className="mt-1">
+                  Format: {application.interview_type ? interviewFormatLabels[application.interview_type as InterviewFormat]?.label || application.interview_type : "Belgilanmagan"}
+                </p>
+                {application.meeting_link && (
+                  <p className="mt-1 break-all">
+                    Havola:{" "}
+                    <a
+                      href={application.meeting_link}
+                      target="_blank"
+                      rel="noreferrer noopener"
+                      className="font-medium text-purple-700 hover:underline"
+                    >
+                      {application.meeting_link}
+                    </a>
+                  </p>
+                )}
+              </div>
+            )}
+
+            <form className="mt-4 space-y-4" onSubmit={handleInterviewSchedule}>
+              <div className="space-y-2">
+                <Label htmlFor="interview-at">Sana va vaqt</Label>
+                <Input
+                  id="interview-at"
+                  type="datetime-local"
+                  step="60"
+                  value={interviewDateTime}
+                  onChange={(event) => setInterviewDateTime(event.target.value)}
+                  disabled={isUpdating}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="interview-format">Intervyu formati</Label>
+                <select
+                  id="interview-format"
+                  value={interviewFormat}
+                  onChange={(event) => {
+                    const nextValue = event.target.value as InterviewFormat;
+                    setInterviewFormat(nextValue);
+                    if (nextValue !== "video") {
+                      setMeetingLink("");
+                    }
+                  }}
+                  disabled={isUpdating}
+                  className={cn(
+                    "flex h-10 w-full rounded-lg border border-surface-200 bg-white px-3 py-2 text-sm",
+                    "focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-500/20"
+                  )}
+                >
+                  {Object.entries(interviewFormatLabels).map(([value, config]) => (
+                    <option key={value} value={value}>
+                      {config.label}
+                    </option>
+                  ))}
+                </select>
+                <p className="text-xs text-surface-500">
+                  {interviewFormatLabels[interviewFormat].helper}
+                </p>
+              </div>
+
+              {isVideoInterview && (
+                <div className="space-y-2">
+                  <Label htmlFor="meeting-link">Meeting link</Label>
+                  <Input
+                    id="meeting-link"
+                    type="url"
+                    value={meetingLink}
+                    onChange={(event) => setMeetingLink(event.target.value)}
+                    placeholder="https://..."
+                    disabled={isUpdating}
+                  />
+                  <p className="text-xs text-surface-500">
+                    Video intervyu uchun tavsiya etiladi.
+                  </p>
+                </div>
+              )}
+
+              <div className="space-y-2">
+                <Label htmlFor="interview-notes">Izoh</Label>
+                <Textarea
+                  id="interview-notes"
+                  value={interviewNotes}
+                  onChange={(event) => setInterviewNotes(event.target.value)}
+                  placeholder="Masalan: Zoom link, panel tarkibi yoki qo'shimcha ko'rsatmalar"
+                  disabled={isUpdating}
+                />
+              </div>
+
+              <div className="flex flex-wrap items-center gap-3">
+                <Button
+                  type="submit"
+                  disabled={isUpdating || !interviewDateTime}
+                  className="min-w-[180px]"
+                >
+                  {isUpdating ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <Calendar className="mr-2 h-4 w-4" />
+                  )}
+                  {application.status === "interview" ? "Intervyuni yangilash" : "Intervyuni belgilash"}
+                </Button>
+                <p className="text-sm text-surface-500">
+                  Bu forma statusni avtomatik ravishda <span className="font-medium text-surface-700">interview</span> ga o'tkazadi va formatni saqlaydi.
+                </p>
+              </div>
+            </form>
+          </motion.div>
+
           {/* Job Info */}
           {job && (
             <motion.div

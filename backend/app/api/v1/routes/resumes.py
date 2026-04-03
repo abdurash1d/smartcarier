@@ -27,12 +27,16 @@ VERSION: 1.0.0
 # IMPORTS
 # =============================================================================
 
-import logging
-import time
 import io
+import logging
+import re
+import textwrap
+import time
 from typing import Optional, List, Dict, Any
 from uuid import UUID
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
+
+
 
 from fastapi import APIRouter, Depends, HTTPException, status, Query, Response
 from fastapi.responses import StreamingResponse
@@ -86,6 +90,419 @@ def resume_to_response(resume: Resume) -> ResumeResponse:
         created_at=resume.created_at,
         updated_at=resume.updated_at,
     )
+
+
+def _validate_resume_content(content: Dict[str, Any]) -> None:
+    """Validate manual resume content for the integration fixtures."""
+    if not isinstance(content, dict):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Invalid resume content"
+        )
+
+    personal_info = content.get("personal_info")
+    if not isinstance(personal_info, dict):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="personal_info is required"
+        )
+
+    name = personal_info.get("name") or personal_info.get("full_name")
+    email = personal_info.get("email")
+    if not name or not email:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="personal_info.name and personal_info.email are required"
+        )
+
+    if not re.match(r"^[^@\s]+@[^@\s]+\.[^@\s]+$", str(email)):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Invalid email address"
+        )
+
+
+def _normalize_keyword(value: Any) -> Optional[str]:
+    """Normalize a keyword for deduplication and counting."""
+    if value is None:
+        return None
+
+    normalized = re.sub(r"\s+", " ", str(value).strip().lower())
+    normalized = re.sub(r'^[\s"\'`.,;:!?()\[\]{}<>]+|[\s"\'`.,;:!?()\[\]{}<>]+$', "", normalized)
+    return normalized or None
+
+
+def _add_keywords(bucket: List[str], values: Any) -> None:
+    """Add one or many keyword values to a list."""
+    if not values:
+        return
+
+    if isinstance(values, str):
+        values = [values]
+
+    if isinstance(values, dict):
+        values = values.values()
+
+    for value in values:
+        if isinstance(value, dict):
+            _add_keywords(bucket, value.get("skills"))
+            _add_keywords(bucket, value.get("keyword"))
+            _add_keywords(bucket, value.get("name"))
+            _add_keywords(bucket, value.get("category"))
+            continue
+
+        normalized = _normalize_keyword(value)
+        if normalized:
+            bucket.append(normalized)
+
+
+def _extract_resume_keywords(content: Dict[str, Any]) -> List[str]:
+    """Extract distinct ATS-relevant keywords from resume content."""
+    keywords: List[str] = []
+
+    summary = content.get("professional_summary")
+    if isinstance(summary, dict):
+        _add_keywords(keywords, summary.get("keywords"))
+    elif isinstance(summary, str):
+        # Older content models store summary as a plain string.
+        _add_keywords(keywords, summary)
+
+    skills = content.get("skills", {})
+    if isinstance(skills, list):
+        _add_keywords(keywords, skills)
+    elif isinstance(skills, dict):
+        _add_keywords(keywords, skills.get("technical_skills"))
+        _add_keywords(keywords, skills.get("soft_skills"))
+        _add_keywords(keywords, skills.get("tools_technologies"))
+        _add_keywords(keywords, skills.get("languages"))
+        _add_keywords(keywords, skills.get("technical"))
+        _add_keywords(keywords, skills.get("soft"))
+    else:
+        _add_keywords(keywords, skills)
+
+    experience = content.get("work_experience") or content.get("experience") or []
+    for exp in experience:
+        if not isinstance(exp, dict):
+            continue
+        _add_keywords(keywords, exp.get("job_title") or exp.get("position"))
+        _add_keywords(keywords, exp.get("company_name") or exp.get("company"))
+        _add_keywords(keywords, exp.get("technologies_used"))
+
+    education = content.get("education") or []
+    for edu in education:
+        if not isinstance(edu, dict):
+            continue
+        _add_keywords(keywords, edu.get("field_of_study") or edu.get("field") or edu.get("major"))
+        _add_keywords(keywords, edu.get("degree_type") or edu.get("degree"))
+        _add_keywords(keywords, edu.get("institution_name") or edu.get("institution"))
+
+    projects = content.get("projects") or []
+    for project in projects:
+        if isinstance(project, dict):
+            _add_keywords(keywords, project.get("technologies"))
+            _add_keywords(keywords, project.get("project_name") or project.get("name"))
+
+    certifications = content.get("certifications") or []
+    for certification in certifications:
+        if isinstance(certification, dict):
+            _add_keywords(keywords, certification.get("name"))
+            _add_keywords(keywords, certification.get("issuing_organization") or certification.get("issuer"))
+
+    languages = content.get("languages") or []
+    for language in languages:
+        if isinstance(language, dict):
+            _add_keywords(keywords, language.get("name"))
+            _add_keywords(keywords, language.get("proficiency"))
+        else:
+            _add_keywords(keywords, language)
+
+    # Preserve order while removing duplicates.
+    seen = set()
+    distinct_keywords = []
+    for keyword in keywords:
+        if keyword not in seen:
+            seen.add(keyword)
+            distinct_keywords.append(keyword)
+
+    return distinct_keywords
+
+
+def _build_resume_text(content: Dict[str, Any]) -> str:
+    """Build a readable text representation of resume content."""
+    lines: List[str] = []
+
+    personal_info = content.get("personal_info", {})
+    if isinstance(personal_info, dict):
+        name = personal_info.get("name") or personal_info.get("full_name")
+        email = personal_info.get("email")
+        phone = personal_info.get("phone")
+        location = personal_info.get("location")
+        if name:
+            lines.append(f"Name: {name}")
+        if email:
+            lines.append(f"Email: {email}")
+        if phone:
+            lines.append(f"Phone: {phone}")
+        if location:
+            lines.append(f"Location: {location}")
+
+    summary = content.get("professional_summary")
+    if isinstance(summary, dict):
+        if summary.get("text"):
+            lines.append("")
+            lines.append("Professional Summary:")
+            lines.append(summary["text"])
+        if summary.get("keywords"):
+            lines.append(f"Keywords: {', '.join(str(keyword) for keyword in summary['keywords'])}")
+    elif isinstance(summary, str):
+        lines.append("")
+        lines.append("Professional Summary:")
+        lines.append(summary)
+    elif isinstance(content.get("summary"), str):
+        lines.append("")
+        lines.append("Professional Summary:")
+        lines.append(content["summary"])
+
+    experience = content.get("work_experience") or content.get("experience") or []
+    if experience:
+        lines.append("")
+        lines.append("Experience:")
+        for exp in experience:
+            if not isinstance(exp, dict):
+                continue
+            title = exp.get("job_title") or exp.get("position")
+            company = exp.get("company_name") or exp.get("company")
+            start_date = exp.get("start_date")
+            end_date = exp.get("end_date")
+            period = " - ".join(str(value) for value in [start_date, end_date] if value)
+            line_parts = [part for part in [title, company, period] if part]
+            if line_parts:
+                lines.append(" - ".join(line_parts))
+
+            description = exp.get("description")
+            if description:
+                lines.append(f"  Description: {description}")
+
+            responsibilities = exp.get("responsibilities") or []
+            for responsibility in responsibilities:
+                if responsibility:
+                    lines.append(f"  - {responsibility}")
+
+            achievements = exp.get("achievements") or []
+            for achievement in achievements:
+                if isinstance(achievement, dict):
+                    achievement_text = achievement.get("description") or achievement.get("metric")
+                    metric = achievement.get("metric")
+                    if achievement_text and metric and metric not in achievement_text:
+                        achievement_text = f"{achievement_text} ({metric})"
+                else:
+                    achievement_text = achievement
+                if achievement_text:
+                    lines.append(f"  * {achievement_text}")
+
+            technologies = exp.get("technologies_used") or []
+            if technologies:
+                lines.append(f"  Technologies: {', '.join(str(item) for item in technologies if item)}")
+
+    education = content.get("education") or []
+    if education:
+        lines.append("")
+        lines.append("Education:")
+        for edu in education:
+            if not isinstance(edu, dict):
+                continue
+            degree = edu.get("degree_type") or edu.get("degree")
+            field = edu.get("field_of_study") or edu.get("field") or edu.get("major")
+            institution = edu.get("institution_name") or edu.get("institution")
+            graduation_date = edu.get("graduation_date") or edu.get("year")
+            line_parts = [part for part in [degree, field, institution, graduation_date] if part]
+            if line_parts:
+                lines.append(" - ".join(str(part) for part in line_parts))
+
+    skills = content.get("skills")
+    if skills:
+        lines.append("")
+        lines.append("Skills:")
+        if isinstance(skills, list):
+            lines.append(", ".join(str(item) for item in skills if item))
+        elif isinstance(skills, dict):
+            technical_categories = skills.get("technical_skills") or []
+            for category in technical_categories:
+                if isinstance(category, dict):
+                    category_name = category.get("category")
+                    category_skills = category.get("skills") or []
+                    if category_name or category_skills:
+                        prefix = f"  {category_name}: " if category_name else "  "
+                        lines.append(prefix + ", ".join(str(item) for item in category_skills if item))
+                elif category:
+                    lines.append(f"  {category}")
+
+            for label, key in (
+                ("Soft skills", "soft_skills"),
+                ("Tools and technologies", "tools_technologies"),
+                ("Languages", "languages"),
+                ("Technical skills", "technical"),
+                ("Soft skills", "soft"),
+            ):
+                values = skills.get(key) or []
+                if values:
+                    lines.append(f"  {label}: {', '.join(str(item) for item in values if item)}")
+        else:
+            lines.append(str(skills))
+
+    projects = content.get("projects") or []
+    if projects:
+        lines.append("")
+        lines.append("Projects:")
+        for project in projects:
+            if not isinstance(project, dict):
+                continue
+            project_name = project.get("project_name") or project.get("name")
+            description = project.get("description")
+            technologies = project.get("technologies") or []
+            project_line = project_name or "Project"
+            if description:
+                project_line += f" - {description}"
+            lines.append(project_line)
+            if technologies:
+                lines.append(f"  Technologies: {', '.join(str(item) for item in technologies if item)}")
+
+    certifications = content.get("certifications") or []
+    if certifications:
+        lines.append("")
+        lines.append("Certifications:")
+        for certification in certifications:
+            if not isinstance(certification, dict):
+                continue
+            name = certification.get("name")
+            issuer = certification.get("issuing_organization") or certification.get("issuer")
+            line_parts = [part for part in [name, issuer] if part]
+            if line_parts:
+                lines.append(" - ".join(str(part) for part in line_parts))
+
+    return "\n".join(lines).strip()
+
+
+def _escape_pdf_text(text: str) -> str:
+    """Escape text for inclusion in a PDF content stream."""
+    return text.replace("\\", "\\\\").replace("(", "\\(").replace(")", "\\)")
+
+
+def _render_pdf_bytes(lines: List[str]) -> bytes:
+    """Render a simple multi-page PDF containing the provided lines."""
+    wrapped_lines: List[str] = []
+    for line in lines:
+        text = "" if line is None else str(line)
+        if not text:
+            wrapped_lines.append("")
+            continue
+
+        wrapped = textwrap.wrap(
+            text,
+            width=88,
+            break_long_words=False,
+            break_on_hyphens=False,
+        )
+        wrapped_lines.extend(wrapped or [""])
+
+    max_lines_per_page = 38
+    pages = [
+        wrapped_lines[index:index + max_lines_per_page]
+        for index in range(0, len(wrapped_lines), max_lines_per_page)
+    ] or [[]]
+
+    font_object_number = 3 + (len(pages) * 2)
+    objects: List[bytes] = []
+
+    objects.append(b"<< /Type /Catalog /Pages 2 0 R >>")
+
+    page_refs = []
+    for page_index, page_lines in enumerate(pages):
+        page_object_number = 3 + (page_index * 2)
+        content_object_number = page_object_number + 1
+        page_refs.append(f"{page_object_number} 0 R")
+
+        content_commands = ["BT", "/F1 12 Tf", "72 760 Td"]
+        first_line = True
+        for line in page_lines:
+            escaped_line = _escape_pdf_text(line)
+            if first_line:
+                content_commands.append(f"({escaped_line}) Tj")
+                first_line = False
+            else:
+                content_commands.append("T*")
+                content_commands.append(f"({escaped_line}) Tj")
+        if first_line:
+            content_commands.append("() Tj")
+        content_commands.append("ET")
+
+        content_stream = "\n".join(content_commands).encode("utf-8")
+        page_object = (
+            f"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] "
+            f"/Resources << /Font << /F1 {font_object_number} 0 R >> >> "
+            f"/Contents {content_object_number} 0 R >>"
+        ).encode("utf-8")
+
+        objects.append(page_object)
+        objects.append(
+            b"<< /Length "
+            + str(len(content_stream)).encode("utf-8")
+            + b" >>\nstream\n"
+            + content_stream
+            + b"\nendstream"
+        )
+
+    objects.insert(
+        1,
+        f"<< /Type /Pages /Kids [{' '.join(page_refs)}] /Count {len(pages)} >>".encode("utf-8")
+    )
+    objects.append(b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>")
+
+    pdf = bytearray(b"%PDF-1.4\n%\xe2\xe3\xcf\xd3\n")
+    offsets = [0]
+
+    for index, obj in enumerate(objects, start=1):
+        offsets.append(len(pdf))
+        pdf.extend(f"{index} 0 obj\n".encode("utf-8"))
+        pdf.extend(obj)
+        pdf.extend(b"\nendobj\n")
+
+    xref_position = len(pdf)
+    pdf.extend(f"xref\n0 {len(objects) + 1}\n".encode("utf-8"))
+    pdf.extend(b"0000000000 65535 f \n")
+    for offset in offsets[1:]:
+        pdf.extend(f"{offset:010d} 00000 n \n".encode("utf-8"))
+
+    pdf.extend(
+        (
+            "trailer\n"
+            f"<< /Size {len(objects) + 1} /Root 1 0 R >>\n"
+            "startxref\n"
+            f"{xref_position}\n"
+            "%%EOF\n"
+        ).encode("utf-8")
+    )
+
+    return bytes(pdf)
+
+
+def _generate_pdf(resume: Resume) -> bytes:
+    """Generate PDF bytes for a resume."""
+    lines = [
+        resume.title,
+        f"Resume ID: {resume.id}",
+        f"Status: {resume.status}",
+        f"Generated At: {datetime.now(timezone.utc).isoformat()}",
+        "",
+    ]
+
+    resume_text = _build_resume_text(resume.content or {})
+    if resume_text:
+        lines.extend(resume_text.splitlines())
+    else:
+        lines.append("No resume content available.")
+
+    return _render_pdf_bytes(lines)
 
 
 # =============================================================================
@@ -215,6 +632,7 @@ class ResumeAnalyticsResponse(BaseModel):
     
     # View statistics
     total_views: int
+    view_count: int = 0
     views_this_week: int
     views_this_month: int
     
@@ -252,6 +670,7 @@ class PDFDownloadResponse(BaseModel):
 # ENDPOINTS
 # =============================================================================
 
+@router.get("")
 @router.get(
     "/",
     response_model=ResumeListResponse,
@@ -321,14 +740,22 @@ async def list_resumes(
     """
 )
 async def get_resume(
-    resume_id: UUID,
+    resume_id: str,
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
     """Get a specific resume by ID."""
+
+    try:
+        resume_uuid = UUID(resume_id)
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Resume not found"
+        )
     
     resume = db.query(Resume).filter(
-        Resume.id == resume_id,
+        Resume.id == resume_uuid,
         Resume.user_id == current_user.id,
         Resume.is_deleted == False
     ).first()
@@ -374,6 +801,8 @@ async def create_resume(
     db: Session = Depends(get_db)
 ):
     """Create a new resume manually."""
+
+    _validate_resume_content(resume_data.content)
     
     # Create resume
     resume = Resume(
@@ -396,6 +825,7 @@ async def create_resume(
 @router.post(
     "/generate-ai",
     response_model=AIResumeGenerateResponse,
+    status_code=status.HTTP_201_CREATED,
     summary="🔥 Generate resume with AI",
     description="""
     **CORE FEATURE** - Generate a professional resume using AI.
@@ -534,8 +964,16 @@ async def generate_ai_resume(
         # Generate cover letter if requested
         cover_letter = None
         if request.include_cover_letter:
-            # TODO: Implement cover letter generation
-            cover_letter = "Cover letter generation coming soon!"
+            try:
+                cover_letter = await ai_service.generate_cover_letter(
+                    resume_text=_build_resume_text(content),
+                    job_description=request.job_description
+                    or f"Tailored application for the {job_title} role.",
+                    company_name=request.target_company or "the target company",
+                    tone=tone.value,
+                )
+            except AIGenerationError as e:
+                logger.warning(f"Cover letter generation failed: {e}")
         
         # Create resume in database
         resume_title = f"{job_title} Resume - {request.template.value.title()}"
@@ -550,6 +988,11 @@ async def generate_ai_resume(
         )
         
         db.add(resume)
+        db.commit()
+        db.refresh(resume)
+
+        pdf_url = f"/api/v1/resumes/{resume.id}/pdf"
+        resume.pdf_url = pdf_url
         db.commit()
         db.refresh(resume)
         
@@ -571,6 +1014,7 @@ async def generate_ai_resume(
             resume=resume_to_response(resume),
             resume_content=content,
             cover_letter=cover_letter,
+            pdf_url=pdf_url,
             ats_score=ats_score,
             ats_suggestions=ats_suggestions,
             template_used=request.template.value,
@@ -768,18 +1212,26 @@ async def archive_resume(
     The PDF is generated from the resume content and template.
     Returns a URL to download the PDF (valid for 1 hour).
     
-    **Note:** For direct PDF streaming, use the `/download-stream` endpoint.
+    **Note:** For direct PDF streaming, use the `/pdf` endpoint.
     """
 )
 async def download_resume_pdf(
-    resume_id: UUID,
+    resume_id: str,
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
-    """Generate and return PDF download link."""
+    """Stream the resume as a PDF for download."""
+
+    try:
+        resume_uuid = UUID(resume_id)
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Resume not found"
+        )
     
     resume = db.query(Resume).filter(
-        Resume.id == resume_id,
+        Resume.id == resume_uuid,
         Resume.user_id == current_user.id,
         Resume.is_deleted == False
     ).first()
@@ -790,32 +1242,74 @@ async def download_resume_pdf(
             detail="Resume not found"
         )
     
+    pdf_bytes = _generate_pdf(resume)
+    safe_title = re.sub(r"[^A-Za-z0-9._-]+", "_", resume.title).strip("_") or f"resume_{resume.id}"
+
+    return StreamingResponse(
+        iter([pdf_bytes]),
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f'inline; filename="{safe_title}.pdf"'
+        },
+    )
+
+
+@router.get(
+    "/{resume_id}/download",
+    summary="Download resume PDF file",
+    description="Stream a generated PDF version of the resume."
+)
+async def get_resume_download(
+    resume_id: str,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """Alias GET endpoint for compatibility with older clients/tests."""
+    return await download_resume_pdf(resume_id=resume_id, current_user=current_user, db=db)
+
+
+@router.get(
+    "/{resume_id}/pdf",
+    summary="Download resume PDF file",
+    description="Stream a generated PDF version of the resume."
+)
+async def get_resume_pdf(
+    resume_id: str,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """Stream the generated PDF for a resume."""
+
     try:
-        # Generate PDF (placeholder - implement actual PDF generation)
-        pdf_url = await _generate_pdf(resume)
-        
-        # Update resume with PDF URL
-        resume.pdf_url = pdf_url
-        db.commit()
-        
-        # Set expiration (1 hour from now)
-        expires_at = datetime.now(timezone.utc) + timedelta(hours=1)
-        
-        logger.info(f"PDF generated for resume: {resume.id}")
-        
-        return PDFDownloadResponse(
-            success=True,
-            message="PDF generated successfully",
-            pdf_url=pdf_url,
-            download_expires_at=expires_at,
+        resume_uuid = UUID(resume_id)
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Resume not found"
         )
-        
-    except Exception as e:
-        logger.exception(f"PDF generation failed: {e}")
-        return PDFDownloadResponse(
-            success=False,
-            message=f"PDF generation failed: {str(e)}"
+
+    resume = db.query(Resume).filter(
+        Resume.id == resume_uuid,
+        Resume.user_id == current_user.id,
+        Resume.is_deleted == False
+    ).first()
+
+    if not resume:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Resume not found"
         )
+
+    pdf_bytes = _generate_pdf(resume)
+    safe_title = re.sub(r"[^A-Za-z0-9._-]+", "_", resume.title).strip("_") or f"resume_{resume.id}"
+
+    return StreamingResponse(
+        iter([pdf_bytes]),
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f'inline; filename="{safe_title}.pdf"'
+        },
+    )
 
 
 @router.get(
@@ -833,14 +1327,22 @@ async def download_resume_pdf(
     """
 )
 async def get_resume_analytics(
-    resume_id: UUID,
+    resume_id: str,
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
     """Get analytics for a resume."""
+
+    try:
+        resume_uuid = UUID(resume_id)
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Resume not found"
+        )
     
     resume = db.query(Resume).filter(
-        Resume.id == resume_id,
+        Resume.id == resume_uuid,
         Resume.user_id == current_user.id,
         Resume.is_deleted == False
     ).first()
@@ -853,7 +1355,7 @@ async def get_resume_analytics(
     
     # Get application statistics
     applications = db.query(Application).filter(
-        Application.resume_id == resume_id,
+        Application.resume_id == resume_uuid,
         Application.is_deleted == False
     ).all()
     
@@ -872,7 +1374,7 @@ async def get_resume_analytics(
     
     # Get last application date
     last_application = db.query(Application).filter(
-        Application.resume_id == resume_id,
+        Application.resume_id == resume_uuid,
         Application.is_deleted == False
     ).order_by(Application.applied_at.desc()).first()
     
@@ -883,11 +1385,13 @@ async def get_resume_analytics(
     views_this_month = resume.view_count
     
     logger.info(f"Analytics retrieved for resume: {resume.id}")
+    ats_keywords_matched = len(_extract_resume_keywords(resume.content or {}))
     
     return ResumeAnalyticsResponse(
         resume_id=str(resume.id),
         title=resume.title,
         total_views=resume.view_count,
+        view_count=resume.view_count,
         views_this_week=views_this_week,
         views_this_month=views_this_month,
         total_applications=total_applications,
@@ -898,7 +1402,7 @@ async def get_resume_analytics(
         interview_rate=round(interview_rate, 1),
         success_rate=round(success_rate, 1),
         ats_score=resume.ats_score,
-        ats_keywords_matched=None,  # TODO: Implement keyword tracking
+        ats_keywords_matched=ats_keywords_matched,
         created_at=resume.created_at,
         last_updated=resume.updated_at,
         last_used_in_application=last_used,
@@ -908,9 +1412,6 @@ async def get_resume_analytics(
 # =============================================================================
 # HELPER FUNCTIONS
 # =============================================================================
-
-from datetime import timedelta
-
 
 def _calculate_ats_score(content: Dict[str, Any], job_description: Optional[str]) -> int:
     """
@@ -979,27 +1480,3 @@ def _get_ats_suggestions(content: Dict[str, Any], job_description: Optional[str]
         suggestions.append("Review the job description and ensure key terms are included")
     
     return suggestions
-
-
-async def _generate_pdf(resume: Resume) -> str:
-    """
-    Generate PDF from resume content.
-    
-    In production, this would:
-    1. Use a template engine (Jinja2, WeasyPrint, etc.)
-    2. Generate PDF
-    3. Upload to S3 or similar storage
-    4. Return presigned URL
-    
-    For now, returns a placeholder URL.
-    """
-    # TODO: Implement actual PDF generation
-    # Options:
-    # - WeasyPrint for HTML to PDF
-    # - ReportLab for programmatic PDF
-    # - External service (HTML to PDF API)
-    
-    # Placeholder URL
-    pdf_url = f"/api/v1/resumes/{resume.id}/pdf"
-    
-    return pdf_url

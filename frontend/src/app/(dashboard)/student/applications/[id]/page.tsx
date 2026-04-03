@@ -65,6 +65,24 @@ const statusConfig: Record<string, { label: string; color: string; icon: any; de
 
 const statusSteps = ["pending", "reviewing", "interview", "accepted"];
 
+type StudentApplicationDetails = Application & {
+  interview_type?: string;
+  meeting_link?: string;
+};
+
+function formatInterviewTypeLabel(interviewType?: string) {
+  if (!interviewType) {
+    return "Format belgilanmagan";
+  }
+
+  const normalized = interviewType.trim().toLowerCase();
+  if (normalized === "video") return "Video intervyu";
+  if (normalized === "phone") return "Telefon intervyu";
+  if (normalized === "in-person" || normalized === "in person") return "Shaxsan intervyu";
+
+  return interviewType;
+}
+
 export default function ApplicationDetailPage() {
   const router = useRouter();
   const params = useParams();
@@ -126,9 +144,10 @@ export default function ApplicationDetailPage() {
     );
   }
 
+  const applicationDetails = application as StudentApplicationDetails;
   const status = statusConfig[application.status] || statusConfig.pending;
   const StatusIcon = status.icon;
-  const job = application.job;
+  const job = applicationDetails.job;
   const currentStepIndex = statusSteps.indexOf(application.status);
   const isRejected = application.status === "rejected";
 
@@ -260,25 +279,67 @@ export default function ApplicationDetailPage() {
               <span className="font-medium">{formatDate(application.reviewed_at)}</span>
             </div>
           )}
-          {application.interview_at && (
+          {applicationDetails.interview_at && (
             <div className="flex justify-between">
               <span className="text-surface-500">Intervyu sanasi</span>
               <span className="font-medium text-purple-600">
                 <Calendar className="mr-1 inline h-4 w-4" />
-                {formatDate(application.interview_at)}
+                {formatDate(applicationDetails.interview_at)}
               </span>
             </div>
           )}
         </div>
 
+        {(application.status === "interview" ||
+          applicationDetails.interview_type ||
+          applicationDetails.meeting_link) && (
+          <div className="mt-4 rounded-xl border border-purple-100 bg-purple-50 p-4">
+            <p className="mb-3 text-sm font-semibold text-surface-700">
+              Intervyu ma&apos;lumotlari
+            </p>
+            <div className="space-y-3 text-sm">
+              <div className="flex items-center justify-between gap-4">
+                <span className="text-surface-500">Format</span>
+                <span className="font-medium text-surface-900">
+                  {formatInterviewTypeLabel(applicationDetails.interview_type)}
+                </span>
+              </div>
+              {applicationDetails.meeting_link ? (
+                <div className="flex items-center justify-between gap-4">
+                  <span className="text-surface-500">Meeting link</span>
+                  <Button
+                    asChild
+                    variant="outline"
+                    size="sm"
+                    className="h-8 rounded-full border-purple-200 bg-white px-3 text-purple-700 hover:bg-purple-50"
+                  >
+                    <a
+                      href={applicationDetails.meeting_link}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      Ochish
+                    </a>
+                  </Button>
+                </div>
+              ) : (
+                <div className="flex items-center justify-between gap-4">
+                  <span className="text-surface-500">Meeting link</span>
+                  <span className="font-medium text-surface-500">Mavjud emas</span>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* Cover Letter */}
-        {application.cover_letter && (
+        {applicationDetails.cover_letter && (
           <div className="mt-4 rounded-xl border border-surface-100 bg-surface-50 p-4">
             <p className="mb-2 flex items-center gap-2 text-sm font-semibold text-surface-700">
               <MessageSquare className="h-4 w-4" /> Cover Letter
             </p>
             <p className="text-sm text-surface-600 leading-relaxed whitespace-pre-wrap">
-              {application.cover_letter}
+              {applicationDetails.cover_letter}
             </p>
           </div>
         )}

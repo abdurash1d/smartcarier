@@ -14,7 +14,7 @@ VALIDATION:
 import re
 from typing import Optional, List
 from datetime import datetime
-from pydantic import BaseModel, EmailStr, Field, field_validator, ConfigDict
+from pydantic import BaseModel, EmailStr, Field, field_validator, ConfigDict, AliasChoices
 from enum import Enum
 
 
@@ -256,6 +256,7 @@ class ChangePasswordRequest(BaseModel):
     
     current_password: str = Field(
         ...,
+        validation_alias=AliasChoices("current_password", "old_password"),
         description="Current password"
     )
     

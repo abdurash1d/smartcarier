@@ -12,6 +12,7 @@ VERSION: 1.0.0
 
 import pytest
 import asyncio
+import inspect
 from typing import Generator
 from datetime import datetime, timezone
 from uuid import uuid4
@@ -27,6 +28,34 @@ from app.models import User, UserRole, Job, Resume, Application
 from app.core.dependencies import get_db
 from app.core.security import create_access_token
 from app.config import settings
+
+
+def pytest_collection_modifyitems(items: list[pytest.Item]) -> None:
+    """
+    Run async tests under anyio when pytest-asyncio is unavailable.
+    """
+    for item in items:
+        obj = getattr(item, "obj", None)
+        is_async_test = obj is not None and inspect.iscoroutinefunction(obj)
+        if ("asyncio" in item.keywords or is_async_test) and "anyio" not in item.keywords:
+            item.add_marker(pytest.mark.anyio)
+
+
+@pytest.hookimpl(tryfirst=True)
+def pytest_pyfunc_call(pyfuncitem: pytest.Function):
+    """
+    Fallback async runner when pytest-asyncio isn't installed.
+    """
+    test_func = pyfuncitem.obj
+    if inspect.iscoroutinefunction(test_func):
+        kwargs = {
+            arg: pyfuncitem.funcargs[arg]
+            for arg in pyfuncitem._fixtureinfo.argnames
+            if arg in pyfuncitem.funcargs
+        }
+        asyncio.run(test_func(**kwargs))
+        return True
+    return None
 
 # =============================================================================
 # DATABASE FIXTURES
@@ -88,7 +117,7 @@ def test_student(test_db) -> User:
         full_name="Test Student",
         phone="+998901234567",
         role=UserRole.STUDENT,
-        is_active=True,
+        is_active_account=True,
         is_verified=True,
     )
     user.set_password("TestPassword123!")
@@ -111,7 +140,7 @@ def test_company(test_db) -> User:
         role=UserRole.COMPANY,
         company_name="Test Company",
         company_website="https://test.com",
-        is_active=True,
+        is_active_account=True,
         is_verified=True,
     )
     user.set_password("TestPassword123!")
@@ -132,7 +161,7 @@ def test_admin(test_db) -> User:
         full_name="Test Admin",
         phone="+998901234569",
         role=UserRole.ADMIN,
-        is_active=True,
+        is_active_account=True,
         is_verified=True,
     )
     user.set_password("AdminPassword123!")
@@ -208,15 +237,19 @@ def test_resume(test_db, test_student: User) -> Resume:
         id=uuid4(),
         user_id=test_student.id,
         title="Test Resume",
-        template="modern",
         status="published",
-        personal_info={
-            "full_name": test_student.full_name,
-            "email": test_student.email,
-            "phone": test_student.phone,
+        content={
+            "personal_info": {
+                "name": test_student.full_name,
+                "email": test_student.email,
+                "phone": test_student.phone,
+            },
+            "summary": "Test summary",
+            "skills": {
+                "technical": ["Python", "FastAPI", "PostgreSQL"],
+                "soft": ["Communication"],
+            },
         },
-        summary="Test summary",
-        skills=["Python", "FastAPI", "PostgreSQL"],
         ats_score=85,
     )
     
@@ -235,16 +268,15 @@ def test_job(test_db, test_company: User) -> Job:
         company_id=test_company.id,
         title="Test Job",
         description="Test job description",
-        requirements=["Python", "FastAPI"],
+        requirements={"skills": ["Python", "FastAPI"]},
         salary_min=1000,
         salary_max=2000,
-        currency="USD",
+        salary_currency="USD",
         location="Tashkent",
-        location_type="hybrid",
-        employment_type="full_time",
+        is_remote_allowed=True,
+        job_type="full_time",
         experience_level="mid",
-        skills_required=["Python", "FastAPI"],
-        status="published",
+        status="active",
     )
     
     test_db.add(job)
