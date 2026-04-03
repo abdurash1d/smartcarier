@@ -46,7 +46,7 @@ from sqlalchemy.orm import Session
 # Local imports
 from app.config import settings, print_config_summary
 from app.api.v1 import api_router
-from app.database import check_database_connection, get_db
+from app.database import check_database_connection, get_db, create_tables
 
 # =============================================================================
 # SENTRY INTEGRATION (Error Monitoring)
@@ -126,6 +126,14 @@ async def lifespan(app: FastAPI):
         logger.info("✅ Database connection successful")
     else:
         logger.error("❌ Database connection failed!")
+
+    # In debug/dev mode, ensure tables exist (CI E2E uses a fresh Postgres instance).
+    # Production environments should use Alembic migrations instead.
+    if settings.DEBUG:
+        try:
+            create_tables()
+        except Exception as e:
+            logger.warning(f"Auto-create tables failed: {e}")
     
     # Log API info
     logger.info(f"📚 API Documentation: http://localhost:8000/docs")
