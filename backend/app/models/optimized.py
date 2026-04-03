@@ -39,27 +39,6 @@ application_indexes = [
     Index('ix_applications_date', Application.applied_at),
 ]
 
-# University model indexes
-university_indexes = [
-    Index('ix_universities_country_ranking', University.country, University.world_ranking),
-    Index('ix_universities_search', University.name, University.country),
-    Index('ix_universities_tuition', University.tuition_min, University.tuition_max),
-]
-
-# Scholarship model indexes
-scholarship_indexes = [
-    Index('ix_scholarships_university', Scholarship.university_id),
-    Index('ix_scholarships_deadline', Scholarship.application_deadline),
-    Index('ix_scholarships_country', Scholarship.country),
-]
-
-# University Application model indexes
-university_application_indexes = [
-    Index('ix_university_applications_user_status', UniversityApplication.user_id, UniversityApplication.status),
-    Index('ix_university_applications_university', UniversityApplication.university_id),
-    Index('ix_university_applications_deadline', UniversityApplication.deadline),
-]
-
 # Notification model indexes
 notification_indexes = [
     Index('ix_notifications_user_read', Notification.user_id, Notification.is_read),
@@ -123,19 +102,6 @@ def get_user_with_applications(db, user_id: str):
             joinedload(User.resumes),
         )\
         .first()
-
-
-def get_universities_by_country_optimized(db, country: str, skip: int = 0, limit: int = 20):
-    """
-    Optimized query for universities by country.
-    Uses index on country field.
-    """
-    return db.query(University)\
-        .filter(University.country == country)\
-        .order_by(University.world_ranking)\
-        .offset(skip)\
-        .limit(limit)\
-        .all()
 
 
 def get_user_notifications_optimized(db, user_id: str, unread_only: bool = False):

@@ -23,13 +23,13 @@ const translations: Record<Locale, TranslationType> = {
 };
 
 // Get nested value from object by path
-function getNestedValue(obj: any, path: string): string {
+function getNestedValue(obj: unknown, path: string): string {
   const keys = path.split(".");
-  let value = obj;
+  let value: unknown = obj;
   
   for (const key of keys) {
     if (value && typeof value === "object" && key in value) {
-      value = value[key];
+      value = (value as Record<string, unknown>)[key];
     } else {
       return path; // Return path if not found
     }
@@ -114,45 +114,49 @@ export function TranslationProvider({ children }: { children: React.ReactNode })
 // Hook to use translation context
 export function useTranslation() {
   const context = useContext(TranslationContext);
-  
-  if (context === undefined) {
-    // Fallback for components outside provider - use local state
-    // This should be avoided in production
-    console.warn("useTranslation must be used within a TranslationProvider");
-    
-    const [locale, setLocaleState] = useState<Locale>(() => {
-      if (typeof window !== "undefined") {
-        return getPreferredLocale();
-      }
-      return defaultLocale;
-    });
 
-    const setLocale = useCallback((newLocale: Locale) => {
-      if (locales.includes(newLocale)) {
-        setLocaleState(newLocale);
-        saveLocale(newLocale);
-      }
-    }, []);
+  // Keep hook order stable even when context is missing.
+  const [fallbackLocale, setFallbackLocaleState] = useState<Locale>(() => {
+    if (typeof window !== "undefined") {
+      return getPreferredLocale();
+    }
+    return defaultLocale;
+  });
 
-    const t = useCallback(
-      (key: string, variables?: Record<string, string | number>): string => {
-        const translation = getNestedValue(translations[locale], key);
-        return replaceVariables(translation, variables);
-      },
-      [locale]
-    );
+  const fallbackSetLocale = useCallback((newLocale: Locale) => {
+    if (locales.includes(newLocale)) {
+      setFallbackLocaleState(newLocale);
+      saveLocale(newLocale);
+    }
+  }, []);
 
-    return {
-      locale,
-      setLocale,
-      t,
-      translations: translations[locale],
+  const fallbackT = useCallback(
+    (key: string, variables?: Record<string, string | number>): string => {
+      const translation = getNestedValue(translations[fallbackLocale], key);
+      return replaceVariables(translation, variables);
+    },
+    [fallbackLocale]
+  );
+
+  const fallbackValue = useMemo(
+    () => ({
+      locale: fallbackLocale,
+      setLocale: fallbackSetLocale,
+      t: fallbackT,
+      translations: translations[fallbackLocale],
       isLoading: false,
       locales,
-    };
+    }),
+    [fallbackLocale, fallbackSetLocale, fallbackT]
+  );
+
+  if (context !== undefined) {
+    return context;
   }
-  
-  return context;
+
+  // Fallback for components outside provider.
+  console.warn("useTranslation must be used within a TranslationProvider");
+  return fallbackValue;
 }
 
 export default TranslationProvider;

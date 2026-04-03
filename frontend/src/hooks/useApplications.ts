@@ -1,14 +1,16 @@
 "use client";
 
 import { useCallback, useState } from "react";
-import type { Application } from "@/types/api";
-import { applicationApi, getErrorMessage } from "@/lib/api";
+import type { Application, AutoApplyRequest, AutoApplyResponse } from "@/types/api";
+import { applicationApi, getApiErrorInfo, getErrorMessage } from "@/lib/api";
 import { toast } from "sonner";
 
 interface ApplicationsState {
   applications: Application[];
   isLoading: boolean;
+  isAutoApplying: boolean;
   error: string | null;
+  autoApplyResult: AutoApplyResponse | null;
   stats: {
     total: number;
     pending: number;
@@ -23,7 +25,9 @@ export function useApplications() {
   const [state, setState] = useState<ApplicationsState>({
     applications: [],
     isLoading: false,
+    isAutoApplying: false,
     error: null,
+    autoApplyResult: null,
     stats: {
       total: 0,
       pending: 0,
@@ -95,6 +99,38 @@ export function useApplications() {
     []
   );
 
+  const autoApply = useCallback(async (data: AutoApplyRequest) => {
+    setState((prev) => ({ ...prev, isAutoApplying: true, error: null }));
+
+    try {
+      const response = await applicationApi.autoApply(data);
+      const result = response.data as AutoApplyResponse;
+
+      setState((prev) => ({
+        ...prev,
+        isAutoApplying: false,
+        autoApplyResult: result,
+      }));
+
+      toast.success(
+        result.dry_run
+          ? "Auto-apply preview generated"
+          : "Auto-apply completed successfully"
+      );
+
+      return result;
+    } catch (error) {
+      const info = getApiErrorInfo(error);
+      setState((prev) => ({
+        ...prev,
+        isAutoApplying: false,
+        error: info.message,
+      }));
+      toast.error(info.message);
+      throw error;
+    }
+  }, []);
+
   const withdrawApplication = useCallback(async (applicationId: string) => {
     try {
       await applicationApi.withdraw(applicationId);
@@ -117,9 +153,9 @@ export function useApplications() {
     ...state,
     fetchMyApplications,
     applyToJob,
+    autoApply,
     withdrawApplication,
   };
 }
 
 export default useApplications;
-

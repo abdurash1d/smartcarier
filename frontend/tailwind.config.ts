@@ -369,7 +369,7 @@ const config: Config = {
         ".text-balance": {
           "text-wrap": "balance",
         },
-        ".scrollbar-hide": {
+           ".scrollbar-hide": {
           "-ms-overflow-style": "none",
           "scrollbar-width": "none",
           "&::-webkit-scrollbar": {
@@ -399,3 +399,4 @@ const config: Config = {
 };
 
 export default config;
+

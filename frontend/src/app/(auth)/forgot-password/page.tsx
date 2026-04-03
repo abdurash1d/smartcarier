@@ -42,7 +42,7 @@ export default function ForgotPasswordPage() {
     setError(null);
 
     try {
-      await requestPasswordReset(data);
+      await requestPasswordReset(data.email);
       setIsSuccess(true);
     } catch (err: unknown) {
       setError((err as { message?: string })?.message || "Failed to send reset email");
@@ -129,7 +129,6 @@ export default function ForgotPasswordPage() {
     </div>
   );
 }
-
 
 
 

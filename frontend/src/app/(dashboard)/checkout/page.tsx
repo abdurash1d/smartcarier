@@ -12,6 +12,7 @@ import { useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { useAuthStore } from "@/store/authStore";
 import { api } from "@/lib/api";
 import { toast } from "sonner";
@@ -48,8 +49,6 @@ const PRICES: Record<BillingCycle, PriceInfo> = {
 
 const FEATURES = [
   "Unlimited AI resume generation",
-  "Unlimited university search",
-  "Unlimited motivation letters",
   "50 job applications/month",
   "Auto-apply to matching jobs",
   "Advanced analytics dashboard",
@@ -128,7 +127,10 @@ export default function CheckoutPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-surface-50 to-brand-50/20 dark:from-surface-950 dark:to-surface-900 py-12">
+    <div className="min-h-screen bg-gradient-to-br from-surface-50 to-brand-50/20 dark:from-surface-950 dark:to-surface-900 py-12 relative">
+      <div className="absolute top-4 right-4">
+        <ThemeToggle />
+      </div>
       <div className="container mx-auto px-4 max-w-6xl">
         {/* Back Button */}
         <Button

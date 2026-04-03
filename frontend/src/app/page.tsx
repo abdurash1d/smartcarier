@@ -439,20 +439,6 @@ export default function LandingPage() {
           className="relative mx-auto max-w-7xl px-4 pt-20 pb-32 sm:px-6 lg:px-8 lg:pt-32"
         >
           <div className="text-center">
-            {/* Badge */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.2 }}
-              className="mb-6 inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-4 py-1.5 text-sm text-white backdrop-blur-sm"
-            >
-              <Bot className="h-4 w-4" />
-              <span>{t("landing.hero.badge")}</span>
-              <span className="rounded-full bg-amber-400 px-2 py-0.5 text-xs font-semibold text-amber-900">
-                NEW
-              </span>
-            </motion.div>
-
             {/* Headline */}
             <motion.h1
               initial={{ opacity: 0, y: 20 }}

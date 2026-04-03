@@ -37,7 +37,6 @@ import { useTranslation } from "@/hooks/useTranslation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { LanguageSwitcher } from "@/components/ui/language-switcher";
 import { cn } from "@/lib/utils";
 
 // =============================================================================
@@ -130,11 +129,6 @@ export default function LoginPage() {
       animate={{ opacity: 1 }}
       className="mx-auto w-full max-w-md"
     >
-      {/* Language Switcher */}
-      <div className="absolute top-4 right-4">
-        <LanguageSwitcher variant="minimal" />
-      </div>
-
       {/* Header */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}

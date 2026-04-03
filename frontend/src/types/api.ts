@@ -22,9 +22,14 @@ export interface User {
   is_verified: boolean;
   avatar_url?: string;
   company_name?: string;
+  company_description?: string;
+  company_size?: string;
+  company_industry?: string;
+  company_logo_url?: string;
   company_website?: string;
   bio?: string;
   location?: string;
+  subscription_tier?: string;
   created_at: string;
   updated_at?: string;
   last_login?: string;
@@ -234,7 +239,24 @@ export interface JobSearchParams {
 // APPLICATION TYPES
 // =============================================================================
 
-export type ApplicationStatus = "pending" | "reviewing" | "interview" | "rejected" | "accepted";
+export type KnownApplicationStatus =
+  | "pending"
+  | "reviewing"
+  | "shortlisted"
+  | "interview"
+  | "accepted"
+  | "rejected"
+  | "withdrawn";
+
+export type ApplicationStatus = string;
+
+export interface ApplicationStatusUpdateRequest {
+  status: KnownApplicationStatus;
+  notes?: string;
+  interview_at?: string;
+  interview_type?: "video" | "phone" | "in-person";
+  meeting_link?: string;
+}
 
 export interface Application {
   id: string;
@@ -246,6 +268,10 @@ export interface Application {
   applied_at: string;
   reviewed_at?: string;
   interview_at?: string;
+  interview_type?: "video" | "phone" | "in-person";
+  meeting_link?: string;
+  decided_at?: string;
+  notes?: string;
   updated_at: string;
   job?: Job;
   resume?: Resume;
@@ -264,9 +290,198 @@ export interface AutoApplyRequest {
     locations?: string[];
     experience_levels?: ExperienceLevel[];
     salary_min?: number;
+    min_salary?: number;
+    keywords?: string[];
+    exclude_companies?: string[];
     max_applications?: number;
+    include_cover_letter?: boolean;
   };
   resume_id: string;
+  dry_run?: boolean;
+}
+
+export interface AutoApplyResult {
+  job_id: string;
+  job_title: string;
+  company_name: string;
+  match_score: number;
+  applied: boolean;
+  message: string;
+  application_id?: string;
+}
+
+export type QuotaLimit = number | "unlimited";
+
+export interface QuotaMetadata {
+  feature?: string;
+  tier?: string;
+  used?: number;
+  monthly_used?: number;
+  current?: number;
+  limit?: QuotaLimit;
+  monthly_limit?: QuotaLimit;
+  remaining?: number | "unlimited";
+  monthly_remaining?: number | "unlimited";
+  is_unlimited?: boolean;
+  unlimited?: boolean;
+  percent_used?: number;
+  reset_at?: string;
+}
+
+export interface AutoApplyResponse {
+  total_jobs_matched: number;
+  applications_submitted: number;
+  applications_skipped: number;
+  results: AutoApplyResult[];
+  resume_used: string;
+  dry_run: boolean;
+  quota?: QuotaMetadata;
+  quota_used?: number;
+  monthly_used?: number;
+  quota_current?: number;
+  quota_limit?: QuotaLimit;
+  monthly_limit?: QuotaLimit;
+  quota_remaining?: number | "unlimited";
+  monthly_remaining?: number | "unlimited";
+  quota_unlimited?: boolean;
+  quota_tier?: string;
+  quota_feature?: string;
+}
+
+export interface PremiumErrorDetail {
+  error?: string;
+  message?: string;
+  current_tier?: string | null;
+  upgrade_url?: string;
+  contact_url?: string;
+}
+
+// =============================================================================
+// ADMIN TYPES
+// =============================================================================
+
+export interface AdminErrorLog {
+  id: string;
+  timestamp: string;
+  category: string;
+  severity: string;
+  error_type: string;
+  error_message: string;
+  error_code?: string | null;
+  stack_trace?: string | null;
+  request_id?: string | null;
+  endpoint?: string | null;
+  method?: string | null;
+  path?: string | null;
+  query_params?: Record<string, unknown> | null;
+  user_id?: string | null;
+  user_email?: string | null;
+  user_role?: string | null;
+  ip_address?: string | null;
+  user_agent?: string | null;
+  extra_data?: Record<string, unknown> | null;
+  resolved: boolean;
+  resolved_at?: string | null;
+  resolved_by?: string | null;
+  resolution_notes?: string | null;
+}
+
+export interface AdminDashboardOverview {
+  total_users: number;
+  new_users_today: number;
+  total_resumes: number;
+  total_jobs: number;
+  total_applications: number;
+}
+
+export interface AdminDashboardErrorSummary {
+  total_24h: number;
+  by_severity: Record<string, number>;
+  by_category: Record<string, number>;
+  recent: AdminErrorLog[];
+}
+
+export interface AdminDashboardData {
+  overview: AdminDashboardOverview;
+  errors: AdminDashboardErrorSummary;
+  timestamp: string;
+}
+
+export interface AdminDashboardResponse {
+  success: boolean;
+  dashboard: AdminDashboardData;
+}
+
+export interface AdminUserStats {
+  users: {
+    total: number;
+    by_role: Record<string, number>;
+    active_last_7_days: number;
+    new_last_7_days: number;
+    verified: number;
+    unverified: number;
+  };
+  content: {
+    total_resumes: number;
+    total_jobs: number;
+    total_applications: number;
+  };
+  timestamp: string;
+}
+
+export interface AdminUserStatsResponse {
+  success: boolean;
+  stats: AdminUserStats;
+}
+
+export interface AdminSystemHealthComponent {
+  status: string;
+  [key: string]: unknown;
+}
+
+export interface AdminSystemHealthResponse {
+  success: boolean;
+  status: string;
+  components: Record<string, AdminSystemHealthComponent>;
+  timestamp: string;
+}
+
+export interface AdminErrorStats {
+  total_errors: number;
+  errors_by_category: Record<string, number>;
+  errors_by_severity: Record<string, number>;
+  errors_by_hour: Record<string, number>;
+  top_error_types: Array<{ type: string; count: number }>;
+  top_endpoints: Array<{ endpoint: string; count: number }>;
+  from_time?: string | null;
+  to_time?: string | null;
+}
+
+export interface AdminErrorStatsResponse {
+  success: boolean;
+  stats: AdminErrorStats;
+}
+
+export interface AdminErrorListResponse {
+  success: boolean;
+  total: number;
+  errors: AdminErrorLog[];
+}
+
+export interface AdminResolveErrorRequest {
+  resolution_notes?: string;
+}
+
+export interface AdminResolveErrorResponse {
+  success: boolean;
+  error: AdminErrorLog;
+}
+
+export interface AdminBulkResolveResponse {
+  success: boolean;
+  message: string;
+  resolved_count: number;
+  requested_count: number;
 }
 
 // =============================================================================
@@ -302,159 +517,4 @@ export interface ApiError {
     message: string;
     details?: Record<string, string[]>;
   };
-}
-
-// =============================================================================
-// UNIVERSITY TYPES
-// =============================================================================
-
-export interface University {
-  id: string;
-  name: string;
-  short_name?: string;
-  country: string;
-  city: string;
-  world_ranking?: number;
-  country_ranking?: number;
-  programs?: string[];
-  description?: string;
-  website_url?: string;
-  logo_url?: string;
-  requirements?: {
-    ielts?: number;
-    toefl?: number;
-    gpa?: number;
-    gre?: boolean;
-  };
-  acceptance_rate?: string;
-  tuition_min?: number;
-  tuition_max?: number;
-  tuition_currency?: string;
-  tuition_note?: string;
-  application_deadline_fall?: string;
-  application_deadline_spring?: string;
-  application_deadline_summer?: string;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface Scholarship {
-  id: string;
-  name: string;
-  description?: string;
-  country: string;
-  amount_info?: {
-    amount?: number;
-    currency?: string;
-    type?: string;
-    monthly_stipend?: number;
-  };
-  coverage?: string[];
-  requirements?: string[];
-  eligibility_criteria?: string;
-  application_deadline: string;
-  website_url?: string;
-  application_url?: string;
-  university_id?: string;
-  created_at: string;
-  updated_at: string;
-}
-
-export type UniversityApplicationStatus = 
-  | "draft"
-  | "in_progress"
-  | "submitted"
-  | "under_review"
-  | "interview_scheduled"
-  | "accepted"
-  | "rejected"
-  | "waitlisted"
-  | "withdrawn";
-
-export interface UniversityApplication {
-  id: string;
-  user_id: string;
-  university_id: string;
-  program: string;
-  intake_semester?: string;
-  intake_year?: number;
-  status: UniversityApplicationStatus;
-  documents?: Record<string, any>;
-  documents_completed: number;
-  documents_total: number;
-  submitted_at?: string;
-  deadline?: string;
-  notes?: string;
-  created_at: string;
-  updated_at: string;
-  university?: {
-    id: string;
-    name: string;
-    country: string;
-    city: string;
-  };
-}
-
-export interface MotivationLetter {
-  id: string;
-  application_id: string;
-  title?: string;
-  content: string;
-  ai_generated: boolean;
-  word_count?: number;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface UniversitySearchParams {
-  search?: string;
-  country?: string;
-  city?: string;
-  min_ranking?: number;
-  max_ranking?: number;
-  programs?: string[];
-  page?: number;
-  limit?: number;
-  sort_by?: "world_ranking" | "name" | "country";
-  sort_order?: "asc" | "desc";
-}
-
-export interface UniversityAISearchRequest {
-  student_profile: {
-    gpa?: number;
-    ielts?: number;
-    toefl?: number;
-    experience?: string[];
-    interests?: string[];
-    achievements?: string[];
-  };
-  preferred_countries?: string[];
-  preferred_programs?: string[];
-  budget_min?: number;
-  budget_max?: number;
-  max_results?: number;
-}
-
-export interface PaginatedUniversityResponse {
-  items: University[];
-  total: number;
-  page: number;
-  limit: number;
-  pages: number;
-}
-
-export interface PaginatedScholarshipResponse {
-  items: Scholarship[];
-  total: number;
-  page: number;
-  limit: number;
-  pages: number;
-}
-
-export interface PaginatedUniversityApplicationResponse {
-  items: UniversityApplication[];
-  total: number;
-  page: number;
-  limit: number;
-  pages: number;
 }

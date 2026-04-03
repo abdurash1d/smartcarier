@@ -305,7 +305,19 @@ class Application(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin):
         nullable=True,
         comment="Scheduled interview date/time"
     )
-    
+
+    interview_type = Column(
+        String(50),
+        nullable=True,
+        comment="Interview format (video, phone, in-person)"
+    )
+
+    meeting_link = Column(
+        Text,
+        nullable=True,
+        comment="Meeting link for the interview (if applicable)"
+    )
+
     decided_at = Column(
         DateTime(timezone=True),
         nullable=True,
@@ -383,6 +395,8 @@ class Application(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin):
     def schedule_interview(
         self,
         interview_date: datetime,
+        interview_type: Optional[str] = None,
+        meeting_link: Optional[str] = None,
         notes: Optional[str] = None
     ) -> None:
         """
@@ -390,10 +404,14 @@ class Application(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin):
         
         Args:
             interview_date: When the interview is scheduled
+            interview_type: Interview format (video, phone, in-person)
+            meeting_link: Meeting URL for the interview
             notes: Optional internal notes
         """
         self.status = ApplicationStatus.INTERVIEW.value
         self.interview_at = interview_date
+        self.interview_type = interview_type.strip().lower() if interview_type else None
+        self.meeting_link = meeting_link.strip() if meeting_link else None
         if not self.reviewed_at:
             self.reviewed_at = utc_now()
         if notes:
@@ -529,6 +547,8 @@ class Application(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin):
             "applied_at": self.applied_at.isoformat() if self.applied_at else None,
             "reviewed_at": self.reviewed_at.isoformat() if self.reviewed_at else None,
             "interview_at": self.interview_at.isoformat() if self.interview_at else None,
+            "interview_type": self.interview_type,
+            "meeting_link": self.meeting_link,
             "decided_at": self.decided_at.isoformat() if self.decided_at else None,
             "is_deleted": self.is_deleted,
         }

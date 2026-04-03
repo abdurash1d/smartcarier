@@ -22,7 +22,7 @@ interface SavedSearch {
 }
 
 interface SavedSearchesProps {
-  searchType: 'jobs' | 'universities' | 'scholarships';
+  searchType: 'jobs';
   onApplySearch: (filters: Record<string, any>) => void;
 }
 
@@ -146,7 +146,7 @@ export function SavedSearches({ searchType, onApplySearch }: SavedSearchesProps)
 // Export function to save search from parent components
 export async function saveSearch(
   name: string,
-  searchType: string,
+  searchType: "jobs",
   filters: Record<string, any>
 ) {
   try {

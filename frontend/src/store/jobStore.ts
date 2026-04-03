@@ -1,20 +1,18 @@
 /**
  * =============================================================================
- * SMARTCAREER AI - Job Store
+ * JOB STORE - Zustand State Management
  * =============================================================================
  *
- * Zustand store for job listings state management.
+ * Thin compatibility layer over the current job API client.
  */
 
 import { create } from "zustand";
 import { immer } from "zustand/middleware/immer";
-import { get as apiGet, post, put, del } from "@/lib/api";
+import { getErrorMessage, jobApi } from "@/lib/api";
 import type {
   Job,
   JobSearchParams,
   JobCreateRequest,
-  JobMatchResult,
-  PaginatedResponse,
 } from "@/types/api";
 
 // =============================================================================
@@ -34,7 +32,7 @@ interface JobState {
   error: string | null;
 
   // Match results
-  matchResults: JobMatchResult[];
+  matchResults: MatchedJob[];
   isMatching: boolean;
 
   // Actions
@@ -46,7 +44,7 @@ interface JobState {
   deleteJob: (id: string) => Promise<void>;
   publishJob: (id: string) => Promise<void>;
   closeJob: (id: string) => Promise<void>;
-  matchJobs: (resumeId: string) => Promise<JobMatchResult[]>;
+  matchJobs: (resumeId: string) => Promise<MatchedJob[]>;
 
   // Helpers
   setSearchParams: (params: Partial<JobSearchParams>) => void;
@@ -55,15 +53,33 @@ interface JobState {
   resetSearch: () => void;
 }
 
+type JobListPayload = {
+  jobs?: Job[];
+  items?: Job[];
+  total?: number;
+  page?: number;
+  page_size?: number;
+  limit?: number;
+  total_pages?: number;
+  pages?: number;
+};
+
+type MatchedJob = Job & { matchScore?: number };
+
+type JobMatchPayload = {
+  matches?: MatchedJob[];
+  items?: MatchedJob[];
+  jobs?: MatchedJob[];
+};
+
 // =============================================================================
 // DEFAULT SEARCH PARAMS
 // =============================================================================
 
 const defaultSearchParams: JobSearchParams = {
   page: 1,
-  page_size: 12,
+  limit: 12,
   sort_by: "created_at",
-  sort_order: "desc",
 };
 
 // =============================================================================
@@ -100,23 +116,19 @@ export const useJobStore = create<JobState>()(
       });
 
       try {
-        const response = await apiGet<{
-          jobs: Job[];
-          total: number;
-          page: number;
-          page_size: number;
-          total_pages: number;
-        }>("/jobs", searchParams as Record<string, unknown>);
+        const response = await jobApi.list(searchParams as any);
+        const data = response.data as JobListPayload;
+        const jobs = data.jobs || data.items || [];
 
         set((state) => {
-          state.jobs = response.jobs;
-          state.totalJobs = response.total;
-          state.totalPages = response.total_pages;
-          state.currentPage = response.page;
+          state.jobs = jobs;
+          state.totalJobs = data.total ?? jobs.length;
+          state.totalPages = data.total_pages ?? data.pages ?? 1;
+          state.currentPage = data.page ?? searchParams.page ?? 1;
           state.isLoading = false;
         });
       } catch (error: unknown) {
-        const errorMessage = (error as { message?: string })?.message || "Failed to search jobs";
+        const errorMessage = getErrorMessage(error) || "Failed to search jobs";
         set((state) => {
           state.error = errorMessage;
           state.isLoading = false;
@@ -134,14 +146,15 @@ export const useJobStore = create<JobState>()(
       });
 
       try {
-        const job = await apiGet<Job>(`/jobs/${id}`);
+        const response = await jobApi.get(id);
+        const job = response.data as Job;
         set((state) => {
           state.currentJob = job;
           state.isLoading = false;
         });
         return job;
       } catch (error: unknown) {
-        const errorMessage = (error as { message?: string })?.message || "Failed to fetch job";
+        const errorMessage = getErrorMessage(error) || "Failed to fetch job";
         set((state) => {
           state.error = errorMessage;
           state.isLoading = false;
@@ -160,13 +173,14 @@ export const useJobStore = create<JobState>()(
       });
 
       try {
-        const response = await apiGet<{ jobs: Job[] }>("/jobs/my");
+        const response = await jobApi.myJobs();
+        const data = response.data as JobListPayload;
         set((state) => {
-          state.myJobs = response.jobs;
+          state.myJobs = data.jobs || data.items || [];
           state.isLoading = false;
         });
       } catch (error: unknown) {
-        const errorMessage = (error as { message?: string })?.message || "Failed to fetch your jobs";
+        const errorMessage = getErrorMessage(error) || "Failed to fetch your jobs";
         set((state) => {
           state.error = errorMessage;
           state.isLoading = false;
@@ -184,7 +198,8 @@ export const useJobStore = create<JobState>()(
       });
 
       try {
-        const job = await post<Job>("/jobs", data);
+        const response = await jobApi.create(data);
+        const job = response.data as Job;
         set((state) => {
           state.myJobs.unshift(job);
           state.currentJob = job;
@@ -192,7 +207,7 @@ export const useJobStore = create<JobState>()(
         });
         return job;
       } catch (error: unknown) {
-        const errorMessage = (error as { message?: string })?.message || "Failed to create job";
+        const errorMessage = getErrorMessage(error) || "Failed to create job";
         set((state) => {
           state.error = errorMessage;
           state.isLoading = false;
@@ -211,7 +226,8 @@ export const useJobStore = create<JobState>()(
       });
 
       try {
-        const job = await put<Job>(`/jobs/${id}`, data);
+        const response = await jobApi.update(id, data);
+        const job = response.data as Job;
         set((state) => {
           // Update in myJobs
           const myIndex = state.myJobs.findIndex((j) => j.id === id);
@@ -230,7 +246,7 @@ export const useJobStore = create<JobState>()(
         });
         return job;
       } catch (error: unknown) {
-        const errorMessage = (error as { message?: string })?.message || "Failed to update job";
+        const errorMessage = getErrorMessage(error) || "Failed to update job";
         set((state) => {
           state.error = errorMessage;
           state.isLoading = false;
@@ -249,7 +265,7 @@ export const useJobStore = create<JobState>()(
       });
 
       try {
-        await del(`/jobs/${id}`);
+        await jobApi.delete(id);
         set((state) => {
           state.myJobs = state.myJobs.filter((j) => j.id !== id);
           state.jobs = state.jobs.filter((j) => j.id !== id);
@@ -259,7 +275,7 @@ export const useJobStore = create<JobState>()(
           state.isLoading = false;
         });
       } catch (error: unknown) {
-        const errorMessage = (error as { message?: string })?.message || "Failed to delete job";
+        const errorMessage = getErrorMessage(error) || "Failed to delete job";
         set((state) => {
           state.error = errorMessage;
           state.isLoading = false;
@@ -273,18 +289,26 @@ export const useJobStore = create<JobState>()(
     // =======================================================================
     publishJob: async (id: string) => {
       try {
-        const job = await post<Job>(`/jobs/${id}/publish`);
+        await jobApi.publish(id);
         set((state) => {
           const myIndex = state.myJobs.findIndex((j) => j.id === id);
           if (myIndex !== -1) {
-            state.myJobs[myIndex] = job;
+            state.myJobs[myIndex] = {
+              ...state.myJobs[myIndex],
+              status: "active",
+              updated_at: new Date().toISOString(),
+            };
           }
           if (state.currentJob?.id === id) {
-            state.currentJob = job;
+            state.currentJob = {
+              ...state.currentJob,
+              status: "active",
+              updated_at: new Date().toISOString(),
+            };
           }
         });
       } catch (error: unknown) {
-        const errorMessage = (error as { message?: string })?.message || "Failed to publish job";
+        const errorMessage = getErrorMessage(error) || "Failed to publish job";
         set((state) => {
           state.error = errorMessage;
         });
@@ -297,18 +321,26 @@ export const useJobStore = create<JobState>()(
     // =======================================================================
     closeJob: async (id: string) => {
       try {
-        const job = await post<Job>(`/jobs/${id}/close`);
+        await jobApi.close(id);
         set((state) => {
           const myIndex = state.myJobs.findIndex((j) => j.id === id);
           if (myIndex !== -1) {
-            state.myJobs[myIndex] = job;
+            state.myJobs[myIndex] = {
+              ...state.myJobs[myIndex],
+              status: "closed",
+              updated_at: new Date().toISOString(),
+            };
           }
           if (state.currentJob?.id === id) {
-            state.currentJob = job;
+            state.currentJob = {
+              ...state.currentJob,
+              status: "closed",
+              updated_at: new Date().toISOString(),
+            };
           }
         });
       } catch (error: unknown) {
-        const errorMessage = (error as { message?: string })?.message || "Failed to close job";
+        const errorMessage = getErrorMessage(error) || "Failed to close job";
         set((state) => {
           state.error = errorMessage;
         });
@@ -326,16 +358,16 @@ export const useJobStore = create<JobState>()(
       });
 
       try {
-        const response = await post<{ matches: JobMatchResult[] }>("/jobs/match", {
-          resume_id: resumeId,
-        });
+        const response = await jobApi.match(resumeId);
+        const data = response.data as JobMatchPayload;
+        const matches = data.matches || data.items || data.jobs || [];
         set((state) => {
-          state.matchResults = response.matches;
+          state.matchResults = matches;
           state.isMatching = false;
         });
-        return response.matches;
+        return matches;
       } catch (error: unknown) {
-        const errorMessage = (error as { message?: string })?.message || "Failed to match jobs";
+        const errorMessage = getErrorMessage(error) || "Failed to match jobs";
         set((state) => {
           state.error = errorMessage;
           state.isMatching = false;

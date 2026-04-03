@@ -94,13 +94,27 @@ class ApplicationStatusUpdate(BaseModel):
         None,
         description="Interview date/time (for interview status)"
     )
+
+    interview_type: Optional[str] = Field(
+        None,
+        max_length=50,
+        description="Interview format (video, phone, in-person)"
+    )
+
+    meeting_link: Optional[str] = Field(
+        None,
+        max_length=2048,
+        description="Meeting link for the interview (if applicable)"
+    )
     
     model_config = ConfigDict(
         json_schema_extra={
             "example": {
                 "status": "interview",
                 "notes": "Strong candidate, schedule for technical interview",
-                "interview_at": "2024-01-15T10:00:00Z"
+                "interview_at": "2024-01-15T10:00:00Z",
+                "interview_type": "video",
+                "meeting_link": "https://meet.google.com/abc-defg-hij"
             }
         }
     )
@@ -153,6 +167,8 @@ class ApplicationResponse(BaseModel):
     applied_at: datetime
     reviewed_at: Optional[datetime] = None
     interview_at: Optional[datetime] = None
+    interview_type: Optional[str] = None
+    meeting_link: Optional[str] = None
     decided_at: Optional[datetime] = None
     
     # Computed

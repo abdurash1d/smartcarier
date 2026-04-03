@@ -208,17 +208,13 @@ def get_valid_job_data():
         
         We offer competitive salary, remote work options, and great benefits.
         """,
-        "requirements": {
-            "skills": ["Python", "FastAPI", "PostgreSQL", "Docker", "Git"],
-            "experience": "3-5 years",
-            "education": "Bachelor's in CS or related field"
-        },
+        "requirements": ["Python", "FastAPI", "PostgreSQL", "Docker", "Git"],
         "salary_min": 2000,
         "salary_max": 4000,
         "location": "Tashkent",
         "job_type": "full_time",
         "experience_level": "senior",
-        "remote_allowed": True
+        "is_remote_allowed": True
     }
 
 
@@ -226,7 +222,7 @@ def get_minimal_job_data():
     """Get minimal valid job data."""
     return {
         "title": "Junior Developer",
-        "description": "Entry-level position for recent graduates.",
+        "description": "Entry-level position for recent graduates who want to learn backend development and ship production features.",
         "location": "Tashkent",
         "job_type": "full_time"
     }
@@ -238,10 +234,7 @@ SAMPLE_JOBS = [
         "company_id": "company-1",
         "title": "Senior Backend Developer",
         "description": "Looking for experienced Python developer...",
-        "requirements": {
-            "skills": ["Python", "FastAPI", "PostgreSQL"],
-            "experience": "5+ years"
-        },
+        "requirements": ["Python", "FastAPI", "PostgreSQL"],
         "salary_min": 3000,
         "salary_max": 5000,
         "location": "Tashkent",
@@ -255,10 +248,7 @@ SAMPLE_JOBS = [
         "company_id": "company-1",
         "title": "Frontend Developer",
         "description": "React developer needed...",
-        "requirements": {
-            "skills": ["React", "TypeScript", "CSS"],
-            "experience": "3+ years"
-        },
+        "requirements": ["React", "TypeScript", "CSS"],
         "salary_min": 2000,
         "salary_max": 3500,
         "location": "Remote",
@@ -272,10 +262,7 @@ SAMPLE_JOBS = [
         "company_id": "company-2",
         "title": "DevOps Engineer",
         "description": "Cloud infrastructure specialist...",
-        "requirements": {
-            "skills": ["AWS", "Docker", "Kubernetes", "Terraform"],
-            "experience": "4+ years"
-        },
+        "requirements": ["AWS", "Docker", "Kubernetes", "Terraform"],
         "salary_min": 3500,
         "salary_max": 6000,
         "location": "Tashkent",

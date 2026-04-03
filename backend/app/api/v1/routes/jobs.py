@@ -158,7 +158,20 @@ class JobMatchResponse(BaseModel):
 
 def job_to_response(job: Job, include_company: bool = True) -> JobResponse:
     """Convert Job model to JobResponse."""
-    
+
+    def _as_list(value: Any) -> List[str]:
+        if value is None:
+            return []
+        if isinstance(value, list):
+            return [str(item) for item in value if item is not None]
+        if isinstance(value, dict):
+            for key in ("skills", "requirements", "items", "values"):
+                nested = value.get(key)
+                if isinstance(nested, list):
+                    return [str(item) for item in nested if item is not None]
+            return [str(item) for item in value.values() if item is not None]
+        return [str(value)]
+
     company_info = None
     if include_company and job.company:
         company_info = CompanyInfo(
@@ -175,9 +188,9 @@ def job_to_response(job: Job, include_company: bool = True) -> JobResponse:
         company=company_info,
         title=job.title,
         description=job.description,
-        requirements=job.requirements or [],
-        responsibilities=job.responsibilities or [],
-        benefits=job.benefits or [],
+        requirements=_as_list(job.requirements),
+        responsibilities=_as_list(job.responsibilities),
+        benefits=_as_list(job.benefits),
         salary_range=job.salary_range_display,
         salary_min=job.salary_min,
         salary_max=job.salary_max,
@@ -249,6 +262,7 @@ def application_to_response(
 # ENDPOINTS
 # =============================================================================
 
+@router.get("")
 @router.get(
     "/",
     response_model=JobListResponse,
@@ -505,14 +519,22 @@ async def list_my_jobs(
     """
 )
 async def get_job(
-    job_id: UUID,
+    job_id: str,
     current_user: Optional[User] = Depends(get_optional_current_user),
     db: Session = Depends(get_db)
 ):
     """Get job details and increment view count."""
+
+    try:
+        job_uuid = UUID(job_id)
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Job not found"
+        )
     
     job = db.query(Job).filter(
-        Job.id == job_id,
+        Job.id == job_uuid,
         Job.is_deleted == False
     ).first()
     
@@ -542,6 +564,12 @@ async def get_job(
 
 
 @router.post(
+    "",
+    response_model=JobResponse,
+    status_code=status.HTTP_201_CREATED,
+    include_in_schema=False,
+)
+@router.post(
     "/",
     response_model=JobResponse,
     status_code=status.HTTP_201_CREATED,
@@ -551,7 +579,7 @@ async def get_job(
     
     **Access:** Company accounts only
     
-    **Note:** Jobs are created in "draft" status. Use `/publish` to make them active.
+    Jobs are created as **active** by default.
     """
 )
 async def create_job(
@@ -578,7 +606,7 @@ async def create_job(
         experience_level=job_data.experience_level.value,
         external_apply_url=job_data.external_apply_url,
         expires_at=job_data.expires_at,
-        status=JobStatus.DRAFT.value,  # Always start as draft
+        status=JobStatus.ACTIVE.value,
     )
     
     db.add(job)

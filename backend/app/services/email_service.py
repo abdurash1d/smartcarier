@@ -863,5 +863,3 @@ async def send_email_background(
 
 
 
-
-

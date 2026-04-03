@@ -12,7 +12,8 @@
 
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import {
@@ -22,17 +23,12 @@ import {
   Eye,
   Sparkles,
   Briefcase,
-  Clock,
-  TrendingUp,
   ArrowRight,
-  Plus,
   ChevronRight,
   CheckCircle,
   AlertCircle,
-  Bell,
   Target,
   Zap,
-  Loader2,
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useTranslation } from "@/hooks/useTranslation";
@@ -65,11 +61,79 @@ const itemVariants = {
   visible: { opacity: 1, y: 0 },
 };
 
+type UpcomingInterviewCandidate = {
+  id: string;
+  status: string;
+  interview_at?: string;
+  interview_type?: string;
+  meeting_link?: string;
+  job?: {
+    title?: string;
+    company_name?: string;
+    company?: { name?: string };
+  };
+};
+
+type DashboardApplication = {
+  id: string;
+  status: string;
+  applied_at?: string;
+  interview_at?: string;
+  interview_type?: string;
+  meeting_link?: string;
+  job?: {
+    title?: string;
+    company_name?: string;
+    company?: { name?: string };
+  };
+};
+
+const interviewDateFormatter = new Intl.DateTimeFormat("uz-UZ", {
+  dateStyle: "medium",
+  timeStyle: "short",
+});
+
+function formatInterviewDateTime(dateValue: string) {
+  const date = new Date(dateValue);
+  if (Number.isNaN(date.getTime())) {
+    return dateValue;
+  }
+
+  return interviewDateFormatter.format(date);
+}
+
+function formatInterviewTypeLabel(interviewType?: string) {
+  if (!interviewType) {
+    return "Format belgilanmagan";
+  }
+
+  const normalized = interviewType.trim().toLowerCase();
+  if (normalized === "video") return "Video intervyu";
+  if (normalized === "phone") return "Telefon intervyu";
+  if (normalized === "in-person" || normalized === "in person") return "Shaxsan intervyu";
+
+  return interviewType;
+}
+
+function getUpcomingInterview(applications: UpcomingInterviewCandidate[]) {
+  const now = Date.now();
+
+  return applications
+    .filter((app) => app.status === "interview" && app.interview_at)
+    .map((app) => ({
+      ...app,
+      interviewTimestamp: new Date(app.interview_at as string).getTime(),
+    }))
+    .filter((app) => !Number.isNaN(app.interviewTimestamp) && app.interviewTimestamp >= now)
+    .sort((a, b) => a.interviewTimestamp - b.interviewTimestamp)[0] || null;
+}
+
 // =============================================================================
 // MAIN COMPONENT
 // =============================================================================
 
 export default function StudentDashboardPage() {
+  const router = useRouter();
   const { user } = useAuth();
   const { t } = useTranslation();
 
@@ -77,12 +141,11 @@ export default function StudentDashboardPage() {
   const { stats: appStats, applications, isLoading: appsLoading, fetchMyApplications } = useApplications();
   const { jobs, isLoading: jobsLoading, fetchJobs } = useJobs();
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     fetchResumes();
     fetchMyApplications();
     fetchJobs({}, 1);
-  }, []);
+  }, [fetchJobs, fetchMyApplications, fetchResumes]);
 
   const isLoading = resumesLoading || appsLoading;
 
@@ -148,10 +211,12 @@ export default function StudentDashboardPage() {
   ];
 
   // Build recent activity from real applications
-  const recentActivity = applications.slice(0, 5).map((app, i) => ({
+  const applicationsForDisplay = applications as DashboardApplication[];
+
+  const recentActivity = applicationsForDisplay.slice(0, 5).map((app) => ({
     id: app.id,
     type: "application",
-    title: `${(app as any).job?.title || "Ish o'rni"} — ${(app as any).job?.company?.name || "Kompaniya"}`,
+    title: `${app.job?.title || "Ish joyi"} — ${app.job?.company?.name || app.job?.company_name || "Kompaniya"}`,
     time: app.applied_at ? formatRelativeTime(app.applied_at) : "",
     icon: app.status === "interview" ? Calendar : app.status === "accepted" ? CheckCircle : Send,
     color: app.status === "interview"
@@ -160,6 +225,12 @@ export default function StudentDashboardPage() {
       ? "bg-cyan-100 text-cyan-600 dark:bg-cyan-500/20"
       : "bg-blue-100 text-blue-600 dark:bg-blue-500/20",
   }));
+
+  const upcomingInterview = getUpcomingInterview(applicationsForDisplay as UpcomingInterviewCandidate[]);
+  const upcomingInterviewCompanyName =
+    upcomingInterview?.job?.company?.name ||
+    upcomingInterview?.job?.company_name ||
+    "Kompaniya";
 
   const quickActions = [
     {
@@ -287,7 +358,7 @@ export default function StudentDashboardPage() {
           {t("dashboard.quickActions.title")}
         </h2>
         <div className="grid gap-4 sm:grid-cols-3">
-          {quickActions.map((action, index) => (
+          {quickActions.map((action) => (
             <Link key={action.title} href={action.href}>
               <motion.div
                 whileHover={{ scale: 1.02, y: -4 }}
@@ -346,7 +417,7 @@ export default function StudentDashboardPage() {
                 </div>
               ) : recentActivity.length === 0 ? (
                 <p className="py-6 text-center text-sm text-surface-500">
-                  Hozircha faoliyat yo'q
+                  Hozircha faoliyat mavjud emas
                 </p>
               ) : (
                 <div className="space-y-4">
@@ -397,7 +468,7 @@ export default function StudentDashboardPage() {
                 </div>
               ) : jobs.length === 0 ? (
                 <p className="py-6 text-center text-sm text-surface-500">
-                  Hozircha ish o'rinlari mavjud emas
+                  Hozircha ish imkoniyatlari mavjud emas
                 </p>
               ) : (
                 <div className="space-y-4">
@@ -450,30 +521,84 @@ export default function StudentDashboardPage() {
       <motion.div variants={itemVariants}>
         <Card className="border-green-200 bg-gradient-to-r from-green-50 to-emerald-50 dark:border-green-500/30 dark:from-green-900/20 dark:to-emerald-900/20">
           <CardContent className="p-6">
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-              <div className="flex items-center gap-4">
-                <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-green-100 dark:bg-green-500/20">
+            {appsLoading ? (
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex items-center gap-4">
+                  <div className="h-14 w-14 rounded-2xl bg-green-100/80 dark:bg-green-500/20" />
+                  <div className="space-y-2">
+                    <div className="h-5 w-44 rounded bg-green-100/80 dark:bg-green-500/20" />
+                    <div className="h-4 w-64 rounded bg-green-100/70 dark:bg-green-500/10" />
+                    <div className="h-4 w-56 rounded bg-green-100/70 dark:bg-green-500/10" />
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <div className="h-10 w-28 rounded-lg bg-green-100/80 dark:bg-green-500/20" />
+                  <div className="h-10 w-32 rounded-lg bg-green-100/80 dark:bg-green-500/20" />
+                </div>
+              </div>
+            ) : upcomingInterview ? (
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex items-start gap-4">
+                  <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-green-100 dark:bg-green-500/20">
+                    <Calendar className="h-7 w-7 text-green-600" />
+                  </div>
+                  <div>
+                    <h3 className="font-display text-lg font-semibold text-surface-900 dark:text-white">
+                      {t("dashboard.interview.title")}
+                    </h3>
+                    <p className="text-surface-600 dark:text-surface-300">
+                      <strong>{upcomingInterview.job?.title || "Intervyu"}</strong>{" "}
+                      {t("dashboard.recentActivity.at")} {upcomingInterviewCompanyName}
+                    </p>
+                    <p className="text-sm text-surface-500">
+                      {formatInterviewDateTime(upcomingInterview.interview_at as string)}
+                    </p>
+                    <div className="mt-3 flex flex-wrap items-center gap-3">
+                      <Badge variant="secondary" className="bg-white/80 text-surface-700">
+                        {formatInterviewTypeLabel(upcomingInterview.interview_type)}
+                      </Badge>
+                      {upcomingInterview.meeting_link ? (
+                        <Button asChild variant="outline" size="sm" className="h-8 rounded-full border-green-200 bg-white/80 px-3 text-green-700 hover:bg-green-50">
+                          <a
+                            href={upcomingInterview.meeting_link}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                          >
+                            Meeting link
+                          </a>
+                        </Button>
+                      ) : (
+                        <span className="text-sm text-surface-500">
+                          Meeting link mavjud emas
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <Button variant="outline" onClick={() => router.push("/student/applications")}>
+                    {t("dashboard.interview.reschedule")}
+                  </Button>
+                  <Button className="bg-green-600 hover:bg-green-700" onClick={() => router.push("/student/applications")}>
+                    {t("dashboard.interview.joinMeeting")}
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <div className="flex flex-col gap-3 rounded-2xl border border-dashed border-green-200 bg-white/60 p-5 text-center dark:border-green-500/30 dark:bg-surface-900/30">
+                <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-green-100 dark:bg-green-500/20">
                   <Calendar className="h-7 w-7 text-green-600" />
                 </div>
                 <div>
                   <h3 className="font-display text-lg font-semibold text-surface-900 dark:text-white">
                     {t("dashboard.interview.title")}
                   </h3>
-                  <p className="text-surface-600 dark:text-surface-300">
-                    <strong>Senior Developer</strong> {t("dashboard.recentActivity.at")} Click.uz
-                  </p>
-                  <p className="text-sm text-surface-500">
-                    {t("dashboard.interview.tomorrow")} {t("dashboard.interview.at")} 10:00 AM • {t("dashboard.interview.videoCall")}
+                  <p className="mt-1 text-sm text-surface-500">
+                    Hozircha rejalashtirilgan intervyu mavjud emas.
                   </p>
                 </div>
               </div>
-              <div className="flex gap-2">
-                <Button variant="outline">{t("dashboard.interview.reschedule")}</Button>
-                <Button className="bg-green-600 hover:bg-green-700">
-                  {t("dashboard.interview.joinMeeting")}
-                </Button>
-              </div>
-            </div>
+            )}
           </CardContent>
         </Card>
       </motion.div>

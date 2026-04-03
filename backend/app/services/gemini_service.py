@@ -397,74 +397,8 @@ Return ONLY valid JSON.
             logger.error(f"Job match analysis error: {e}")
             return {"success": False, "error": str(e)}
     
-    async def generate_motivation_letter(
-        self,
-        user_data: Dict[str, Any],
-        university_name: str,
-        program_name: str,
-        country: str
-    ) -> Dict[str, Any]:
-        """
-        Universitetga topshirish uchun motivatsion xat yaratish
-        """
-        if not self.is_available:
-            return {"error": "Gemini API not configured", "success": False}
-        
-        prompt = f"""
-You are an expert in university applications. Write a compelling motivation letter.
-
-STUDENT DATA:
-{json.dumps(user_data, indent=2, ensure_ascii=False)}
-
-UNIVERSITY: {university_name}
-PROGRAM: {program_name}
-COUNTRY: {country}
-
-Write a motivation letter that:
-1. Opens with a compelling personal story or hook
-2. Explains why this specific program and university
-3. Highlights relevant achievements and experiences
-4. Shows career goals and how this program fits
-5. Ends with strong commitment and enthusiasm
-
-Return JSON format:
-{{
-    "motivation_letter": "Full letter text...",
-    "word_count": 500,
-    "key_themes": ["Theme 1", "Theme 2"],
-    "suggestions": ["Suggestion 1"]
-}}
-
-Return ONLY valid JSON.
-"""
-        
-        try:
-            response = self.model.generate_content(prompt)
-            text = response.text.strip()
-            
-            if text.startswith("```json"):
-                text = text[7:]
-            if text.startswith("```"):
-                text = text[3:]
-            if text.endswith("```"):
-                text = text[:-3]
-            
-            result = json.loads(text.strip())
-            
-            return {
-                "success": True,
-                **result,
-                "provider": "gemini"
-            }
-            
-        except Exception as e:
-            logger.error(f"Motivation letter error: {e}")
-            return {"success": False, "error": str(e)}
-
-
 # =============================================================================
 # GLOBAL INSTANCE
 # =============================================================================
 
 gemini_service = GeminiService()
-

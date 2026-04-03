@@ -55,11 +55,28 @@ from app.core.dependencies import (
     PaginationParams,
     rate_limit,
 )
+from app.core.premium import get_premium_user, get_feature_limit
 from app.models import (
     User, Job, Resume, Application, 
     ApplicationStatus, JobStatus, UserRole, ResumeStatus
 )
-from app.config import settings
+
+try:
+    from app.services.email_service import email_service
+except ModuleNotFoundError as exc:
+    if exc.name != "aiosmtplib":
+        raise
+
+    class _FallbackEmailService:
+        """Fallback used when the optional email dependency is unavailable."""
+
+        async def send_interview_scheduled_email(self, *args, **kwargs):
+            logger.warning(
+                "Email service dependency missing; interview notification skipped."
+            )
+            return False
+
+    email_service = _FallbackEmailService()
 
 # =============================================================================
 # LOGGING
@@ -178,13 +195,27 @@ class StatusUpdateRequest(BaseModel):
         None,
         description="Interview date/time (required for 'interview' status)"
     )
+
+    interview_type: Optional[str] = Field(
+        None,
+        max_length=50,
+        description="Interview format (video, phone, in-person)"
+    )
+
+    meeting_link: Optional[str] = Field(
+        None,
+        max_length=2048,
+        description="Meeting link for the interview (if applicable)"
+    )
     
     model_config = ConfigDict(
         json_schema_extra={
             "example": {
                 "status": "interview",
                 "notes": "Strong candidate, schedule for technical round",
-                "interview_at": "2024-01-15T10:00:00Z"
+                "interview_at": "2024-01-15T10:00:00Z",
+                "interview_type": "video",
+                "meeting_link": "https://meet.google.com/abc-defg-hij"
             }
         }
     )
@@ -292,6 +323,8 @@ class ApplicationData(BaseModel):
     applied_at: datetime
     reviewed_at: Optional[datetime]
     interview_at: Optional[datetime]
+    interview_type: Optional[str] = None
+    meeting_link: Optional[str] = None
     decided_at: Optional[datetime]
     
     days_since_applied: int
@@ -342,6 +375,9 @@ class AutoApplyData(BaseModel):
     results: List[AutoApplyResult]
     resume_used: str
     dry_run: bool
+    monthly_limit: Optional[int] = None
+    monthly_used: int
+    monthly_remaining: Optional[int] = None
 
 
 # =============================================================================
@@ -421,6 +457,8 @@ def application_to_data(
         applied_at=app.applied_at,
         reviewed_at=app.reviewed_at,
         interview_at=app.interview_at,
+        interview_type=app.interview_type,
+        meeting_link=app.meeting_link,
         decided_at=app.decided_at,
         days_since_applied=app.days_since_applied,
         is_in_progress=app.is_in_progress,
@@ -446,6 +484,79 @@ def log_request(
         f"status={status_code} | "
         f"duration={duration_ms:.2f}ms"
     )
+
+
+def _get_month_start(now: Optional[datetime] = None) -> datetime:
+    """Return the UTC start of the current month."""
+    now = now or datetime.now(timezone.utc)
+    if now.tzinfo is None:
+        now = now.replace(tzinfo=timezone.utc)
+    now = now.astimezone(timezone.utc)
+    return now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+
+
+def _get_monthly_auto_apply_usage(
+    db: Session,
+    user_id: UUID,
+    month_start: datetime
+) -> int:
+    """Count auto-apply submissions for the current month."""
+    return db.query(func.count(Application.id)).filter(
+        Application.user_id == user_id,
+        Application.is_deleted == False,
+        Application.match_score.isnot(None),
+        Application.applied_at >= month_start,
+    ).scalar() or 0
+
+
+def _format_interview_email_payload(
+    application: Application,
+    interview_at: datetime,
+) -> Optional[Dict[str, Any]]:
+    """Build interview notification email payload from an application."""
+    applicant = application.user
+    job = application.job
+
+    if not applicant or not applicant.email or not job or not interview_at:
+        return None
+
+    company = job.company
+    company_name = None
+    if company:
+        company_name = company.company_name or company.full_name
+
+    interview_type = application.interview_type or (
+        "video" if job.is_remote_allowed or job.job_type == "remote" else "in-person"
+    )
+
+    return {
+        "to_email": applicant.email,
+        "user_name": applicant.full_name or "Foydalanuvchi",
+        "job_title": job.title,
+        "company_name": company_name or "Unknown company",
+        "interview_date": interview_at.strftime("%Y-%m-%d"),
+        "interview_time": interview_at.strftime("%H:%M"),
+        "interview_type": interview_type,
+        "meeting_link": application.meeting_link,
+    }
+
+
+def _resolve_interview_type(
+    requested_type: Optional[str],
+    job: Job,
+    meeting_link: Optional[str] = None,
+) -> str:
+    """Resolve a usable interview type for storage and notifications."""
+    if requested_type and requested_type.strip():
+        return requested_type.strip().lower()
+
+    if meeting_link:
+        return "video"
+
+    if job.is_remote_allowed or job.job_type == "remote":
+        return "video"
+
+    return "in-person"
 
 
 # =============================================================================
@@ -723,6 +834,54 @@ async def get_my_applications(
 
 
 @router.get(
+    "/stats",
+    response_model=StandardResponse,
+    summary="Get application stats",
+    description="Get application counts for the current user.",
+)
+async def get_application_stats(
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db),
+):
+    """Get status counts for the current user's applications."""
+
+    start_time = time.time()
+
+    q = db.query(Application).filter(
+        Application.user_id == current_user.id,
+        Application.is_deleted == False
+    )
+
+    total = q.count()
+    status_counts = db.query(
+        Application.status,
+        func.count(Application.id)
+    ).filter(
+        Application.user_id == current_user.id,
+        Application.is_deleted == False
+    ).group_by(Application.status).all()
+
+    counts = {status: count for status, count in status_counts}
+
+    return create_response(
+        success=True,
+        message="Application stats retrieved successfully",
+        data={
+            "total": total,
+            "counts": counts,
+            "pending": counts.get(ApplicationStatus.PENDING.value, 0),
+            "reviewing": counts.get(ApplicationStatus.REVIEWING.value, 0),
+            "shortlisted": counts.get(ApplicationStatus.SHORTLISTED.value, 0),
+            "interview": counts.get(ApplicationStatus.INTERVIEW.value, 0),
+            "accepted": counts.get(ApplicationStatus.ACCEPTED.value, 0),
+            "rejected": counts.get(ApplicationStatus.REJECTED.value, 0),
+            "withdrawn": counts.get(ApplicationStatus.WITHDRAWN.value, 0),
+        },
+        start_time=start_time
+    )
+
+
+@router.get(
     "/{application_id}",
     response_model=StandardResponse,
     summary="Get application details",
@@ -834,6 +993,8 @@ async def update_application_status(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="You can only update applications for your own jobs"
         )
+
+    interview_email_payload = None
     
     # Validate status
     valid_statuses = [s.value for s in ApplicationStatus]
@@ -854,7 +1015,17 @@ async def update_application_status(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Interview date is required for 'interview' status"
             )
-        application.schedule_interview(request.interview_at, request.notes)
+        resolved_interview_type = _resolve_interview_type(
+            request.interview_type,
+            application.job,
+            request.meeting_link,
+        )
+        application.schedule_interview(
+            request.interview_at,
+            interview_type=resolved_interview_type,
+            meeting_link=request.meeting_link,
+            notes=request.notes,
+        )
     elif request.status == ApplicationStatus.REJECTED.value:
         application.reject(request.notes)
     elif request.status == ApplicationStatus.ACCEPTED.value:
@@ -868,6 +1039,28 @@ async def update_application_status(
     db.refresh(application)
     
     logger.info(f"Application {application.id} updated to {request.status}")
+
+    if request.status == ApplicationStatus.INTERVIEW.value:
+        interview_email_payload = _format_interview_email_payload(application, application.interview_at)
+
+    if interview_email_payload:
+        try:
+            await email_service.send_interview_scheduled_email(
+                to_email=interview_email_payload["to_email"],
+                user_name=interview_email_payload["user_name"],
+                job_title=interview_email_payload["job_title"],
+                company_name=interview_email_payload["company_name"],
+                interview_date=interview_email_payload["interview_date"],
+                interview_time=interview_email_payload["interview_time"],
+                interview_type=interview_email_payload["interview_type"],
+                meeting_link=interview_email_payload["meeting_link"],
+            )
+        except Exception as exc:
+            logger.exception(
+                "Failed to send interview scheduled email for application %s: %s",
+                application.id,
+                exc,
+            )
     
     app_data = application_to_data(
         application,
@@ -981,6 +1174,7 @@ async def withdraw_application(
 async def auto_apply(
     request: AutoApplyRequest,
     student: User = Depends(get_current_student),
+    _premium_user: User = Depends(get_premium_user),
     db: Session = Depends(get_db),
     _: None = Depends(rate_limit(max_requests=5, window_seconds=60))  # Stricter rate limit
 ):
@@ -1023,6 +1217,22 @@ async def auto_apply(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Resume must be published to use auto-apply"
             )
+
+        # =====================================================================
+        # CHECK MONTHLY QUOTA
+        # =====================================================================
+
+        month_start = _get_month_start()
+        monthly_limit = get_feature_limit("auto_apply", student.subscription_tier)
+        current_month_usage = _get_monthly_auto_apply_usage(db, student.id, month_start)
+        quota_remaining = None
+        if monthly_limit is not None:
+            quota_remaining = max(monthly_limit - current_month_usage, 0)
+
+        logger.info(
+            f"[{request_id}] Monthly auto-apply usage: {current_month_usage} / "
+            f"{monthly_limit if monthly_limit is not None else 'unlimited'}"
+        )
         
         # =====================================================================
         # FIND MATCHING JOBS
@@ -1118,7 +1328,8 @@ async def auto_apply(
         results = []
         applications_submitted = 0
         applications_skipped = 0
-        
+        quota_notice_seen = False
+
         for job, score in scored_jobs:
             company_name = job.company.company_name or job.company.full_name if job.company else "Unknown"
             
@@ -1134,6 +1345,10 @@ async def auto_apply(
             if request.dry_run:
                 result.message = "Dry run - not applied"
                 applications_skipped += 1
+            elif quota_remaining is not None and quota_remaining <= 0:
+                result.message = "Monthly auto-apply quota reached"
+                applications_skipped += 1
+                quota_notice_seen = True
             else:
                 try:
                     # Create application
@@ -1154,6 +1369,8 @@ async def auto_apply(
                     result.message = "Successfully applied"
                     result.application_id = str(application.id)
                     applications_submitted += 1
+                    if quota_remaining is not None:
+                        quota_remaining -= 1
                     
                 except IntegrityError:
                     db.rollback()
@@ -1188,11 +1405,39 @@ async def auto_apply(
             results=results,
             resume_used=resume.title,
             dry_run=request.dry_run,
+            monthly_limit=monthly_limit,
+            monthly_used=(
+                current_month_usage
+                if request.dry_run
+                else current_month_usage + applications_submitted
+            ),
+            monthly_remaining=(
+                None
+                if monthly_limit is None
+                else max(
+                    monthly_limit
+                    - (
+                        current_month_usage
+                        if request.dry_run
+                        else current_month_usage + applications_submitted
+                    ),
+                    0,
+                )
+            ),
         )
         
         message = f"Auto-apply complete! {applications_submitted} applications submitted."
         if request.dry_run:
             message = f"Dry run complete. {len(results)} jobs would be applied to."
+        elif quota_notice_seen or (
+            monthly_limit is not None
+            and current_month_usage >= monthly_limit
+            and applications_submitted == 0
+        ):
+            message = (
+                f"Monthly auto-apply quota reached. {applications_submitted} "
+                f"applications submitted."
+            )
         
         return create_response(
             success=True,

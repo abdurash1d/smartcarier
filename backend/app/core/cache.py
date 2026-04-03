@@ -139,9 +139,9 @@ def cached(ttl: int = 300, prefix: str = "cache"):
         prefix: Cache key prefix
     
     Example:
-        @cached(ttl=3600, prefix="university")
-        def get_universities(country: str):
-            return expensive_db_query(country)
+        @cached(ttl=3600, prefix="jobs")
+        def get_jobs(location: str):
+            return expensive_db_query(location)
     """
     def decorator(func: Callable):
         @wraps(func)
@@ -210,12 +210,6 @@ def invalidate_job_cache(job_id: str):
     logger.debug(f"Invalidated cache for job: {job_id}")
 
 
-def invalidate_university_cache(university_id: str):
-    """Invalidate cache for a specific university"""
-    cache.clear_pattern(f"*:university:{university_id}:*")
-    logger.debug(f"Invalidated cache for university: {university_id}")
-
-
 # =============================================================================
 # COMMON CACHE KEYS
 # =============================================================================
@@ -233,15 +227,9 @@ class CacheKeys:
     JOB_DETAIL = "job:detail:{job_id}"
     JOB_SEARCH = "jobs:search:{query}"
     
-    # University caches
-    UNIVERSITY_LIST = "universities:list:{country}:{skip}:{limit}"
-    UNIVERSITY_DETAIL = "university:detail:{university_id}"
-    SCHOLARSHIP_LIST = "scholarships:list:{skip}:{limit}"
-    
     # AI caches (longer TTL)
     AI_RESUME = "ai:resume:{user_id}"
     AI_COVER_LETTER = "ai:cover_letter:{user_id}:{job_id}"
-    AI_UNIVERSITY_MATCH = "ai:university:match:{user_id}"
 
 
 # =============================================================================
@@ -254,10 +242,10 @@ class CacheKeys:
 from app.core.cache import cached, cache
 
 # Cache with decorator
-@cached(ttl=3600, prefix="university")
-async def get_universities_by_country(country: str):
+@cached(ttl=3600, prefix="jobs")
+async def get_jobs_by_location(location: str):
     # Expensive database query
-    return db.query(University).filter_by(country=country).all()
+    return db.query(Job).filter_by(location=location).all()
 
 # Manual caching
 def get_user_applications(user_id: str):

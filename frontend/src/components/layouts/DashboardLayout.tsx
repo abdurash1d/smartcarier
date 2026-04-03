@@ -5,7 +5,7 @@
 
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -18,14 +18,15 @@ import {
   Menu,
   X,
   ChevronDown,
-  Bell,
   Users,
   PlusCircle,
   LayoutDashboard,
   Zap,
+  Activity,
+  AlertTriangle,
+  Server,
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
-import { Button } from "@/components/ui/button";
 import { UserAvatar } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
@@ -51,18 +52,75 @@ const companyNavItems: NavItem[] = [
   { name: "Settings", href: "/company/settings", icon: Settings },
 ];
 
+const adminNavItems: NavItem[] = [
+  { name: "Overview", href: "/admin#overview", icon: Activity },
+  { name: "System Health", href: "/admin#health", icon: Server },
+  { name: "Users", href: "/admin#users", icon: Users },
+  { name: "Errors", href: "/admin#errors", icon: AlertTriangle },
+];
+
 interface DashboardLayoutProps {
   children: React.ReactNode;
 }
 
 export function DashboardLayout({ children }: DashboardLayoutProps) {
   const pathname = usePathname();
-  const { user, logout, isStudent, isCompany } = useAuth();
+  const { user, logout, isStudent, isCompany, isAdmin } = useAuth();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
+  const [currentHash, setCurrentHash] = useState("");
 
-  const navItems = isCompany ? companyNavItems : studentNavItems;
-  const dashboardHome = isCompany ? "/company/jobs" : "/student/resumes";
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const updateHash = () => setCurrentHash(window.location.hash);
+    updateHash();
+    window.addEventListener("hashchange", updateHash);
+    return () => window.removeEventListener("hashchange", updateHash);
+  }, []);
+
+  const navItems = isAdmin ? adminNavItems : isCompany ? companyNavItems : studentNavItems;
+  const dashboardHome = isAdmin
+    ? "/admin#overview"
+    : isCompany
+      ? "/company/jobs"
+      : "/student/resumes";
+  const effectiveHash = currentHash || (pathname === "/admin" ? "#overview" : "");
+
+  const userMenuLink = isAdmin ? "/admin#overview" : isCompany ? "/company/settings" : "/student/settings";
+  const userMenuLabel = isAdmin ? "Overview" : "Settings";
+  const UserMenuIcon = isAdmin ? LayoutDashboard : Settings;
+
+  const activeNavName = useMemo(() => {
+    const activeItem = navItems.find((item) => {
+      const [itemPath, itemHash] = item.href.split("#");
+      if (pathname !== itemPath) {
+        return pathname.startsWith(itemPath) && !itemHash;
+      }
+      if (!itemHash) {
+        return pathname.startsWith(itemPath);
+      }
+      return effectiveHash === `#${itemHash}`;
+    });
+
+    return activeItem?.name || "Dashboard";
+  }, [effectiveHash, navItems, pathname]);
+
+  const isNavItemActive = (item: NavItem) => {
+    const [itemPath, itemHash] = item.href.split("#");
+
+    if (pathname !== itemPath) {
+      return pathname.startsWith(itemPath) && !itemHash;
+    }
+
+    if (!itemHash) {
+      return pathname.startsWith(itemPath);
+    }
+
+    return effectiveHash === `#${itemHash}`;
+  };
 
   return (
     <div className="min-h-screen bg-surface-50 dark:bg-surface-950">
@@ -123,7 +181,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
           {/* Navigation */}
           <nav className="flex-1 space-y-1 px-3 py-4">
             {navItems.map((item) => {
-              const isActive = pathname.startsWith(item.href);
+              const isActive = isNavItemActive(item);
               return (
                 <Link
                   key={item.name}
@@ -176,7 +234,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
 
           {/* Page title - shown on mobile */}
           <div className="lg:hidden font-medium text-surface-900 dark:text-white">
-            {navItems.find((item) => pathname.startsWith(item.href))?.name || "Dashboard"}
+            {activeNavName}
           </div>
 
           {/* Spacer */}
@@ -215,12 +273,12 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                     </div>
                     <div className="py-1">
                       <Link
-                        href={isCompany ? "/company/settings" : "/student/settings"}
+                        href={userMenuLink}
                         className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-surface-600 hover:bg-surface-100 dark:text-surface-400 dark:hover:bg-surface-700"
                         onClick={() => setIsUserMenuOpen(false)}
                       >
-                        <Settings className="h-4 w-4" />
-                        Settings
+                        <UserMenuIcon className="h-4 w-4" />
+                        {userMenuLabel}
                       </Link>
                       <button
                         onClick={() => {

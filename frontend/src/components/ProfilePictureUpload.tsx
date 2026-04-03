@@ -82,7 +82,7 @@ export function ProfilePictureUpload() {
       if (user) {
         setUser({
           ...user,
-          avatar_url: null,
+          avatar_url: undefined,
         });
       }
 

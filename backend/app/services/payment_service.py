@@ -957,8 +957,6 @@ SUBSCRIPTION_PRICING = {
         "yearly_uzs": 10000000,  # 10,000,000 UZS (~$909)
         "features": [
             "Unlimited AI resume generation",
-            "Unlimited AI university search",
-            "Unlimited motivation letters",
             "Auto-apply to 50 jobs/month",
             "Priority job matching",
             "Advanced analytics dashboard",
@@ -1023,7 +1021,6 @@ def get_subscription_price(tier: SubscriptionTier, months: int = 1, currency: st
             return pricing.get("monthly_uzs", 0) * months
     
     return 0
-
 
 
 
