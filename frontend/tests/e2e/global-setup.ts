@@ -57,13 +57,14 @@ finally:
     db.close()
 `;
 
-  const candidateDatabaseUrls =
-    process.env.CI === '1'
-      ? [
-          'postgresql://test:test@localhost:5432/smartcareer_test',
-          process.env.DATABASE_URL || 'sqlite:///./smartcareer.db',
-        ]
-      : [process.env.DATABASE_URL || 'sqlite:///./smartcareer.db'];
+  const isCi = !!process.env.CI;
+  const candidateDatabaseUrls = isCi
+    ? [
+        process.env.DATABASE_URL || 'postgresql://test:test@localhost:5432/smartcareer_test',
+        'postgresql://test:test@localhost:5432/smartcareer_test',
+        'sqlite:///./smartcareer.db',
+      ]
+    : [process.env.DATABASE_URL || 'sqlite:///./smartcareer.db'];
 
   let lastError: unknown = null;
 

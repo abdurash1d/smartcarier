@@ -202,6 +202,8 @@ jobs:
         env:
           # Frontend code expects API base to include "/api/v1".
           NEXT_PUBLIC_API_URL: http://127.0.0.1:8000/api/v1
+          # Used by Playwright global-setup seeding (admin account).
+          DATABASE_URL: postgresql://test:test@localhost:5432/smartcareer_test
 
       - name: Dump backend logs (on failure)
         if: failure()
