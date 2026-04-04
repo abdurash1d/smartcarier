@@ -133,6 +133,15 @@ def create_tables() -> None:
     NOTE: In production, use Alembic migrations instead.
     """
     logger.info("Creating database tables...")
+
+    # Ensure all models are imported so SQLAlchemy has them registered on Base.metadata.
+    # Without this, create_all() can be a no-op if endpoints import models lazily,
+    # which then leads to runtime "relation does not exist" errors in fresh DBs (CI/E2E).
+    try:
+        import app.models  # noqa: F401
+    except Exception as e:
+        logger.warning(f"Failed to import models before create_all: {e}")
+
     Base.metadata.create_all(bind=engine)
     logger.info("Database tables created successfully!")
 
