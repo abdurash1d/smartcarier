@@ -13,12 +13,12 @@ import { test, expect } from "@playwright/test";
  * - Verify applications page loads
  */
 
-const APP_URL = "http://localhost:3000";
+const APP_URL = "http://127.0.0.1:3000";
 
 let authStorageValue: string | null = null;
 
 async function fetchJobs(request: any) {
-  const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1";
+  const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000/api/v1";
   const res = await request.get(`${apiBase}/jobs?limit=50&page=1`);
   expect(res.ok()).toBeTruthy();
   const data = await res.json();
@@ -29,7 +29,7 @@ async function fetchJobs(request: any) {
 
 test.describe("Job Application Flow", () => {
   test.beforeAll(async ({ request }) => {
-    const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1";
+    const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000/api/v1";
     const res = await request.post(`${apiBase}/auth/login`, {
       data: { email: "john@example.com", password: "Student123!" },
       headers: { "content-type": "application/json" },

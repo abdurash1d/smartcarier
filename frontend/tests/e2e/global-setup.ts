@@ -4,7 +4,7 @@ type Json = Record<string, any>;
 
 // In the app we commonly use NEXT_PUBLIC_API_URL as ".../api/v1".
 // For seeding, we need the backend origin (no "/api/v1" suffix).
-const RAW_API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+const RAW_API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000';
 const API_URL = RAW_API_URL.replace(/\/api\/v1\/?$/, '');
 
 async function postJson(ctx: any, path: string, body?: Json, headers?: Record<string, string>) {

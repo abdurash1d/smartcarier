@@ -340,6 +340,9 @@ def check_rate_limit_dependency(
         @router.get("/endpoint", dependencies=[Depends(check_rate_limit_dependency(max_requests=10, window_seconds=60))])
     """
     async def dependency(request: Request):
+        if not settings.RATE_LIMIT_ENABLED:
+            return
+
         # Get client IP
         client_ip = request.client.host if request.client else "unknown"
 
@@ -374,6 +377,9 @@ def check_login_rate_limit(request: Request, identifier: Optional[str] = None):
     
     Stricter limits to prevent brute-force attacks.
     """
+    if not settings.RATE_LIMIT_ENABLED:
+        return
+
     client_ip = request.client.host if request.client else "unknown"
     rate_key = f"login:{client_ip}"
     if identifier:
@@ -414,6 +420,9 @@ def record_failed_login(email: str, ip_address: str) -> Tuple[bool, Optional[int
     Returns:
         Tuple of (is_locked, unlock_after_seconds, remaining_attempts)
     """
+    if not settings.RATE_LIMIT_ENABLED:
+        return False, None, 5
+
     if settings.RATE_LIMIT_USE_REDIS and get_redis():
         return redis_rate_limiter.record_failed_login(
             identifier=email.lower(),
@@ -431,6 +440,9 @@ def record_failed_login(email: str, ip_address: str) -> Tuple[bool, Optional[int
 
 def clear_failed_logins(email: str):
     """Clear failed login attempts after successful login."""
+    if not settings.RATE_LIMIT_ENABLED:
+        return
+
     if settings.RATE_LIMIT_USE_REDIS and get_redis():
         redis_rate_limiter.clear_failed_logins(email.lower())
         return
@@ -439,10 +451,12 @@ def clear_failed_logins(email: str):
 
 def is_account_locked(email: str) -> Tuple[bool, Optional[int]]:
     """Check if account is locked due to failed login attempts."""
+    if not settings.RATE_LIMIT_ENABLED:
+        return False, None
+
     if settings.RATE_LIMIT_USE_REDIS and get_redis():
         return redis_rate_limiter.is_account_locked(email.lower())
     return rate_limiter.is_account_locked(email.lower())
-
 
 
 

@@ -55,7 +55,8 @@ def seed_users(db):
         full_name="System Admin",
         phone="+998901111111",
         role=UserRole.ADMIN,
-        is_active=True,
+        # User model maps DB column "is_active" to attribute "is_active_account"
+        is_active_account=True,
         is_verified=True,
     )
     admin.set_password("Admin123!")
@@ -70,7 +71,7 @@ def seed_users(db):
         role=UserRole.COMPANY,
         company_name="EPAM Systems",
         company_website="https://epam.com",
-        is_active=True,
+        is_active_account=True,
         is_verified=True,
     )
     company.set_password("Company123!")
@@ -83,7 +84,7 @@ def seed_users(db):
         full_name="John Doe",
         phone="+998903333333",
         role=UserRole.STUDENT,
-        is_active=True,
+        is_active_account=True,
         is_verified=True,
     )
     student1.set_password("Student123!")
@@ -96,7 +97,7 @@ def seed_users(db):
         full_name="Jane Smith",
         phone="+998904444444",
         role=UserRole.STUDENT,
-        is_active=True,
+        is_active_account=True,
         is_verified=True,
     )
     student2.set_password("Student123!")

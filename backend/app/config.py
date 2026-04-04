@@ -131,6 +131,10 @@ class Settings(BaseSettings):
     REDIS_ENABLED: bool = False
     REDIS_URL: str = "redis://localhost:6379/0"
 
+    # Master toggle for API rate limiting.
+    # CI and E2E runs disable this to avoid flaky test lockouts.
+    RATE_LIMIT_ENABLED: bool = True
+
     # If True and Redis is available, use Redis for rate limiting
     RATE_LIMIT_USE_REDIS: bool = True
 
