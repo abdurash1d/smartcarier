@@ -39,7 +39,7 @@ const TABS = [
 export default function ResumeEditPage() {
   const router = useRouter();
   const params = useParams();
-  const resumeId = params.id as string;
+  const resumeId = params!.id as string;
 
   const [resume, setResume] = useState<Resume | null>(null);
   const [title, setTitle] = useState("");

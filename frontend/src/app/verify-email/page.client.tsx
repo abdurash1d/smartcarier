@@ -15,7 +15,7 @@ import { ThemeToggle } from "@/components/ui/theme-toggle";
 import Link from "next/link";
 
 export default function VerifyEmailPageClient() {
-  const searchParams = useSearchParams();
+  const searchParams = useSearchParams()!;
   const router = useRouter();
   const token = searchParams.get("token");
 
@@ -104,4 +104,3 @@ export default function VerifyEmailPageClient() {
     </div>
   );
 }
-

@@ -357,6 +357,51 @@ export interface PremiumErrorDetail {
 }
 
 // =============================================================================
+// PAYMENT TYPES
+// =============================================================================
+
+export type BillingCycle = "monthly" | "yearly";
+
+export interface CreatePaymentIntentRequest {
+  subscription_tier: "premium" | "enterprise";
+  subscription_months: number;
+  idempotency_key?: string;
+}
+
+export interface PaymentIntentResponse {
+  success: boolean;
+  payment_id: string;
+  client_secret: string;
+  amount: number;
+  currency: string;
+  subscription_tier: string;
+  subscription_months: number;
+}
+
+export interface PricingResponse {
+  success: boolean;
+  pricing: Record<string, { monthly: number; yearly: number }>;
+}
+
+export interface PaymentHistoryItem {
+  id: string;
+  created_at?: string | null;
+  provider: string;
+  status: string;
+  amount: number;
+  currency: string;
+  subscription_tier: string;
+  subscription_months: number;
+  provider_payment_id?: string | null;
+}
+
+export interface PaymentHistoryResponse {
+  success: boolean;
+  payments: PaymentHistoryItem[];
+  total: number;
+}
+
+// =============================================================================
 // ADMIN TYPES
 // =============================================================================
 
