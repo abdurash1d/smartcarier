@@ -17,7 +17,7 @@ if not exist "backend\.env" (
 :: Start Backend
 echo [1/2] Backend ishga tushirilmoqda...
 cd backend
-start cmd /k "py -3.11 -m venv venv311 && venv311\Scripts\activate && pip install -r requirements.txt && set RATE_LIMIT_ENABLED=false && python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000"
+start cmd /k "py -3.11 -m venv venv311 && venv311\Scripts\activate && pip install -r requirements.txt && set SMARTCAREER_DEBUG=true && set RATE_LIMIT_ENABLED=false && python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000"
 
 :: Wait a bit
 timeout /t 5 /nobreak

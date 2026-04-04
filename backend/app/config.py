@@ -24,7 +24,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 import os
 from pathlib import Path
 
-from pydantic import ValidationInfo, field_validator, model_validator
+from pydantic import AliasChoices, Field, ValidationInfo, field_validator, model_validator
 from functools import lru_cache
 from typing import Any, List
 
@@ -180,7 +180,10 @@ class Settings(BaseSettings):
     # Debug mode
     # True: Shows detailed errors, enables /docs endpoint
     # False: Hides errors, disables /docs (use in production)
-    DEBUG: bool = True
+    DEBUG: bool = Field(
+        default=True,
+        validation_alias=AliasChoices("SMARTCAREER_DEBUG", "DEBUG"),
+    )
     
     # =========================================================================
     # 📁 FILE UPLOAD SETTINGS
