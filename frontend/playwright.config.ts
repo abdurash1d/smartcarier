@@ -57,7 +57,9 @@ export default defineConfig({
 
   /* Run your local dev server before starting the tests */
   webServer: {
-    command: 'npm run dev',
+    // Build once and run the production server so E2E hits the same runtime
+    // shape as CI/deploy, instead of a hot-reload dev server.
+    command: 'node -e "require(\'fs\').rmSync(\'.next\', { recursive: true, force: true })" && npm run build && npm run start -- -p 3000',
     url: 'http://127.0.0.1:3000',
     reuseExistingServer: !process.env.CI,
     timeout: 120 * 1000,
