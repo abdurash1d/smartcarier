@@ -42,6 +42,9 @@ jobs:
           DATABASE_URL: sqlite:///./test.db
           JWT_SECRET_KEY: test-secret-key-for-ci
           SECRET_KEY: test-secret-key-for-ci
+          # Ensure rate limiting is enabled in CI so brute-force protection tests
+          # validate the intended behavior regardless of DEBUG defaults.
+          RATE_LIMIT_ENABLED: "true"
       
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v3
@@ -199,7 +202,7 @@ jobs:
           NEXT_PUBLIC_API_URL: http://127.0.0.1:8000/api/v1
       
       - name: Upload Playwright report
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         if: always()
         with:
           name: playwright-report
