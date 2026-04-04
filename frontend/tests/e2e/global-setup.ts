@@ -23,12 +23,14 @@ from sqlalchemy.orm import sessionmaker
 sys.path.insert(0, ".")
 
 from app.config import settings
-from app.models import User, UserRole
-from app.models.base import Base
+from app.models.user import User, UserRole
 
 engine = create_engine(os.environ.get("DATABASE_URL") or str(settings.DATABASE_URL), echo=False)
 SessionLocal = sessionmaker(bind=engine)
-Base.metadata.create_all(bind=engine)
+
+# Only ensure the users table exists. Creating the entire metadata can fail in fresh
+# Postgres (e.g. FK type mismatches) and would silently fall back to sqlite.
+User.__table__.create(bind=engine, checkfirst=True)
 
 db = SessionLocal()
 try:
@@ -57,13 +59,9 @@ finally:
     db.close()
 `;
 
-  const isCi = !!process.env.CI;
+  const isCi = Boolean(process.env.CI) || process.env.GITHUB_ACTIONS === 'true';
   const candidateDatabaseUrls = isCi
-    ? [
-        process.env.DATABASE_URL || 'postgresql://test:test@localhost:5432/smartcareer_test',
-        'postgresql://test:test@localhost:5432/smartcareer_test',
-        'sqlite:///./smartcareer.db',
-      ]
+    ? [process.env.DATABASE_URL || 'postgresql://test:test@localhost:5432/smartcareer_test']
     : [process.env.DATABASE_URL || 'sqlite:///./smartcareer.db'];
 
   let lastError: unknown = null;
