@@ -22,6 +22,7 @@ HOW IT WORKS:
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 import os
+from pathlib import Path
 
 from pydantic import ValidationInfo, field_validator, model_validator
 from functools import lru_cache
@@ -32,6 +33,8 @@ _BOOL_TRUE_VALUES = {"1", "true", "t", "yes", "y", "on", "enabled", "enable"}
 _BOOL_FALSE_VALUES = {"0", "false", "f", "no", "n", "off", "disabled", "disable"}
 _DEBUG_TRUE_VALUES = {"dev", "development", "debug", "local"}
 _DEBUG_FALSE_VALUES = {"prod", "production", "release", "live"}
+BACKEND_ROOT = Path(__file__).resolve().parents[1]
+ENV_FILE = BACKEND_ROOT / ".env"
 
 
 def _normalize_bool_value(value: Any, *, field_name: str, default: bool) -> bool:
@@ -287,7 +290,7 @@ class Settings(BaseSettings):
     # =========================================================================
     
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=str(ENV_FILE),
         env_file_encoding="utf-8",
         case_sensitive=True,
         extra="ignore",
