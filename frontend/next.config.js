@@ -1,4 +1,6 @@
 /** @type {import('next').NextConfig} */
+const path = require("path");
+
 const nextConfig = {
   // Enable React Strict Mode for better development experience
   reactStrictMode: true,
@@ -62,6 +64,15 @@ const nextConfig = {
         permanent: false,
       },
     ];
+  },
+
+  webpack: (config) => {
+    // Ensure `@/...` imports resolve in all environments (CI/Linux included).
+    config.resolve.alias = {
+      ...(config.resolve.alias || {}),
+      "@": path.resolve(__dirname, "src"),
+    };
+    return config;
   },
 };
 
