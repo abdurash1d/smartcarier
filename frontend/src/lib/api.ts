@@ -1,0 +1,522 @@
+/**
+ * =============================================================================
+ * API CLIENT - Axios Instance with Interceptors
+ * =============================================================================
+ *
+ * Features:
+ * - Auto-attach JWT token
+ * - Handle 401 (refresh token)
+ * - Error handling
+ * - Request/response logging
+ */
+
+import axios, { AxiosError, AxiosInstance, InternalAxiosRequestConfig } from "axios";
+import { useAuthStore } from "@/store/authStore";
+import type {
+  AutoApplyRequest,
+  ApplicationStatusUpdateRequest,
+  AdminBulkResolveResponse,
+  AdminDashboardResponse,
+  AdminErrorListResponse,
+  AdminErrorStatsResponse,
+  AdminResolveErrorRequest,
+  AdminResolveErrorResponse,
+  AdminSystemHealthResponse,
+  AdminUserStatsResponse,
+  CreatePaymentIntentRequest,
+  PaymentHistoryResponse,
+  PaymentIntentResponse,
+  PricingResponse,
+  PremiumErrorDetail,
+} from "@/types/api";
+
+// =============================================================================
+// CONFIGURATION
+// =============================================================================
+
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1";
+const REQUEST_TIMEOUT = 30000; // 30 seconds
+
+// =============================================================================
+// CREATE AXIOS INSTANCE
+// =============================================================================
+
+export const api: AxiosInstance = axios.create({
+  baseURL: API_BASE_URL,
+  timeout: REQUEST_TIMEOUT,
+  headers: {
+    "Content-Type": "application/json",
+  },
+});
+
+// =============================================================================
+// REQUEST INTERCEPTOR
+// =============================================================================
+
+api.interceptors.request.use(
+  (config: InternalAxiosRequestConfig) => {
+    // Get token from store
+    const accessToken = useAuthStore.getState().accessToken;
+    
+    // Attach token to request
+    if (accessToken && config.headers) {
+      config.headers.Authorization = `Bearer ${accessToken}`;
+    }
+
+    // Log request in development
+    if (process.env.NODE_ENV === "development") {
+      console.log(`🚀 [API] ${config.method?.toUpperCase()} ${config.url}`, {
+        params: config.params,
+        data: config.data,
+      });
+    }
+
+    return config;
+  },
+  (error) => {
+    console.error("❌ [API] Request error:", error);
+    return Promise.reject(error);
+  }
+);
+
+// =============================================================================
+// RESPONSE INTERCEPTOR
+// =============================================================================
+
+let isRefreshing = false;
+let failedQueue: Array<{
+  resolve: (value: string | null) => void;
+  reject: (error: unknown) => void;
+}> = [];
+
+const processQueue = (error: unknown, token: string | null = null) => {
+  failedQueue.forEach((prom) => {
+    if (error) {
+      prom.reject(error);
+    } else {
+      prom.resolve(token);
+    }
+  });
+  failedQueue = [];
+};
+
+api.interceptors.response.use(
+  (response) => {
+    // Log response in development
+    if (process.env.NODE_ENV === "development") {
+      console.log(`✅ [API] Response:`, {
+        status: response.status,
+        url: response.config.url,
+        data: response.data,
+      });
+    }
+    return response;
+  },
+  async (error: AxiosError) => {
+    const originalRequest = error.config as InternalAxiosRequestConfig & {
+      _retry?: boolean;
+    };
+
+    // Log error in development
+    if (process.env.NODE_ENV === "development") {
+      console.error(`❌ [API] Error:`, {
+        status: error.response?.status,
+        url: originalRequest?.url,
+        message: error.message,
+        data: error.response?.data,
+      });
+    }
+
+    // Handle 401 Unauthorized
+    if (error.response?.status === 401 && !originalRequest._retry) {
+      if (isRefreshing) {
+        // Wait for token refresh
+        return new Promise((resolve, reject) => {
+          failedQueue.push({ resolve, reject });
+        })
+          .then((token) => {
+            if (originalRequest.headers) {
+              originalRequest.headers.Authorization = `Bearer ${token}`;
+            }
+            return api(originalRequest);
+          })
+          .catch((err) => Promise.reject(err));
+      }
+
+      originalRequest._retry = true;
+      isRefreshing = true;
+
+      try {
+        // Attempt to refresh token
+        const newToken = await useAuthStore.getState().refreshAccessToken();
+        
+        if (newToken) {
+          processQueue(null, newToken);
+          if (originalRequest.headers) {
+            originalRequest.headers.Authorization = `Bearer ${newToken}`;
+          }
+          return api(originalRequest);
+        } else {
+          // Refresh failed, logout user
+          processQueue(error, null);
+          useAuthStore.getState().logout();
+          
+          // Redirect to login (if in browser)
+          if (typeof window !== "undefined") {
+            window.location.href = "/login";
+          }
+          
+          return Promise.reject(error);
+        }
+      } catch (refreshError) {
+        processQueue(refreshError, null);
+        useAuthStore.getState().logout();
+        return Promise.reject(refreshError);
+      } finally {
+        isRefreshing = false;
+      }
+    }
+
+    // Handle other errors
+    return Promise.reject(error);
+  }
+);
+
+// =============================================================================
+// API METHODS
+// =============================================================================
+
+// Auth endpoints
+export const authApi = {
+  login: (email: string, password: string) =>
+    api.post("/auth/login", { email, password }),
+  
+  register: (data: {
+    email: string;
+    password: string;
+    full_name: string;
+    phone?: string;
+    role?: string;
+  }) => api.post("/auth/register", data),
+  
+  logout: () => api.post("/auth/logout"),
+  
+  refreshToken: (refreshToken: string) =>
+    api.post("/auth/refresh", { refresh_token: refreshToken }),
+  
+  forgotPassword: (email: string) =>
+    api.post("/auth/forgot-password", { email }),
+  
+  resetPassword: (token: string, password: string) =>
+    api.post("/auth/reset-password", { token, new_password: password }),
+  
+  me: () => api.get("/auth/me"),
+};
+
+// Resume endpoints
+export const resumeApi = {
+  list: (params?: { page?: number; limit?: number; status?: string }) =>
+    api.get("/resumes", { params }),
+  
+  get: (id: string) => api.get(`/resumes/${id}`),
+  
+  create: (data: { title: string; content: object }) =>
+    api.post("/resumes/create", data),
+  
+  generateAI: (data: {
+    user_data: object;
+    template?: string;
+    tone?: string;
+  }) => api.post("/resumes/generate-ai", data),
+  
+  update: (id: string, data: Partial<{ title: string; content: object; status: string }>) =>
+    api.put(`/resumes/${id}`, data),
+  
+  delete: (id: string) => api.delete(`/resumes/${id}`),
+  
+  publish: (id: string) => api.post(`/resumes/${id}/publish`),
+  
+  archive: (id: string) => api.post(`/resumes/${id}/archive`),
+  
+  download: (id: string) =>
+    api.get(`/resumes/${id}/download`, { responseType: "blob" }),
+  
+  analytics: (id: string) => api.get(`/resumes/${id}/analytics`),
+};
+
+// Job endpoints
+export const jobApi = {
+  list: (params?: {
+    search?: string;
+    location?: string;
+    job_type?: string;
+    experience_level?: string;
+    salary_min?: number;
+    salary_max?: number;
+    page?: number;
+    limit?: number;
+    sort_by?: string;
+  }) => api.get("/jobs", { params }),
+  
+  get: (id: string) => api.get(`/jobs/${id}`),
+  
+  create: (data: object) => api.post("/jobs", data),
+  
+  update: (id: string, data: object) => api.put(`/jobs/${id}`, data),
+  
+  delete: (id: string) => api.delete(`/jobs/${id}`),
+  
+  myJobs: (params?: { status?: string; page?: number; limit?: number }) =>
+    api.get("/jobs/my", { params }),
+
+  publish: (id: string) => api.post(`/jobs/${id}/publish`),
+
+  close: (id: string) => api.post(`/jobs/${id}/close`),
+
+  match: (resumeId: string) =>
+    api.post("/jobs/match", { resume_id: resumeId }),
+
+  applications: (id: string) => api.get(`/jobs/${id}/applications`),
+
+  saveJob: (id: string) => api.post(`/jobs/${id}/save`),
+
+  unsaveJob: (id: string) => api.delete(`/jobs/${id}/save`),
+
+  savedJobs: (params?: { page?: number; limit?: number }) =>
+    api.get("/jobs/saved", { params }),
+};
+
+// Application endpoints
+export const applicationApi = {
+  list: (params?: { status?: string; page?: number; limit?: number }) =>
+    api.get("/applications/my-applications", { params }),
+  
+  get: (id: string) => api.get(`/applications/${id}`),
+  
+  apply: (data: {
+    job_id: string;
+    resume_id: string;
+    cover_letter?: string;
+  }) => api.post("/applications/apply", data),
+  
+  withdraw: (id: string) => api.post(`/applications/${id}/withdraw`),
+  
+  updateStatus: (id: string, data: ApplicationStatusUpdateRequest) =>
+    api.put(`/applications/${id}/status`, data),
+  
+  autoApply: (data: AutoApplyRequest) =>
+    api.post("/applications/auto-apply", data),
+};
+
+// Admin endpoints
+export const adminApi = {
+  dashboard: () => api.get<AdminDashboardResponse>("/admin/dashboard"),
+  systemHealth: () => api.get<AdminSystemHealthResponse>("/admin/system/health"),
+  userStats: () => api.get<AdminUserStatsResponse>("/admin/users/stats"),
+  errors: (params?: { limit?: number; offset?: number; resolved?: boolean; hours?: number }) =>
+    api.get<AdminErrorListResponse>("/admin/errors", { params }),
+  errorStats: (hours = 24) => api.get<AdminErrorStatsResponse>("/admin/errors/stats", { params: { hours } }),
+  resolveError: (errorId: string, data: AdminResolveErrorRequest = {}) =>
+    api.post<AdminResolveErrorResponse>(`/admin/errors/${errorId}/resolve`, data),
+  bulkResolveErrors: (errorIds: string[], resolution_notes?: string) =>
+    api.post<AdminBulkResolveResponse>("/admin/errors/bulk-resolve", {
+      error_ids: errorIds,
+      resolution_notes,
+    }),
+};
+
+// User endpoints
+export const userApi = {
+  getProfile: () => api.get("/users/me"),
+  
+  updateProfile: (data: Partial<{
+    full_name: string;
+    phone: string;
+    avatar_url: string;
+  }>) => api.put("/users/me", data),
+  
+  changePassword: (data: {
+    old_password: string;
+    new_password: string;
+  }) => api.post("/auth/change-password", data),
+  
+  uploadAvatar: (file: File) => {
+    const form = new FormData();
+    form.append("file", file);
+    return api.post("/users/me/avatar", form, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+  },
+
+  deleteAccount: () => api.delete("/users/me"),
+};
+
+// AI endpoints
+export const aiApi = {
+  generateResume: (data: object) =>
+    api.post("/ai/generate-resume", data),
+  
+  generateCoverLetter: (data: {
+    job_title: string;
+    company_name: string;
+    resume_id: string;
+    tone?: string;
+  }) => api.post("/ai/generate-cover-letter", data),
+  
+  analyzeResume: (resumeId: string) =>
+    api.post("/ai/analyze-resume", { resume_id: resumeId }),
+  
+  matchJob: (resumeId: string, jobId: string) =>
+    api.post("/ai/match-job", { resume_id: resumeId, job_id: jobId }),
+};
+
+// Payment endpoints
+export const paymentApi = {
+  createPaymentIntent: (data: CreatePaymentIntentRequest) =>
+    api.post<PaymentIntentResponse>("/payments/create-payment-intent", data),
+
+  getPricing: () => api.get<PricingResponse>("/payments/pricing"),
+
+  getMyPayments: () => api.get<PaymentHistoryResponse>("/payments/my-payments"),
+};
+
+// =============================================================================
+// HELPER FUNCTIONS
+// =============================================================================
+
+export interface ApiErrorInfo {
+  message: string;
+  status?: number;
+  upgradeUrl?: string;
+  isPremiumRequired?: boolean;
+}
+
+function getDetailMessage(detail: unknown): {
+  message?: string;
+  upgradeUrl?: string;
+} {
+  if (typeof detail === "string") {
+    return { message: detail };
+  }
+
+  if (detail && typeof detail === "object") {
+    const data = detail as PremiumErrorDetail & Record<string, unknown>;
+    const message =
+      typeof data.message === "string"
+        ? data.message
+        : typeof data.error === "string"
+          ? data.error
+          : undefined;
+    const upgradeUrl =
+      typeof data.upgrade_url === "string"
+        ? data.upgrade_url
+        : typeof data.contact_url === "string"
+          ? data.contact_url
+          : undefined;
+
+    return { message, upgradeUrl };
+  }
+
+  return {};
+}
+
+/**
+ * Normalize API errors into user-friendly metadata
+ */
+export function getApiErrorInfo(error: unknown): ApiErrorInfo {
+  if (!axios.isAxiosError(error)) {
+    return {
+      message: error instanceof Error ? error.message : "An unexpected error occurred.",
+    };
+  }
+
+  const status = error.response?.status;
+  const data = error.response?.data as {
+    detail?: unknown;
+    error?: { message?: string; details?: Record<string, string[]> };
+    message?: string;
+    detail_message?: string;
+  } | undefined;
+
+  if (data?.error?.details) {
+    const details = data.error.details;
+    const messages = Object.entries(details)
+      .map(([field, errors]) => `${field}: ${(errors as string[]).join(", ")}`)
+      .join("; ");
+    return { message: messages, status };
+  }
+
+  const detailInfo = getDetailMessage(data?.detail);
+  const explicitMessage =
+    detailInfo.message ||
+    data?.error?.message ||
+    data?.message ||
+    data?.detail_message;
+
+  if (status === 402) {
+    const upgradeUrl = detailInfo.upgradeUrl || "/pricing";
+    const baseMessage =
+      explicitMessage ||
+      "This feature requires an active Premium or Enterprise subscription.";
+
+    return {
+      message: `${baseMessage} Upgrade at ${upgradeUrl} to continue.`,
+      status,
+      upgradeUrl,
+      isPremiumRequired: true,
+    };
+  }
+
+  if (explicitMessage) {
+    return { message: explicitMessage, status };
+  }
+
+  switch (status) {
+    case 400:
+      return { message: "Invalid request. Please check your input.", status };
+    case 401:
+      return { message: "Please log in to continue.", status };
+    case 403:
+      return { message: "You don't have permission to perform this action.", status };
+    case 404:
+      return { message: "The requested resource was not found.", status };
+    case 409:
+      return { message: "This resource already exists.", status };
+    case 422:
+      return { message: "The provided data is invalid.", status };
+    case 429:
+      return { message: "Too many requests. Please try again later.", status };
+    case 500:
+      return { message: "An unexpected error occurred. Please try again.", status };
+    default:
+      return {
+        message: error instanceof Error ? error.message : "An error occurred.",
+        status,
+      };
+  }
+}
+
+/**
+ * Handle API error and return user-friendly message
+ */
+export function getErrorMessage(error: unknown): string {
+  return getApiErrorInfo(error).message;
+}
+
+/**
+ * Create a debounced function
+ */
+type AnyFunction = (...args: unknown[]) => unknown;
+
+export function debounce<T extends AnyFunction>(
+  func: T,
+  wait: number
+): (...args: Parameters<T>) => void {
+  let timeout: ReturnType<typeof setTimeout>;
+  return (...args: Parameters<T>) => {
+    clearTimeout(timeout);
+    timeout = setTimeout(() => func(...args), wait);
+  };
+}
+
+export default api;
