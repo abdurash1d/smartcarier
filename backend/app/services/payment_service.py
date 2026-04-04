@@ -725,36 +725,34 @@ class PaymentService:
             Processing result
         """
         try:
-            # Verify signature and parse event (Stripe SDK preferred)
-            event = None
-            if not self.stripe_webhook_secret:
-                if settings.PAYMENTS_REQUIRE_WEBHOOK_SECRET and not settings.DEBUG:
-                    raise ValueError("Stripe webhook secret not configured")
-            try:
-                import stripe  # type: ignore
-                if self.stripe_webhook_secret:
-                    event = stripe.Webhook.construct_event(payload, signature, self.stripe_webhook_secret)
-                else:
-                    event = json.loads(payload.decode("utf-8"))
-            except Exception:
-                # Fallback to legacy verification (dev only)
-                if not self._verify_stripe_signature(payload, signature):
-                    logger.error("Invalid Stripe webhook signature")
-                    raise ValueError("Invalid signature")
-                event = json.loads(payload.decode("utf-8"))
+            event = self._parse_stripe_event(payload, signature)
 
             event_type = event.get("type")
             event_data = event.get("data", {}).get("object", {})
-            
+
             logger.info(f"Stripe webhook received: {event_type}")
-            
+
             # Handle different event types
             if event_type == 'payment_intent.succeeded':
                 return await self._handle_payment_success(db, event_data)
-            
+
+            elif event_type == 'checkout.session.completed':
+                if event_data.get("payment_status") not in {"paid", "no_payment_required"}:
+                    logger.info(
+                        "Checkout session completed but not paid yet: %s",
+                        event_data.get("id"),
+                    )
+                    return {
+                        "status": "ignored",
+                        "event_type": event_type,
+                        "reason": "session_not_paid",
+                    }
+                normalized_payment = self._normalize_checkout_session(event_data)
+                return await self._handle_payment_success(db, normalized_payment)
+
             elif event_type == 'payment_intent.payment_failed':
                 return await self._handle_payment_failure(db, event_data)
-            
+
             elif event_type == 'charge.refunded':
                 return await self._handle_refund(db, event_data)
             
@@ -765,6 +763,52 @@ class PaymentService:
         except Exception as e:
             logger.exception(f"Webhook processing error: {e}")
             raise
+
+    def _parse_stripe_event(self, payload: bytes, signature: str) -> Dict[str, Any]:
+        """
+        Parse and verify a Stripe webhook payload.
+
+        Uses Stripe SDK verification when the package and secret are available.
+        Falls back to the local HMAC verifier for development and tests.
+        """
+        if not self.stripe_webhook_secret:
+            if settings.PAYMENTS_REQUIRE_WEBHOOK_SECRET and not settings.DEBUG:
+                raise ValueError("Stripe webhook secret not configured")
+
+            if not self._verify_stripe_signature(payload, signature):
+                raise ValueError("Invalid signature")
+            return json.loads(payload.decode("utf-8"))
+
+        try:
+            import stripe  # type: ignore
+            return stripe.Webhook.construct_event(payload, signature, self.stripe_webhook_secret)
+        except Exception as exc:
+            logger.warning(
+                "Stripe SDK webhook verification failed, using local verifier fallback: %s",
+                exc,
+            )
+            if not self._verify_stripe_signature(payload, signature):
+                logger.error("Invalid Stripe webhook signature")
+                raise ValueError("Invalid signature")
+            return json.loads(payload.decode("utf-8"))
+
+    def _normalize_checkout_session(self, session_data: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Convert a checkout.session.completed payload into a payment_intent-like object.
+
+        This lets the same activation logic work for both Stripe PaymentIntent and
+        Checkout Session flows.
+        """
+        metadata = session_data.get("metadata") or {}
+        payment_intent_id = session_data.get("payment_intent") or session_data.get("id")
+        amount = session_data.get("amount_total") or session_data.get("amount_subtotal") or 0
+
+        return {
+            "id": payment_intent_id,
+            "amount": amount,
+            "metadata": metadata,
+            "checkout_session_id": session_data.get("id"),
+        }
     
     def _verify_stripe_signature(self, payload: bytes, signature: str) -> bool:
         """
@@ -817,9 +861,32 @@ class PaymentService:
         amount = payment_data.get('amount')
         metadata = payment_data.get('metadata', {})
         
+        payment_record = None
+        payment_id = metadata.get("payment_id") or payment_data.get("payment_id")
+        if db:
+            if payment_id:
+                try:
+                    payment_record = db.query(PaymentModel).filter(PaymentModel.id == UUID(str(payment_id))).first()
+                except Exception:
+                    payment_record = None
+            if not payment_record and payment_intent_id:
+                payment_record = db.query(PaymentModel).filter(
+                    PaymentModel.provider_payment_id == str(payment_intent_id)
+                ).first()
+
         user_id = metadata.get('user_id')
-        subscription_tier = metadata.get('subscription_tier', 'premium')
-        subscription_months = int(metadata.get("subscription_months", "1") or 1)
+        if not user_id and payment_record:
+            user_id = str(payment_record.user_id)
+
+        subscription_tier = metadata.get('subscription_tier')
+        if not subscription_tier and payment_record:
+            subscription_tier = payment_record.subscription_tier
+        subscription_tier = subscription_tier or 'premium'
+
+        subscription_months = metadata.get("subscription_months")
+        if subscription_months is None and payment_record:
+            subscription_months = payment_record.subscription_months
+        subscription_months = int(subscription_months or 1)
         
         logger.info(f"Payment succeeded: {payment_intent_id} for user {user_id}")
         
@@ -831,11 +898,13 @@ class PaymentService:
 
         # Update DB payment + user subscription (production)
         if db and user_id:
-            payment = db.query(PaymentModel).filter(PaymentModel.provider_payment_id == payment_intent_id).first()
+            payment = payment_record
             if payment:
                 payment.status = PaymentStatus.COMPLETED.value
+                if payment_intent_id:
+                    payment.provider_payment_id = str(payment_intent_id)
                 db.add(payment)
-            user = db.query(User).filter(User.id == UUID(user_id), User.is_deleted == False).first()
+            user = db.query(User).filter(User.id == UUID(str(user_id)), User.is_deleted == False).first()
             if user:
                 now = datetime.now(timezone.utc)
                 base = user.subscription_expires_at if getattr(user, "subscription_expires_at", None) and user.subscription_expires_at > now else now
@@ -1021,7 +1090,6 @@ def get_subscription_price(tier: SubscriptionTier, months: int = 1, currency: st
             return pricing.get("monthly_uzs", 0) * months
     
     return 0
-
 
 
 

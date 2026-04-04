@@ -18,10 +18,13 @@ import pytest
 import hmac
 import hashlib
 import json
+from datetime import datetime, timezone, timedelta
 from fastapi import status
 from fastapi.testclient import TestClient
 
+from app.config import settings
 from app.models import User
+from app.models.payment import Payment as PaymentModel
 from app.services.payment_service import payment_service, SubscriptionTier
 
 
@@ -155,57 +158,109 @@ async def test_double_payment_prevention():
 # WEBHOOK TESTS
 # =============================================================================
 
+def _build_stripe_signature(payload: bytes, secret: str, timestamp: int | None = None) -> str:
+    if timestamp is None:
+        timestamp = int(datetime.now(timezone.utc).timestamp())
+    signed_payload = f"{timestamp}.{payload.decode('utf-8')}"
+    digest = hmac.new(
+        secret.encode("utf-8"),
+        signed_payload.encode("utf-8"),
+        hashlib.sha256,
+    ).hexdigest()
+    return f"t={timestamp},v1={digest}"
+
+
 @pytest.mark.payment
 @pytest.mark.slow
-def test_webhook_payment_succeeded(client: TestClient, monkeypatch: pytest.MonkeyPatch, test_student: User):
-    """Test webhook for successful payment."""
-    # Make test deterministic regardless of local .env secrets.
-    payment_service.stripe_webhook_secret = ""
-    monkeypatch.setattr("app.config.settings.DEBUG", True, raising=False)
-    monkeypatch.setattr("app.config.settings.PAYMENTS_REQUIRE_WEBHOOK_SECRET", False, raising=False)
+def test_webhook_payment_succeeded_updates_subscription(
+    client: TestClient,
+    test_db,
+    monkeypatch: pytest.MonkeyPatch,
+    test_student: User,
+):
+    """Test Stripe webhook success updates payment + user subscription."""
+    secret = "whsec_test_secret_123"
+    payment_service.stripe_webhook_secret = secret
+    monkeypatch.setattr(settings, "DEBUG", False, raising=False)
+    monkeypatch.setattr(settings, "PAYMENTS_REQUIRE_WEBHOOK_SECRET", True, raising=False)
 
-    # Mock Stripe event
+    payment = PaymentModel(
+        provider="stripe",
+        provider_payment_id="pi_test_123",
+        status="processing",
+        user_id=test_student.id,
+        amount=1200,
+        currency="USD",
+        subscription_tier="premium",
+        subscription_months=3,
+        idempotency_key="stripe-webhook-test-key",
+    )
+    test_db.add(payment)
+    test_db.commit()
+    test_db.refresh(payment)
+
+    previous_expiry = test_student.subscription_expires_at
+
     event = {
         "type": "payment_intent.succeeded",
         "data": {
             "object": {
                 "id": "pi_test_123",
-                "amount": 999,
+                "amount": 1200,
                 "metadata": {
                     "user_id": str(test_student.id),
+                    "payment_id": str(payment.id),
                     "subscription_tier": "premium",
-                    "subscription_months": "1",
-                }
+                    "subscription_months": "3",
+                },
             }
-        }
+        },
     }
-    
-    payload = json.dumps(event).encode('utf-8')
-    
-    # Create signature (simplified - in production use real Stripe signature)
-    signature = "t=1234567890,v1=mock_signature"
-    
+
+    payload = json.dumps(event).encode("utf-8")
+    signature = _build_stripe_signature(payload, secret)
+
     response = client.post(
         "/api/v1/payments/webhook/stripe",
         content=payload,
-        headers={"stripe-signature": signature}
+        headers={"stripe-signature": signature},
     )
-    
-    # In development mode (no webhook secret), should succeed
+
     assert response.status_code == status.HTTP_200_OK
+    data = response.json()
+    assert data["success"] is True
+    assert data["result"]["status"] == "success"
+
+    test_db.refresh(payment)
+    test_db.refresh(test_student)
+    assert payment.status == "completed"
+    assert payment.provider_payment_id == "pi_test_123"
+    assert test_student.subscription_tier == "premium"
+    assert test_student.subscription_expires_at is not None
+    if previous_expiry is not None:
+        assert test_student.subscription_expires_at > previous_expiry
+    assert test_student.subscription_expires_at > datetime.now(timezone.utc)
 
 
 @pytest.mark.payment
-def test_webhook_missing_signature(client: TestClient):
-    """Test webhook without signature fails."""
-    event = {"type": "test"}
-    payload = json.dumps(event).encode('utf-8')
-    
+def test_webhook_invalid_signature_rejected(
+    client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    """Test webhook with invalid signature fails."""
+    payment_service.stripe_webhook_secret = "whsec_test_secret_123"
+    monkeypatch.setattr(settings, "DEBUG", False, raising=False)
+    monkeypatch.setattr(settings, "PAYMENTS_REQUIRE_WEBHOOK_SECRET", True, raising=False)
+
+    event = {"type": "payment_intent.succeeded", "data": {"object": {"id": "pi_test_123"}}}
+    payload = json.dumps(event).encode("utf-8")
+
     response = client.post(
         "/api/v1/payments/webhook/stripe",
         content=payload,
+        headers={"stripe-signature": "t=1234567890,v1=invalid"},
     )
-    
+
     assert response.status_code == status.HTTP_400_BAD_REQUEST
 
 
@@ -310,8 +365,6 @@ def test_payment_logs_query():
     # Filter by status
     pending_logs = service.get_payment_logs(status=PaymentStatus.PENDING)
     assert all(log.status == PaymentStatus.PENDING for log in pending_logs)
-
-
 
 
 
