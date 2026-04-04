@@ -1,4 +1,6 @@
 import { request } from '@playwright/test';
+import { execFileSync } from 'node:child_process';
+import path from 'node:path';
 
 type Json = Record<string, any>;
 
@@ -6,6 +8,88 @@ type Json = Record<string, any>;
 // For seeding, we need the backend origin (no "/api/v1" suffix).
 const RAW_API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000';
 const API_URL = RAW_API_URL.replace(/\/api\/v1\/?$/, '');
+const ROOT_DIR = path.resolve(process.cwd(), '..');
+const BACKEND_DIR = path.join(ROOT_DIR, 'backend');
+
+function ensureAdminAccount() {
+  const script = `
+import os
+import sys
+from uuid import uuid4
+
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+
+sys.path.insert(0, ".")
+
+from app.config import settings
+from app.models import User, UserRole
+from app.models.base import Base
+
+engine = create_engine(os.environ.get("DATABASE_URL") or str(settings.DATABASE_URL), echo=False)
+SessionLocal = sessionmaker(bind=engine)
+Base.metadata.create_all(bind=engine)
+
+db = SessionLocal()
+try:
+    admin = db.query(User).filter(User.email == "admin@smartcareer.uz").first()
+    if admin is None:
+        admin = User(
+            id=uuid4(),
+            email="admin@smartcareer.uz",
+            full_name="System Admin",
+            phone="+998901111111",
+            role=UserRole.ADMIN,
+            is_active_account=True,
+            is_verified=True,
+        )
+        db.add(admin)
+    else:
+        admin.full_name = "System Admin"
+        admin.phone = "+998901111111"
+        admin.role = UserRole.ADMIN
+        admin.is_active_account = True
+        admin.is_verified = True
+
+    admin.set_password("Admin123!")
+    db.commit()
+finally:
+    db.close()
+`;
+
+  const candidateDatabaseUrls =
+    process.env.CI === '1'
+      ? [
+          'postgresql://test:test@localhost:5432/smartcareer_test',
+          process.env.DATABASE_URL || 'sqlite:///./smartcareer.db',
+        ]
+      : [process.env.DATABASE_URL || 'sqlite:///./smartcareer.db'];
+
+  let lastError: unknown = null;
+
+  for (const databaseUrl of candidateDatabaseUrls) {
+    try {
+      execFileSync('python', ['-X', 'utf8', '-c', script], {
+        cwd: BACKEND_DIR,
+        stdio: 'pipe',
+        env: {
+          ...process.env,
+          DATABASE_URL: databaseUrl,
+          PYTHONUTF8: '1',
+        },
+      });
+      return;
+    } catch (error) {
+      lastError = error;
+    }
+  }
+
+  if (lastError instanceof Error) {
+    throw lastError;
+  }
+
+  throw new Error('Failed to seed admin account');
+}
 
 async function postJson(ctx: any, path: string, body?: Json, headers?: Record<string, string>) {
   return await ctx.post(`${API_URL}${path}`, {
@@ -114,6 +198,8 @@ async function applyToJob(ctx: any, token: string, jobId: string, resumeId: stri
 
 export default async function globalSetup() {
   const ctx = await request.newContext();
+
+  ensureAdminAccount();
 
   // Fixed seed accounts used by Playwright specs.
   const studentEmail = 'john@example.com';

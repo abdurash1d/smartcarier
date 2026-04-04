@@ -58,9 +58,10 @@ const fadeIn = {
 };
 
 export default function LoginPageClient() {
-  const searchParams = useSearchParams();
+  const searchParams = useSearchParams()!;
   const sessionExpired = searchParams.get("session_expired") === "true";
   const registered = searchParams.get("registered") === "true";
+  const passwordReset = searchParams.get("password_reset") === "true";
   const redirectTo = searchParams.get("redirect");
 
   const { login, isLoading, error, clearError } = useAuth();
@@ -140,6 +141,17 @@ export default function LoginPageClient() {
           >
             <CheckCircle className="h-5 w-5 flex-shrink-0" />
             <p>{t("auth.login.registered")}</p>
+          </motion.div>
+        )}
+
+        {passwordReset && (
+          <motion.div
+            key="password-reset"
+            {...fadeIn}
+            className="mb-6 flex items-center gap-3 rounded-xl border border-green-200 bg-green-50 p-4 text-sm text-green-800"
+          >
+            <CheckCircle className="h-5 w-5 flex-shrink-0" />
+            <p>{t("auth.login.passwordReset")}</p>
           </motion.div>
         )}
 
@@ -284,4 +296,3 @@ export default function LoginPageClient() {
     </motion.div>
   );
 }
-
