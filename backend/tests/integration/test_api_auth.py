@@ -10,6 +10,10 @@ import pytest
 from fastapi import status
 from httpx import AsyncClient
 
+from app.models import User
+import app.core.redis_client as redis_client_module
+import app.services.oauth_service as oauth_service_module
+import app.services.email_service as email_service_module
 from tests.fixtures.sample_data import (
     get_valid_user_data,
     INVALID_USERS,
@@ -487,6 +491,71 @@ class TestForgotPassword:
         )
         
         assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+
+
+# =============================================================================
+# OAUTH TESTS
+# =============================================================================
+
+class TestGoogleOAuth:
+    """Tests for Google OAuth callback."""
+
+    @pytest.mark.asyncio
+    async def test_google_oauth_callback_creates_new_user(
+        self,
+        async_client: AsyncClient,
+        test_db,
+        monkeypatch: pytest.MonkeyPatch,
+    ):
+        """Test Google OAuth callback creates a new user with correct fields."""
+
+        class FakeRedis:
+            def __init__(self):
+                self._store = {"oauth_state:google:test-state": "1"}
+
+            def exists(self, key):
+                return key in self._store
+
+            def delete(self, key):
+                self._store.pop(key, None)
+
+        class FakeOAuthService:
+            async def get_google_user_info(self, code: str):
+                assert code == "mock-code"
+                return {
+                    "email": "oauth.user@example.com",
+                    "name": "OAuth User",
+                    "picture": "https://example.com/avatar.png",
+                }
+
+        class FakeEmailService:
+            async def send_welcome_email(self, *args, **kwargs):
+                return True
+
+        fake_redis = FakeRedis()
+        monkeypatch.setattr(redis_client_module, "get_redis", lambda: fake_redis)
+        monkeypatch.setattr(oauth_service_module, "oauth_service", FakeOAuthService())
+        monkeypatch.setattr(email_service_module, "email_service", FakeEmailService())
+
+        response = await async_client.get(
+            "/api/v1/auth/callback/google",
+            params={"code": "mock-code", "state": "test-state"},
+        )
+
+        assert response.status_code in [status.HTTP_307_TEMPORARY_REDIRECT, status.HTTP_302_FOUND]
+        assert "/oauth/callback#" in response.headers["location"]
+
+        user = (
+            test_db.query(User)
+            .filter(User.email == "oauth.user@example.com")
+            .first()
+        )
+        assert user is not None
+        assert user.full_name == "OAuth User"
+        assert user.role.value == "student"
+        assert user.is_active_account is True
+        assert user.is_verified is True
+        assert user.avatar_url == "https://example.com/avatar.png"
 
 
 # =============================================================================
