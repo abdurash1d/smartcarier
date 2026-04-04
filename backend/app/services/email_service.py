@@ -31,7 +31,12 @@ import asyncio
 import json
 
 # For async email
-import aiosmtplib
+try:
+    import aiosmtplib  # type: ignore
+except ModuleNotFoundError as exc:
+    if exc.name != "aiosmtplib":
+        raise
+    aiosmtplib = None
 
 # For templates
 from jinja2 import Environment, PackageLoader, select_autoescape, FileSystemLoader
@@ -133,6 +138,7 @@ class EmailService:
         # SendGrid
         self.sendgrid_api_key = settings.SENDGRID_API_KEY
         self.use_sendgrid = bool(self.sendgrid_api_key)
+        self.email_transport = settings.EMAIL_TRANSPORT.strip().lower()
         
         # Template engine
         template_dir = Path(__file__).parent.parent / "templates" / "email"
@@ -145,7 +151,12 @@ class EmailService:
             self.jinja_env = None
             logger.warning(f"Email templates directory not found: {template_dir}")
         
-        logger.info(f"EmailService initialized. SendGrid: {self.use_sendgrid}")
+        logger.info(
+            "EmailService initialized. transport=%s sendgrid=%s smtp=%s",
+            self.email_transport,
+            self.use_sendgrid,
+            bool(self.smtp_user and self.smtp_password),
+        )
     
     # =========================================================================
     # PUBLIC METHODS
@@ -173,6 +184,15 @@ class EmailService:
             True agar muvaffaqiyatli, False aks holda
         """
         try:
+            providers = self._get_delivery_providers()
+            if not providers:
+                logger.warning(
+                    "Email delivery disabled or not configured; skipping %s to %s***",
+                    email_type.value,
+                    to_email[:3],
+                )
+                return False
+
             # Get subject
             template_config = EMAIL_TEMPLATES.get(email_type, {})
             subject = template_config.get(
@@ -183,15 +203,22 @@ class EmailService:
             # Render HTML body
             html_body = self._render_template(email_type, context, language)
             
-            # Send via appropriate provider
-            if self.use_sendgrid:
-                success = await self._send_via_sendgrid(
-                    to_email, to_name, subject, html_body
-                )
-            else:
-                success = await self._send_via_smtp(
-                    to_email, to_name, subject, html_body
-                )
+            # Try providers in priority order.
+            success = False
+            for provider in providers:
+                if provider == "sendgrid":
+                    success = await self._send_via_sendgrid(
+                        to_email, to_name, subject, html_body
+                    )
+                elif provider == "smtp":
+                    success = await self._send_via_smtp(
+                        to_email, to_name, subject, html_body
+                    )
+                else:
+                    continue
+
+                if success:
+                    break
             
             # Log result
             if success:
@@ -366,7 +393,55 @@ class EmailService:
     # =========================================================================
     # PRIVATE METHODS
     # =========================================================================
-    
+
+    def _smtp_is_configured(self) -> bool:
+        """Determine whether SMTP credentials are present."""
+        return bool(self.smtp_user and self.smtp_password)
+
+    def _send_via_smtp_sync(self, message: MIMEMultipart) -> None:
+        """Blocking SMTP send used when aiosmtplib is unavailable."""
+        timeout = settings.EMAIL_SMTP_TIMEOUT_SECONDS
+        tls_context = ssl.create_default_context()
+
+        smtp_cls = smtplib.SMTP_SSL if self.smtp_port == 465 else smtplib.SMTP
+        with smtp_cls(self.smtp_host, self.smtp_port, timeout=timeout) as server:
+            if self.smtp_use_tls and smtp_cls is smtplib.SMTP:
+                server.starttls(context=tls_context)
+            if self._smtp_is_configured():
+                server.login(self.smtp_user, self.smtp_password)
+            server.send_message(message)
+
+    def _get_delivery_providers(self) -> List[str]:
+        """
+        Return delivery backends in priority order.
+
+        auto:
+            SendGrid first, then SMTP.
+        smtp:
+            SMTP only.
+        sendgrid:
+            SendGrid only.
+        disabled:
+            No delivery.
+        """
+        mode = (self.email_transport or "auto").strip().lower()
+
+        if mode == "disabled":
+            return []
+
+        if mode == "sendgrid":
+            return ["sendgrid"] if self.sendgrid_api_key else []
+
+        if mode == "smtp":
+            return ["smtp"] if self._smtp_is_configured() else []
+
+        providers: List[str] = []
+        if self.sendgrid_api_key:
+            providers.append("sendgrid")
+        if self._smtp_is_configured():
+            providers.append("smtp")
+        return providers
+
     def _render_template(
         self,
         email_type: EmailType,
@@ -677,15 +752,18 @@ class EmailService:
             html_part = MIMEText(html_body, "html")
             message.attach(html_part)
             
-            # Send async
-            await aiosmtplib.send(
-                message,
-                hostname=self.smtp_host,
-                port=self.smtp_port,
-                username=self.smtp_user,
-                password=self.smtp_password,
-                use_tls=self.smtp_use_tls,
-            )
+            # Send async when the optional dependency is installed.
+            if aiosmtplib is not None:
+                await aiosmtplib.send(
+                    message,
+                    hostname=self.smtp_host,
+                    port=self.smtp_port,
+                    username=self.smtp_user,
+                    password=self.smtp_password,
+                    use_tls=self.smtp_use_tls,
+                )
+            else:
+                await asyncio.to_thread(self._send_via_smtp_sync, message)
             
             return True
             

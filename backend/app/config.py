@@ -205,6 +205,16 @@ class Settings(BaseSettings):
     
     # SendGrid (optional - for production)
     SENDGRID_API_KEY: str = ""
+
+    # Email delivery mode.
+    # auto: use SendGrid if configured, otherwise SMTP if credentials exist, otherwise no-op.
+    # smtp: force SMTP transport.
+    # sendgrid: force SendGrid transport.
+    # disabled: skip outbound email delivery.
+    EMAIL_TRANSPORT: str = "auto"
+
+    # SMTP request timeout used by the fallback stdlib client.
+    EMAIL_SMTP_TIMEOUT_SECONDS: int = 30
     
     # Frontend URL (for email links)
     FRONTEND_URL: str = "http://localhost:3000"

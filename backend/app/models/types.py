@@ -10,9 +10,10 @@ This GUID type keeps one model definition that works in both.
 from __future__ import annotations
 
 import uuid
+from datetime import datetime, timezone
 
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
-from sqlalchemy.types import CHAR, TypeDecorator
+from sqlalchemy.types import CHAR, DateTime, TypeDecorator
 
 
 class GUID(TypeDecorator):
@@ -50,3 +51,29 @@ class GUID(TypeDecorator):
             return value
         return uuid.UUID(str(value))
 
+
+class UTCDateTime(TypeDecorator):
+    """
+    Cross-database timezone-aware datetime.
+
+    SQLite commonly strips timezone information even when DateTime(timezone=True)
+    is declared. This decorator normalizes values to UTC on the way in and makes
+    sure UTC tzinfo is restored on the way out.
+    """
+
+    impl = DateTime(timezone=True)
+    cache_ok = True
+
+    def process_bind_param(self, value, dialect):
+        if value is None:
+            return None
+        if value.tzinfo is None:
+            value = value.replace(tzinfo=timezone.utc)
+        return value.astimezone(timezone.utc)
+
+    def process_result_value(self, value, dialect):
+        if value is None:
+            return None
+        if value.tzinfo is None:
+            return value.replace(tzinfo=timezone.utc)
+        return value.astimezone(timezone.utc)
