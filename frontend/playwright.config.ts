@@ -41,33 +41,19 @@ export default defineConfig({
     video: 'retain-on-failure',
   },
 
-  /* Configure projects for major browsers */
-  projects: [
-    {
-      name: 'chromium',
-      use: { ...devices['Desktop Chrome'] },
-    },
-
-    {
-      name: 'firefox',
-      use: { ...devices['Desktop Firefox'] },
-    },
-
-    {
-      name: 'webkit',
-      use: { ...devices['Desktop Safari'] },
-    },
-
-    /* Test against mobile viewports. */
-    {
-      name: 'Mobile Chrome',
-      use: { ...devices['Pixel 5'] },
-    },
-    {
-      name: 'Mobile Safari',
-      use: { ...devices['iPhone 12'] },
-    },
-  ],
+  /* Configure projects (browsers) */
+  projects: process.env.CI
+    ? [
+        // Keep CI stable and fast. Run cross-browser suites locally or on a separate workflow.
+        { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
+      ]
+    : [
+        { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
+        { name: 'firefox', use: { ...devices['Desktop Firefox'] } },
+        { name: 'webkit', use: { ...devices['Desktop Safari'] } },
+        { name: 'Mobile Chrome', use: { ...devices['Pixel 5'] } },
+        { name: 'Mobile Safari', use: { ...devices['iPhone 12'] } },
+      ],
 
   /* Run your local dev server before starting the tests */
   webServer: {
