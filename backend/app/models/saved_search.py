@@ -12,6 +12,7 @@ from datetime import datetime, timezone
 import uuid
 
 from app.models.base import Base
+from app.models.types import GUID
 
 
 class SavedSearch(Base):
@@ -19,18 +20,18 @@ class SavedSearch(Base):
     
     __tablename__ = "saved_searches"
     
-    # Primary key - Using String(36) for UUID compatibility with both PostgreSQL and SQLite
+    # Primary key - GUID maps to PostgreSQL UUID, SQLite CHAR(36)
     id = Column(
-        String(36),
+        GUID(),
         primary_key=True,
-        default=lambda: str(uuid.uuid4()),
+        default=uuid.uuid4,
         unique=True,
         nullable=False
     )
     
     # Foreign keys
     user_id = Column(
-        String(36),
+        GUID(),
         ForeignKey("users.id", ondelete="CASCADE"),
         nullable=False,
         index=True
