@@ -21,7 +21,9 @@ HOW IT WORKS:
 """
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from pydantic import ValidationInfo, field_validator
+import os
+
+from pydantic import ValidationInfo, field_validator, model_validator
 from functools import lru_cache
 from typing import Any, List
 
@@ -294,6 +296,7 @@ class Settings(BaseSettings):
     @field_validator(
         "DEBUG",
         "REDIS_ENABLED",
+        "RATE_LIMIT_ENABLED",
         "RATE_LIMIT_USE_REDIS",
         "TOKEN_BLACKLIST_USE_REDIS",
         "SMTP_USE_TLS",
@@ -306,6 +309,19 @@ class Settings(BaseSettings):
         """Normalize loose env values before Pydantic's bool parsing runs."""
         default = bool(cls.model_fields[info.field_name].default)
         return _normalize_bool_value(value, field_name=info.field_name, default=default)
+
+    @model_validator(mode="after")
+    def _apply_dev_defaults(self) -> "Settings":
+        """
+        Apply safe developer defaults unless explicitly overridden.
+
+        We disable rate limiting by default in DEBUG to avoid local lockouts when
+        QA/testing repeatedly hits auth endpoints. Production environments should
+        set RATE_LIMIT_ENABLED=true explicitly.
+        """
+        if self.DEBUG and "RATE_LIMIT_ENABLED" not in os.environ:
+            self.RATE_LIMIT_ENABLED = False
+        return self
 
 
 @lru_cache()
