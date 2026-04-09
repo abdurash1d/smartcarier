@@ -112,7 +112,7 @@ export default function StudentDashboardLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const pathname = usePathname();
+  const pathname = usePathname()!;
   const { t } = useTranslation();
   const { isAuthorized } = useRequireAuth("student");
   const { user, logout } = useAuth();

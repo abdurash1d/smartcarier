@@ -301,10 +301,20 @@ async def get_system_health(
     }
     
     # Check email service
+    email_mode = getattr(settings, "EMAIL_TRANSPORT", "auto").strip().lower()
+    smtp_configured = bool(settings.SMTP_USER and settings.SMTP_PASSWORD)
+    sendgrid_configured = bool(settings.SENDGRID_API_KEY)
+    email_configured = (
+        email_mode == "disabled"
+        or email_mode == "auto" and (smtp_configured or sendgrid_configured)
+        or email_mode == "smtp" and smtp_configured
+        or email_mode == "sendgrid" and sendgrid_configured
+    )
     components["email_service"] = {
-        "status": "healthy" if settings.SMTP_USER or settings.SENDGRID_API_KEY else "warning",
-        "smtp_configured": bool(settings.SMTP_USER),
-        "sendgrid_configured": bool(settings.SENDGRID_API_KEY),
+        "status": "healthy" if email_configured else "warning",
+        "transport_mode": email_mode,
+        "smtp_configured": smtp_configured,
+        "sendgrid_configured": sendgrid_configured,
     }
     
     # Error stats (last hour)

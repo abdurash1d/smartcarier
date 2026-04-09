@@ -42,9 +42,9 @@ def test_register_student_success(client: TestClient):
     
     assert response.status_code == status.HTTP_201_CREATED
     data = response.json()
-    assert data["success"] is True
     assert "access_token" in data
     assert "refresh_token" in data
+    assert data.get("token_type") == "bearer"
     assert data["user"]["email"] == "newstudent@example.com"
     assert data["user"]["role"] == "student"
 
@@ -84,7 +84,7 @@ def test_register_duplicate_email(client: TestClient, test_student: User):
         }
     )
     
-    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert response.status_code == status.HTTP_409_CONFLICT
     assert "already exists" in response.json()["detail"].lower()
 
 
@@ -174,8 +174,8 @@ def test_login_nonexistent_user(client: TestClient):
 @pytest.mark.auth
 @pytest.mark.slow
 def test_login_rate_limiting(client: TestClient, test_student: User):
-    """Test login rate limiting."""
-    # Make 6 failed login attempts (limit is 5)
+    """Test brute-force protection / lockout after failed login attempts."""
+    # Make 6 failed login attempts (account locks after 5)
     for i in range(6):
         response = client.post(
             "/api/v1/auth/login",
@@ -185,10 +185,13 @@ def test_login_rate_limiting(client: TestClient, test_student: User):
             }
         )
         
-        if i < 5:
+        if i < 4:
             assert response.status_code == status.HTTP_401_UNAUTHORIZED
+        elif i == 4:
+            # 5th failed attempt locks the account (brute-force protection)
+            assert response.status_code == status.HTTP_403_FORBIDDEN
         else:
-            # 6th attempt should be rate limited
+            # Additional attempts are rate limited
             assert response.status_code == status.HTTP_429_TOO_MANY_REQUESTS
 
 

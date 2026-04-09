@@ -406,7 +406,11 @@ class TestCoverLetterGeneration:
     async def test_generate_cover_letter_success(self, ai_service):
         """Test successful cover letter generation."""
         with patch.object(ai_service, '_call_openai_api') as mock_api:
-            mock_api.return_value = "Dear Hiring Manager,\n\nI am excited to apply..."
+            mock_api.return_value = (
+                "Dear Hiring Manager,\n\n"
+                "I am excited to apply for this role. With strong experience in Python and backend systems, "
+                "I can contribute immediately.\n\nSincerely,\nJohn Doe"
+            )
             
             result = await ai_service.generate_cover_letter(
                 job_title="Software Engineer",

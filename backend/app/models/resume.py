@@ -118,7 +118,7 @@ from typing import Optional, List, Dict, Any, TYPE_CHECKING
 from sqlalchemy import (
     Column, String, Boolean, Integer, Text, ForeignKey, Index
 )
-from sqlalchemy.dialects.postgresql import UUID
+from app.models.types import GUID
 from sqlalchemy import JSON
 from sqlalchemy.orm import relationship, validates
 
@@ -221,7 +221,7 @@ class Resume(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin):
     
     # Foreign key to user
     user_id = Column(
-        UUID(as_uuid=True),
+        GUID(),
         ForeignKey('users.id', ondelete='CASCADE'),
         nullable=False,
         index=True,

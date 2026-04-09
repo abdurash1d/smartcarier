@@ -21,7 +21,10 @@ HOW IT WORKS:
 """
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from pydantic import ValidationInfo, field_validator
+import os
+from pathlib import Path
+
+from pydantic import AliasChoices, Field, ValidationInfo, field_validator, model_validator
 from functools import lru_cache
 from typing import Any, List
 
@@ -30,6 +33,8 @@ _BOOL_TRUE_VALUES = {"1", "true", "t", "yes", "y", "on", "enabled", "enable"}
 _BOOL_FALSE_VALUES = {"0", "false", "f", "no", "n", "off", "disabled", "disable"}
 _DEBUG_TRUE_VALUES = {"dev", "development", "debug", "local"}
 _DEBUG_FALSE_VALUES = {"prod", "production", "release", "live"}
+BACKEND_ROOT = Path(__file__).resolve().parents[1]
+ENV_FILE = BACKEND_ROOT / ".env"
 
 
 def _normalize_bool_value(value: Any, *, field_name: str, default: bool) -> bool:
@@ -131,6 +136,10 @@ class Settings(BaseSettings):
     REDIS_ENABLED: bool = False
     REDIS_URL: str = "redis://localhost:6379/0"
 
+    # Master toggle for API rate limiting.
+    # CI and E2E runs disable this to avoid flaky test lockouts.
+    RATE_LIMIT_ENABLED: bool = True
+
     # If True and Redis is available, use Redis for rate limiting
     RATE_LIMIT_USE_REDIS: bool = True
 
@@ -171,7 +180,10 @@ class Settings(BaseSettings):
     # Debug mode
     # True: Shows detailed errors, enables /docs endpoint
     # False: Hides errors, disables /docs (use in production)
-    DEBUG: bool = True
+    DEBUG: bool = Field(
+        default=True,
+        validation_alias=AliasChoices("SMARTCAREER_DEBUG", "DEBUG"),
+    )
     
     # =========================================================================
     # 📁 FILE UPLOAD SETTINGS
@@ -201,6 +213,16 @@ class Settings(BaseSettings):
     
     # SendGrid (optional - for production)
     SENDGRID_API_KEY: str = ""
+
+    # Email delivery mode.
+    # auto: use SendGrid if configured, otherwise SMTP if credentials exist, otherwise no-op.
+    # smtp: force SMTP transport.
+    # sendgrid: force SendGrid transport.
+    # disabled: skip outbound email delivery.
+    EMAIL_TRANSPORT: str = "auto"
+
+    # SMTP request timeout used by the fallback stdlib client.
+    EMAIL_SMTP_TIMEOUT_SECONDS: int = 30
     
     # Frontend URL (for email links)
     FRONTEND_URL: str = "http://localhost:3000"
@@ -271,7 +293,7 @@ class Settings(BaseSettings):
     # =========================================================================
     
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=str(ENV_FILE),
         env_file_encoding="utf-8",
         case_sensitive=True,
         extra="ignore",
@@ -280,6 +302,7 @@ class Settings(BaseSettings):
     @field_validator(
         "DEBUG",
         "REDIS_ENABLED",
+        "RATE_LIMIT_ENABLED",
         "RATE_LIMIT_USE_REDIS",
         "TOKEN_BLACKLIST_USE_REDIS",
         "SMTP_USE_TLS",
@@ -292,6 +315,19 @@ class Settings(BaseSettings):
         """Normalize loose env values before Pydantic's bool parsing runs."""
         default = bool(cls.model_fields[info.field_name].default)
         return _normalize_bool_value(value, field_name=info.field_name, default=default)
+
+    @model_validator(mode="after")
+    def _apply_dev_defaults(self) -> "Settings":
+        """
+        Apply safe developer defaults unless explicitly overridden.
+
+        We disable rate limiting by default in DEBUG to avoid local lockouts when
+        QA/testing repeatedly hits auth endpoints. Production environments should
+        set RATE_LIMIT_ENABLED=true explicitly.
+        """
+        if self.DEBUG and "RATE_LIMIT_ENABLED" not in os.environ:
+            self.RATE_LIMIT_ENABLED = False
+        return self
 
 
 @lru_cache()

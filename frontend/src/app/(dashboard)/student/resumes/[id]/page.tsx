@@ -46,7 +46,7 @@ const statusConfig = {
 export default function ResumeDetailPage() {
   const router = useRouter();
   const params = useParams();
-  const resumeId = params.id as string;
+  const resumeId = params!.id as string;
 
   const [resume, setResume] = useState<Resume | null>(null);
   const [isLoading, setIsLoading] = useState(true);

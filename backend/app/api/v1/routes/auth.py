@@ -822,7 +822,7 @@ async def google_oauth_callback(
                 email=email.lower(),
                 full_name=user_info.get("name", "User"),
                 role=UserRole.STUDENT,  # Default role
-                is_active=True,
+                is_active_account=True,
                 is_verified=True,  # Email verified by Google
                 avatar_url=user_info.get("picture"),
             )
@@ -968,7 +968,7 @@ async def linkedin_oauth_callback(
                 email=email.lower(),
                 full_name=user_info.get("name", "User"),
                 role=UserRole.STUDENT,  # Default role
-                is_active=True,
+                is_active_account=True,
                 is_verified=True,  # Email verified by LinkedIn
                 avatar_url=user_info.get("picture"),
             )
@@ -1018,7 +1018,6 @@ async def linkedin_oauth_callback(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="OAuth authentication failed"
         )
-
 
 
 

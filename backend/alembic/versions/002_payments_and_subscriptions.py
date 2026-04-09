@@ -19,6 +19,7 @@ def upgrade() -> None:
     # Detect database type
     bind = op.get_bind()
     is_sqlite = bind.dialect.name == 'sqlite'
+    is_postgres = bind.dialect.name == "postgresql"
     
     # UUID type: PostgreSQL uses native UUID, SQLite uses String(36)
     uuid_type = sa.String(36) if is_sqlite else postgresql.UUID(as_uuid=True)
@@ -61,6 +62,15 @@ def upgrade() -> None:
     op.create_index("idx_payments_status", "payments", ["status"])
     op.create_index("idx_payments_provider_payment_id", "payments", ["provider_payment_id"])
 
+    # -------------------------------------------------------------------------
+    # Alembic version table: widen version_num for descriptive revision IDs.
+    #
+    # SQLite doesn't enforce VARCHAR length, but Postgres does (default is 32).
+    # Our revision IDs are human-readable and can exceed 32 chars.
+    # -------------------------------------------------------------------------
+    if is_postgres:
+        op.execute("ALTER TABLE alembic_version ALTER COLUMN version_num TYPE VARCHAR(255)")
+
 
 def downgrade() -> None:
     op.drop_index("idx_payments_provider_payment_id", table_name="payments")
@@ -72,5 +82,4 @@ def downgrade() -> None:
     op.drop_column("users", "stripe_customer_id")
     op.drop_column("users", "subscription_expires_at")
     op.drop_column("users", "subscription_tier")
-
 

@@ -446,14 +446,20 @@ class TestDownloadPDF:
     async def test_download_pdf_success(
         self, async_client: AsyncClient, auth_headers, test_resume
     ):
-        """Test successful PDF download."""
+        """Test successful PDF download (URL generation + streaming endpoint)."""
         response = await async_client.post(
             f"/api/v1/resumes/{test_resume.id}/download",
             headers=auth_headers
         )
         
         assert response.status_code == status.HTTP_200_OK
-        assert response.headers.get("content-type") == "application/pdf"
+        payload = response.json()
+        assert payload.get("success") is True
+        assert payload.get("pdf_url")
+
+        pdf_response = await async_client.get(payload["pdf_url"], headers=auth_headers)
+        assert pdf_response.status_code == status.HTTP_200_OK
+        assert pdf_response.headers.get("content-type") == "application/pdf"
 
     @pytest.mark.asyncio
     async def test_download_pdf_valid_format(
@@ -466,9 +472,12 @@ class TestDownloadPDF:
         )
         
         assert response.status_code == status.HTTP_200_OK
+        payload = response.json()
+        pdf_response = await async_client.get(payload["pdf_url"], headers=auth_headers)
+        assert pdf_response.status_code == status.HTTP_200_OK
         
         # Check PDF magic bytes
-        content = response.content
+        content = pdf_response.content
         assert content.startswith(b'%PDF') or len(content) > 0
 
     @pytest.mark.asyncio

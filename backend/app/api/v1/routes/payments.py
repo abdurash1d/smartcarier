@@ -183,6 +183,9 @@ async def create_payment_intent(
             subscription_months=request_data.subscription_months,
         )
         
+    except HTTPException:
+        # Preserve intended HTTP errors (e.g. invalid tier/config)
+        raise
     except ValueError as e:
         logger.error(f"Payment intent creation failed: {e}")
         raise HTTPException(
@@ -231,6 +234,9 @@ async def stripe_webhook(
         
         return {"success": True, "result": result}
         
+    except HTTPException:
+        # Let FastAPI handle intentional HTTP errors (do not wrap into 500)
+        raise
     except ValueError as e:
         logger.error(f"Webhook validation failed: {e}")
         raise HTTPException(
@@ -305,8 +311,6 @@ async def get_pricing():
         success=True,
         pricing={k.value if hasattr(k, "value") else str(k): v for k, v in SUBSCRIPTION_PRICING.items()}
     )
-
-
 
 
 

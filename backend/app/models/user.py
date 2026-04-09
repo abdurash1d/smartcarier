@@ -71,6 +71,7 @@ from sqlalchemy.orm import relationship, validates
 
 # Local imports
 from app.models.base import Base, UUIDMixin, TimestampMixin, SoftDeleteMixin, utc_now
+from app.models.types import UTCDateTime
 
 # Type checking imports (avoid circular imports at runtime)
 if TYPE_CHECKING:
@@ -314,7 +315,7 @@ class User(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin):
     )
 
     subscription_expires_at = Column(
-        DateTime(timezone=True),
+        UTCDateTime(),
         nullable=True,
         comment="When premium access expires"
     )

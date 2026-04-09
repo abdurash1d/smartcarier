@@ -14,6 +14,7 @@ def test_settings_normalize_loose_bool_env_values(monkeypatch):
     monkeypatch.setenv("DEBUG", "release")
     monkeypatch.setenv("REDIS_ENABLED", "yes")
     monkeypatch.setenv("SMTP_USE_TLS", "0")
+    monkeypatch.setenv("EMAIL_TRANSPORT", "disabled")
 
     import app.config as config
 
@@ -22,4 +23,4 @@ def test_settings_normalize_loose_bool_env_values(monkeypatch):
     assert config.settings.DEBUG is False
     assert config.settings.REDIS_ENABLED is True
     assert config.settings.SMTP_USE_TLS is False
-
+    assert config.settings.EMAIL_TRANSPORT == "disabled"

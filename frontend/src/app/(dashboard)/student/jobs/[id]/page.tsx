@@ -59,7 +59,7 @@ const jobTypeColors: Record<string, string> = {
 export default function JobDetailPage() {
   const router = useRouter();
   const params = useParams();
-  const jobId = params.id as string;
+  const jobId = params!.id as string;
 
   const [job, setJob] = useState<Job | null>(null);
   const [isLoading, setIsLoading] = useState(true);

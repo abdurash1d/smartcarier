@@ -3,7 +3,7 @@
  * AUTH LAYOUT
  * =============================================================================
  *
- * Shared layout for authentication pages (login, register, forgot-password)
+ * Shared layout for authentication pages (login, register, forgot-password, reset-password)
  * Features split-screen design with animated background
  */
 

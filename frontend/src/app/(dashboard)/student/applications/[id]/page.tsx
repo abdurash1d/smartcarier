@@ -86,7 +86,7 @@ function formatInterviewTypeLabel(interviewType?: string) {
 export default function ApplicationDetailPage() {
   const router = useRouter();
   const params = useParams();
-  const appId = params.id as string;
+  const appId = params!.id as string;
 
   const [application, setApplication] = useState<Application | null>(null);
   const [isLoading, setIsLoading] = useState(true);

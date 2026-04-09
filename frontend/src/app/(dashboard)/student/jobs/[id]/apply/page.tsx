@@ -852,7 +852,7 @@ function SuccessScreen({ job, onViewApplications }: { job: Job; onViewApplicatio
 export default function ApplyPage() {
   const router = useRouter();
   const params = useParams();
-  const jobId = params.id as string;
+  const jobId = params!.id as string;
 
   const { fetchJob, currentJob, isLoading: jobLoading } = useJobs();
   const { resumes, fetchResumes, isLoading: resumesLoading } = useResume();
