@@ -354,46 +354,38 @@ export default function AIResumeBuilderPage() {
   // Generate Resume using AI API
   const handleGenerate = async () => {
     try {
-      const payload = {
-        personal_info: {
-          full_name: formData.fullName,
+      type GenerateResumePayload = Parameters<typeof generateResume>[0];
+
+      const payload: GenerateResumePayload = {
+        user_data: {
+          name: formData.fullName,
           email: formData.email,
           phone: formData.phone,
-          location: formData.location,
+          location: formData.location || undefined,
           professional_title: formData.professionalTitle,
-          linkedin_url: formData.linkedinUrl,
-          portfolio_url: formData.portfolioUrl,
+          linkedin_url: formData.linkedinUrl || undefined,
+          portfolio_url: formData.portfolioUrl || undefined,
+          skills: [...formData.technicalSkills, ...formData.softSkills].filter(Boolean),
+          experience: formData.experiences.map((exp) => ({
+            company: exp.company,
+            position: exp.position,
+            duration: exp.isCurrent
+              ? `${exp.startDate} - Present`
+              : `${exp.startDate}${exp.endDate ? ` - ${exp.endDate}` : ""}`,
+            description: exp.description,
+          })),
+          education: formData.education.map((edu) => ({
+            institution: edu.institution,
+            degree: edu.degree,
+            field: edu.field,
+            year: edu.year,
+          })),
         },
-        experience: formData.experiences.map((exp) => ({
-          company: exp.company,
-          position: exp.position,
-          start_date: exp.startDate,
-          end_date: exp.isCurrent ? null : exp.endDate,
-          is_current: exp.isCurrent,
-          description: exp.description,
-        })),
-        education: formData.education.map((edu) => ({
-          institution: edu.institution,
-          degree: edu.degree,
-          field: edu.field,
-          year: edu.year,
-        })),
-        skills: {
-          technical: formData.technicalSkills,
-          soft: formData.softSkills,
-        },
-        languages: formData.languages.map((l) => ({
-          name: l.name,
-          proficiency: l.proficiency,
-        })),
-        certifications: formData.certifications,
-        projects: formData.projects,
-        template: selectedTemplate,
-        tone: selectedTone,
-        title: `${formData.professionalTitle} Resume`,
+        template: selectedTemplate as GenerateResumePayload["template"],
+        tone: selectedTone as GenerateResumePayload["tone"],
       };
 
-      const result = await generateResume(payload as any);
+      const result = await generateResume(payload);
       if (result) {
         setIsGenerated(true);
         localStorage.removeItem("resume_draft");

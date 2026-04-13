@@ -17,6 +17,21 @@ from fastapi.testclient import TestClient
 from app.models import User
 
 
+def _error_message(payload: dict) -> str:
+    """Extract a user-facing error message from legacy and envelope formats."""
+    detail = payload.get("detail")
+    if isinstance(detail, str):
+        return detail
+    if isinstance(detail, dict):
+        return str(detail.get("message") or detail.get("error") or detail)
+
+    error = payload.get("error")
+    if isinstance(error, dict):
+        return str(error.get("message") or error.get("code") or "")
+
+    return ""
+
+
 # =============================================================================
 # USER PROFILE TESTS
 # =============================================================================
@@ -96,7 +111,7 @@ def test_change_password_wrong_current(client: TestClient, student_headers: dict
     )
     
     assert response.status_code == status.HTTP_400_BAD_REQUEST
-    assert "incorrect" in response.json()["detail"].lower()
+    assert "incorrect" in _error_message(response.json()).lower()
 
 
 @pytest.mark.unit

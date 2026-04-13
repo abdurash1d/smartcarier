@@ -22,6 +22,21 @@ from fastapi.testclient import TestClient
 from app.models import User
 
 
+def _error_message(payload: dict) -> str:
+    """Extract a user-facing error message from legacy and envelope formats."""
+    detail = payload.get("detail")
+    if isinstance(detail, str):
+        return detail
+    if isinstance(detail, dict):
+        return str(detail.get("message") or detail.get("error") or detail)
+
+    error = payload.get("error")
+    if isinstance(error, dict):
+        return str(error.get("message") or error.get("code") or "")
+
+    return ""
+
+
 # =============================================================================
 # REGISTRATION TESTS
 # =============================================================================
@@ -85,7 +100,7 @@ def test_register_duplicate_email(client: TestClient, test_student: User):
     )
     
     assert response.status_code == status.HTTP_409_CONFLICT
-    assert "already exists" in response.json()["detail"].lower()
+    assert "already exists" in _error_message(response.json()).lower()
 
 
 @pytest.mark.auth
@@ -154,7 +169,7 @@ def test_login_invalid_password(client: TestClient, test_student: User):
     )
     
     assert response.status_code == status.HTTP_401_UNAUTHORIZED
-    assert "invalid" in response.json()["detail"].lower()
+    assert "invalid" in _error_message(response.json()).lower()
 
 
 @pytest.mark.auth

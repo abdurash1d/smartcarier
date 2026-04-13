@@ -357,9 +357,10 @@ export const aiApi = {
     api.post("/ai/generate-resume", data),
   
   generateCoverLetter: (data: {
-    job_title: string;
+    resume_text: string;
+    job_description: string;
     company_name: string;
-    resume_id: string;
+    hiring_manager?: string;
     tone?: string;
   }) => api.post("/ai/generate-cover-letter", data),
   

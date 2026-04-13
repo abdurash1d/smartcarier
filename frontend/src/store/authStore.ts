@@ -33,6 +33,95 @@ async function parseApiError(res: Response): Promise<string> {
   }
 }
 
+type UnknownRecord = Record<string, unknown>;
+
+function isRecord(value: unknown): value is UnknownRecord {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function isUserLike(value: unknown): value is User {
+  if (!isRecord(value)) {
+    return false;
+  }
+
+  const hasEmail = typeof value.email === "string";
+  const hasIdentity =
+    typeof value.full_name === "string" ||
+    typeof value.role === "string" ||
+    typeof value.id === "string";
+
+  return hasEmail && hasIdentity;
+}
+
+function unwrapPayload(payload: unknown): UnknownRecord {
+  if (!isRecord(payload)) {
+    return {};
+  }
+
+  const nested = isRecord(payload.data) ? payload.data : null;
+  return nested ?? payload;
+}
+
+function extractUser(payload: unknown): User | null {
+  const root = unwrapPayload(payload);
+  const nestedUser = isUserLike(root.user) ? root.user : null;
+  if (nestedUser) {
+    return nestedUser;
+  }
+
+  if (isUserLike(payload)) {
+    return payload;
+  }
+
+  if (isRecord(payload) && isUserLike(payload.user)) {
+    return payload.user;
+  }
+
+  return null;
+}
+
+function extractTokens(payload: unknown): { accessToken: string | null; refreshToken: string | null } {
+  const root = unwrapPayload(payload);
+  const nestedTokens = isRecord(root.tokens) ? root.tokens : null;
+
+  const accessToken =
+    (typeof root.access_token === "string" ? root.access_token : null) ??
+    (typeof nestedTokens?.access_token === "string" ? nestedTokens.access_token : null);
+  const refreshToken =
+    (typeof root.refresh_token === "string" ? root.refresh_token : null) ??
+    (typeof nestedTokens?.refresh_token === "string" ? nestedTokens.refresh_token : null);
+
+  return { accessToken, refreshToken };
+}
+
+function applyAuthResponse(
+  set: (updater: (state: AuthState) => void) => void,
+  payload: unknown,
+  options?: { requireTokens?: boolean }
+) {
+  const user = extractUser(payload);
+  const { accessToken, refreshToken } = extractTokens(payload);
+  const requireTokens = options?.requireTokens ?? true;
+
+  if (requireTokens && (!accessToken || !refreshToken)) {
+    throw new Error("Authentication response is missing access or refresh token");
+  }
+
+  set((state) => {
+    state.user = user;
+    state.accessToken = accessToken;
+    state.refreshToken = refreshToken;
+    state.isAuthenticated = !!user || (!!accessToken && !!refreshToken);
+    state.isLoading = false;
+  });
+
+  return { user, accessToken, refreshToken };
+}
+
+function extractMeUser(payload: unknown): User | null {
+  return extractUser(payload);
+}
+
 // =============================================================================
 // TYPES
 // =============================================================================
@@ -126,14 +215,7 @@ export const useAuthStore = create<AuthState>()(
           }
 
           const data = await res.json();
-
-          set((state) => {
-            state.user = data.user;
-            state.accessToken = data.access_token;
-            state.refreshToken = data.refresh_token;
-            state.isAuthenticated = true;
-            state.isLoading = false;
-          });
+          applyAuthResponse(set, data);
         } catch (error: any) {
           set((state) => {
             state.isLoading = false;
@@ -163,14 +245,7 @@ export const useAuthStore = create<AuthState>()(
           }
 
           const resp = await res.json();
-
-          set((state) => {
-            state.user = resp.user;
-            state.accessToken = resp.access_token;
-            state.refreshToken = resp.refresh_token;
-            state.isAuthenticated = true;
-            state.isLoading = false;
-          });
+          applyAuthResponse(set, resp);
         } catch (error: any) {
           set((state) => {
             state.isLoading = false;
@@ -233,15 +308,9 @@ export const useAuthStore = create<AuthState>()(
           }
 
           const data = await res.json();
+          const { accessToken } = applyAuthResponse(set, data);
 
-          set((state) => {
-            state.user = data.user;
-            state.accessToken = data.access_token;
-            state.refreshToken = data.refresh_token;
-            state.isAuthenticated = true;
-          });
-
-          return data.access_token as string;
+          return accessToken;
         } catch (error) {
           // If refresh fails, logout
           await get().logout();
@@ -275,9 +344,7 @@ export const useAuthStore = create<AuthState>()(
           }
 
           const updated = await res.json();
-
-          // Backend may return {success, user} or raw user; handle both
-          const user = updated.user ?? updated;
+          const user = extractMeUser(updated) ?? extractUser(updated) ?? updated;
 
           set((state) => {
             state.user = user;

@@ -32,13 +32,15 @@ VERSION: 1.0.0
 
 import logging
 from contextlib import asynccontextmanager
-from typing import Any, Dict
 from datetime import datetime
+from typing import Any, Dict
+from uuid import uuid4
 
-from fastapi import FastAPI, Request, status, Depends
+from fastapi import Depends, FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
+from starlette.exceptions import HTTPException as StarletteHTTPException
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy import text
 from sqlalchemy.orm import Session
@@ -46,7 +48,19 @@ from sqlalchemy.orm import Session
 # Local imports
 from app.config import settings, print_config_summary
 from app.api.v1 import api_router
-from app.database import check_database_connection, get_db, create_tables
+from app.database import check_database_connection, get_db
+
+# =============================================================================
+# LOGGING CONFIGURATION
+# =============================================================================
+
+logging.basicConfig(
+    level=logging.DEBUG if settings.DEBUG else logging.INFO,
+    format="%(asctime)s | %(levelname)-8s | %(name)s | %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S"
+)
+
+logger = logging.getLogger(__name__)
 
 # =============================================================================
 # SENTRY INTEGRATION (Error Monitoring)
@@ -78,17 +92,68 @@ if settings.SENTRY_DSN and not settings.DEBUG:
     except Exception as e:
         logger.warning(f"Failed to initialize Sentry: {e}")
 
+
 # =============================================================================
-# LOGGING CONFIGURATION
+# ERROR RESPONSE HELPERS
 # =============================================================================
 
-logging.basicConfig(
-    level=logging.DEBUG if settings.DEBUG else logging.INFO,
-    format="%(asctime)s | %(levelname)-8s | %(name)s | %(message)s",
-    datefmt="%Y-%m-%d %H:%M:%S"
-)
+def _utc_timestamp() -> str:
+    return datetime.utcnow().isoformat() + "Z"
 
-logger = logging.getLogger(__name__)
+
+def _get_request_id(request: Request) -> str:
+    request_id = getattr(request.state, "request_id", None)
+    if request_id:
+        return str(request_id)
+    incoming = (request.headers.get("X-Request-ID") or "").strip()
+    if incoming and len(incoming) <= 128:
+        return incoming
+    return str(uuid4())
+
+
+def _error_envelope(
+    *,
+    request: Request,
+    code: str,
+    message: str,
+    details: Any = None,
+) -> Dict[str, Any]:
+    return {
+        "success": False,
+        "error": {
+            "code": code,
+            "message": message,
+            "details": details,
+        },
+        "request_id": _get_request_id(request),
+        "timestamp": _utc_timestamp(),
+    }
+
+
+def _http_error_details(detail: Any) -> tuple[str, str, Any]:
+    code = "HTTP_ERROR"
+    message = "Request failed"
+    details = None
+
+    if isinstance(detail, dict):
+        code = str(detail.get("code") or detail.get("error") or code)
+        message = str(detail.get("message") or detail.get("detail") or detail.get("error") or message)
+        if "details" in detail:
+            details = detail.get("details")
+        else:
+            remaining = {
+                key: value
+                for key, value in detail.items()
+                if key not in {"code", "error", "message", "detail", "details"}
+            }
+            details = remaining or None
+    elif isinstance(detail, list):
+        details = detail
+        message = "Request failed"
+    elif detail is not None:
+        message = str(detail)
+
+    return code, message, details
 
 
 # =============================================================================
@@ -127,14 +192,6 @@ async def lifespan(app: FastAPI):
     else:
         logger.error("❌ Database connection failed!")
 
-    # In debug/dev mode, ensure tables exist (CI E2E uses a fresh Postgres instance).
-    # Production environments should use Alembic migrations instead.
-    if settings.DEBUG:
-        try:
-            create_tables()
-        except Exception as e:
-            logger.warning(f"Auto-create tables failed: {e}")
-    
     # Log API info
     logger.info(f"📚 API Documentation: http://localhost:8000/docs")
     logger.info(f"🔧 Debug Mode: {settings.DEBUG}")
@@ -211,24 +268,31 @@ def create_application() -> FastAPI:
     from fastapi.middleware.gzip import GZipMiddleware
     application.add_middleware(GZipMiddleware, minimum_size=1000)  # Compress responses > 1KB
     logger.info("GZip compression enabled (minimum_size=1KB)")
-    
+
     # =========================================================================
-    # SECURITY HEADERS MIDDLEWARE (Production)
+    # REQUEST ID + SECURITY HEADERS MIDDLEWARE (Production)
     # =========================================================================
     
     @application.middleware("http")
-    async def add_security_headers(request: Request, call_next):
+    async def add_request_id_and_security_headers(request: Request, call_next):
         """
-        Add security headers to all responses in production.
-        
+        Add a correlation id to every request and security headers to responses.
+
         Headers:
+        - X-Request-ID: Correlation id for logs and client debugging
         - X-Content-Type-Options: Prevent MIME type sniffing
         - X-Frame-Options: Prevent clickjacking
         - X-XSS-Protection: Enable XSS filter
         - Strict-Transport-Security: Force HTTPS
         - Referrer-Policy: Control referrer information
         """
+        incoming_request_id = (request.headers.get("X-Request-ID") or "").strip()
+        if not incoming_request_id or len(incoming_request_id) > 128:
+            incoming_request_id = str(uuid4())
+        request.state.request_id = incoming_request_id
+
         response = await call_next(request)
+        response.headers["X-Request-ID"] = incoming_request_id
         
         if not settings.DEBUG:
             response.headers["X-Content-Type-Options"] = "nosniff"
@@ -276,18 +340,51 @@ async def validation_exception_handler(
     """
     errors = []
     for error in exc.errors():
-        field = ".".join(str(loc) for loc in error["loc"][1:])  # Skip "body"
-        message = error["msg"]
-        errors.append({"field": field, "message": message})
-    
-    logger.warning(f"Validation error: {errors}")
-    
+        loc = error.get("loc", ())
+        if loc and loc[0] in {"body", "query", "path", "header"}:
+            field = ".".join(str(part) for part in loc[1:])
+        else:
+            field = ".".join(str(part) for part in loc)
+        errors.append({
+            "field": field,
+            "message": error.get("msg", "Invalid value"),
+            "type": error.get("type", "validation_error"),
+        })
+
+    request_id = _get_request_id(request)
+    logger.warning("[%s] Validation error: %s", request_id, errors)
+
     return JSONResponse(
         status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-        content={
-            "detail": "Validation error",
-            "errors": errors
-        }
+        content=_error_envelope(
+            request=request,
+            code="VALIDATION_ERROR",
+            message="Request validation failed",
+            details=errors,
+        ),
+    )
+
+
+@app.exception_handler(StarletteHTTPException)
+async def http_exception_handler(
+    request: Request,
+    exc: StarletteHTTPException
+) -> JSONResponse:
+    """
+    Normalize FastAPI HTTPException responses into the global error envelope.
+    """
+    code, message, details = _http_error_details(exc.detail)
+    request_id = _get_request_id(request)
+    logger.warning("[%s] HTTP %s error: %s", request_id, exc.status_code, message)
+
+    return JSONResponse(
+        status_code=exc.status_code,
+        content=_error_envelope(
+            request=request,
+            code=code or f"HTTP_{exc.status_code}",
+            message=message or "Request failed",
+            details=details,
+        ),
     )
 
 
@@ -301,27 +398,31 @@ async def sqlalchemy_exception_handler(
     
     Logs the actual error but returns generic message to user.
     """
-    logger.exception(f"Database error: {exc}")
+    request_id = _get_request_id(request)
+    logger.exception("[%s] Database error", request_id)
     
     # Log to error service
     try:
-        from app.services.error_logging_service import error_logger, ErrorCategory, ErrorSeverity
+        from app.services.error_logging_service import error_logger
         await error_logger.log_database_error(
             error=exc,
             operation="query",
             extra_data={
                 "endpoint": request.url.path,
                 "method": request.method,
+                "request_id": request_id,
             }
         )
     except Exception as log_error:
-        logger.error(f"Failed to log error: {log_error}")
+        logger.error("[%s] Failed to log database error: %s", request_id, log_error)
     
     return JSONResponse(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-        content={
-            "detail": "A database error occurred. Please try again later."
-        }
+        content=_error_envelope(
+            request=request,
+            code="DATABASE_ERROR",
+            message="A database error occurred. Please try again later.",
+        ),
     )
 
 
@@ -335,35 +436,30 @@ async def general_exception_handler(
     
     Logs the error and returns a generic message.
     """
-    logger.exception(f"Unexpected error: {exc}")
+    request_id = _get_request_id(request)
+    logger.exception("[%s] Unexpected error", request_id)
     
     # Log to error service
     try:
-        from app.services.error_logging_service import error_logger, ErrorCategory, ErrorSeverity
+        from app.services.error_logging_service import error_logger
         await error_logger.log_api_error(
             error=exc,
             endpoint=request.url.path,
             method=request.method,
             status_code=500,
             ip_address=request.client.host if request.client else None,
+            request_id=request_id,
         )
     except Exception as log_error:
-        logger.error(f"Failed to log error: {log_error}")
-    
-    if settings.DEBUG:
-        return JSONResponse(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            content={
-                "detail": str(exc),
-                "type": type(exc).__name__
-            }
-        )
-    
+        logger.error("[%s] Failed to log unexpected error: %s", request_id, log_error)
+
     return JSONResponse(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-        content={
-            "detail": "An unexpected error occurred. Please try again later."
-        }
+        content=_error_envelope(
+            request=request,
+            code="INTERNAL_SERVER_ERROR",
+            message="An unexpected error occurred. Please try again later.",
+        ),
     )
 
 
@@ -446,10 +542,15 @@ async def health_check(db: Session = Depends(get_db)):
     # Check Redis (if enabled)
     if settings.REDIS_ENABLED:
         try:
-            from app.core.redis_client import redis_client
-            await redis_client.ping()
+            from app.core.redis_client import get_redis
+
+            redis_client = get_redis()
+            if redis_client is None:
+                raise RuntimeError("Redis unavailable")
+            redis_client.ping()
             health_status["redis"] = "connected"
-        except:
+        except Exception as e:
+            logger.warning("Health check - Redis error: %s", e)
             health_status["redis"] = "disconnected"
     else:
         health_status["redis"] = "disabled"
@@ -462,6 +563,70 @@ async def health_check(db: Session = Depends(get_db)):
         )
     
     return health_status
+
+
+@app.get(
+    "/livez",
+    tags=["Health"],
+    summary="Liveness probe",
+    response_model=Dict[str, Any]
+)
+async def livez():
+    """
+    Lightweight liveness probe for container orchestration.
+    """
+    return {
+        "status": "alive",
+        "version": settings.APP_VERSION,
+        "timestamp": _utc_timestamp(),
+    }
+
+
+@app.get(
+    "/readyz",
+    tags=["Health"],
+    summary="Readiness probe",
+    response_model=Dict[str, Any]
+)
+async def readyz():
+    """
+    Readiness probe that fails if the database is unavailable.
+    """
+    ready_status = {
+        "status": "ready",
+        "version": settings.APP_VERSION,
+        "timestamp": _utc_timestamp(),
+        "database": "connected",
+        "redis": "disabled",
+    }
+
+    if not check_database_connection():
+        ready_status["status"] = "unready"
+        ready_status["database"] = "disconnected"
+        return JSONResponse(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            content=ready_status,
+        )
+
+    if settings.REDIS_ENABLED:
+        try:
+            from app.core.redis_client import get_redis
+
+            redis_client = get_redis()
+            if redis_client is None:
+                raise RuntimeError("Redis unavailable")
+            redis_client.ping()
+            ready_status["redis"] = "connected"
+        except Exception as e:
+            logger.warning("Readiness probe - Redis error: %s", e)
+            ready_status["redis"] = "disconnected"
+            ready_status["status"] = "unready"
+            return JSONResponse(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                content=ready_status,
+            )
+
+    return ready_status
 
 
 @app.get(
