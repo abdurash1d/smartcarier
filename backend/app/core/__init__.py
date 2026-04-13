@@ -22,6 +22,8 @@ from app.core.dependencies import (
     get_current_user,
     get_current_active_user,
     get_current_admin,
+    get_current_super_admin,
+    require_admin_permission,
     get_current_company,
 )
 
@@ -38,6 +40,8 @@ __all__ = [
     "get_current_user",
     "get_current_active_user",
     "get_current_admin",
+    "get_current_super_admin",
+    "require_admin_permission",
     "get_current_company",
 ]
 

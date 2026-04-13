@@ -118,6 +118,8 @@ from app.models.base import (
 from app.models.user import (
     User,                   # User accounts (students, companies, admins)
     UserRole,               # Enum: student, company, admin
+    AdminSubRole,           # Enum: admin sub-roles
+    ADMIN_PERMISSION_MATRIX,
 )
 
 from app.models.resume import (
@@ -171,6 +173,8 @@ __all__ = [
     # -------------------------------------------------------------------------
     "User",                # Main user model
     "UserRole",            # STUDENT, COMPANY, ADMIN
+    "AdminSubRole",        # SUPER_ADMIN, OPERATIONS_ADMIN, etc.
+    "ADMIN_PERMISSION_MATRIX",
     
     # -------------------------------------------------------------------------
     # Resume Model & Enums

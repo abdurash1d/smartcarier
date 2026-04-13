@@ -13,7 +13,11 @@
 import axios, { AxiosError, AxiosInstance, InternalAxiosRequestConfig } from "axios";
 import { useAuthStore } from "@/store/authStore";
 import type {
+  AdminAccessUsersResponse,
+  AdminRoleMatrixResponse,
   AutoApplyRequest,
+  AdminUpdateAdminRoleRequest,
+  AdminUpdateAdminRoleResponse,
   ApplicationStatusUpdateRequest,
   AdminBulkResolveResponse,
   AdminDashboardResponse,
@@ -323,6 +327,10 @@ export const adminApi = {
       error_ids: errorIds,
       resolution_notes,
     }),
+  roleMatrix: () => api.get<AdminRoleMatrixResponse>("/admin/access/roles-matrix"),
+  adminUsers: () => api.get<AdminAccessUsersResponse>("/admin/access/admin-users"),
+  updateAdminRole: (userId: string, data: AdminUpdateAdminRoleRequest) =>
+    api.patch<AdminUpdateAdminRoleResponse>(`/admin/access/admin-users/${userId}/role`, data),
 };
 
 // User endpoints

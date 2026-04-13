@@ -25,6 +25,7 @@ import {
   Activity,
   AlertTriangle,
   Server,
+  KeyRound,
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { UserAvatar } from "@/components/ui/avatar";
@@ -57,6 +58,7 @@ const adminNavItems: NavItem[] = [
   { name: "System Health", href: "/admin#health", icon: Server },
   { name: "Users", href: "/admin#users", icon: Users },
   { name: "Errors", href: "/admin#errors", icon: AlertTriangle },
+  { name: "Access", href: "/admin/access", icon: KeyRound },
 ];
 
 interface DashboardLayoutProps {

@@ -103,6 +103,7 @@ def create_token_response(user: User) -> TokenResponse:
         full_name=user.full_name,
         phone=user.phone,
         role=user.role.value,
+        admin_role=user.effective_admin_role.value if user.effective_admin_role else None,
         is_verified=user.is_verified,
         avatar_url=user.avatar_url,
         bio=user.bio,
@@ -783,6 +784,7 @@ async def get_current_user_profile(
         full_name=current_user.full_name,
         phone=current_user.phone,
         role=current_user.role.value,
+        admin_role=current_user.effective_admin_role.value if current_user.effective_admin_role else None,
         is_verified=current_user.is_verified,
         avatar_url=current_user.avatar_url,
         bio=current_user.bio,
@@ -1060,7 +1062,6 @@ async def linkedin_oauth_callback(
             error_code="LINKEDIN_OAUTH_AUTHENTICATION_FAILED",
             message="OAuth authentication failed",
         )
-
 
 
 

@@ -11,6 +11,12 @@
 // =============================================================================
 
 export type UserRole = "student" | "company" | "admin";
+export type AdminAccessRole =
+  | "super_admin"
+  | "operations_admin"
+  | "finance_admin"
+  | "security_admin"
+  | "support_agent";
 
 export interface User {
   id: string;
@@ -18,6 +24,7 @@ export interface User {
   full_name: string;
   phone?: string;
   role: UserRole;
+  admin_role?: AdminAccessRole | null;
   is_active: boolean;
   is_verified: boolean;
   avatar_url?: string;
@@ -527,6 +534,84 @@ export interface AdminBulkResolveResponse {
   message: string;
   resolved_count: number;
   requested_count: number;
+}
+
+export interface AdminRoleMatrixPermission {
+  key: string;
+  label: string;
+  description?: string;
+}
+
+export interface AdminRoleMatrixSection {
+  key: string;
+  label: string;
+  permissions: AdminRoleMatrixPermission[];
+}
+
+export interface AdminRoleMatrixItem {
+  role: AdminAccessRole;
+  label: string;
+  sections: AdminRoleMatrixSection[];
+}
+
+export interface AdminRoleMatrixResponse {
+  success: boolean;
+  matrix?: AdminRoleMatrixItem[];
+  roles?: Record<string, string[]>;
+  data?: {
+    matrix?: AdminRoleMatrixItem[];
+    roles?: Record<string, string[]>;
+  };
+}
+
+export interface AdminAccessUser {
+  id: string;
+  email: string;
+  full_name: string;
+  role: UserRole;
+  admin_role?: AdminAccessRole | null;
+  is_active: boolean;
+  is_verified: boolean;
+  created_at?: string;
+  last_login?: string | null;
+}
+
+export interface AdminAccessUsersResponse {
+  success: boolean;
+  total?: number;
+  users: Array<
+    Partial<AdminAccessUser> & {
+      user_id?: string;
+      is_active_account?: boolean;
+      effective_permissions?: string[];
+      last_login_at?: string | null;
+    }
+  >;
+  data?: {
+    total?: number;
+    users: Array<
+      Partial<AdminAccessUser> & {
+        user_id?: string;
+        is_active_account?: boolean;
+        effective_permissions?: string[];
+        last_login_at?: string | null;
+      }
+    >;
+  };
+}
+
+export interface AdminUpdateAdminRoleRequest {
+  admin_role: AdminAccessRole;
+}
+
+export interface AdminUpdateAdminRoleResponse {
+  success: boolean;
+  message?: string;
+  user?: AdminAccessUser;
+  data?: {
+    user_id: string;
+    admin_role: AdminAccessRole;
+  };
 }
 
 // =============================================================================

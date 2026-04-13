@@ -89,6 +89,7 @@ async def get_my_profile(
         full_name=current_user.full_name,
         phone=current_user.phone,
         role=current_user.role.value,
+        admin_role=current_user.effective_admin_role.value if current_user.effective_admin_role else None,
         is_verified=current_user.is_verified,
         is_active=current_user.is_active_account,
         avatar_url=current_user.avatar_url,
@@ -145,6 +146,7 @@ async def update_my_profile(
         full_name=current_user.full_name,
         phone=current_user.phone,
         role=current_user.role.value,
+        admin_role=current_user.effective_admin_role.value if current_user.effective_admin_role else None,
         is_verified=current_user.is_verified,
         is_active=current_user.is_active_account,
         avatar_url=current_user.avatar_url,
@@ -211,6 +213,7 @@ async def get_user(
         full_name=user.full_name,
         phone=None,  # Hide phone for public profile
         role=user.role.value,
+        admin_role=user.effective_admin_role.value if user.effective_admin_role else None,
         is_verified=user.is_verified,
         is_active=user.is_active_account,
         avatar_url=user.avatar_url,
@@ -270,6 +273,7 @@ async def list_users(
             full_name=user.full_name,
             phone=user.phone,
             role=user.role.value,
+            admin_role=user.effective_admin_role.value if user.effective_admin_role else None,
             is_verified=user.is_verified,
             is_active=user.is_active_account,
             avatar_url=user.avatar_url,
@@ -420,6 +424,7 @@ async def upload_avatar(
         full_name=current_user.full_name,
         phone=current_user.phone,
         role=current_user.role.value,
+        admin_role=current_user.effective_admin_role.value if current_user.effective_admin_role else None,
         is_verified=current_user.is_verified,
         is_active=current_user.is_active_account,
         avatar_url=current_user.avatar_url,
@@ -554,7 +559,6 @@ async def update_privacy_settings(
     current_user.privacy_settings = settings_data.model_dump()
     db.commit()
     return {"success": True, "message": "Maxfiylik sozlamalari saqlandi"}
-
 
 
 
