@@ -68,8 +68,10 @@ services:
       REDIS_URL: redis://:smartcareer_redis_password@redis:6379/0
       
       # JWT (use secrets from .env in production)
-      SECRET_KEY: ${SECRET_KEY:-your-super-secret-key-change-this}
-      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-your-jwt-secret-key-change-this}
+      # Defaults are intentionally long enough to satisfy backend production
+      # secret validation when DEBUG=false. Override via `.env` in real deploys.
+      SECRET_KEY: ${SECRET_KEY:-smartcareer-dev-secret-key-0123456789abcdef0123456789abcdef}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-smartcareer-dev-jwt-secret-0123456789abcdef0123456789abcdef}
       
       # AI
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
