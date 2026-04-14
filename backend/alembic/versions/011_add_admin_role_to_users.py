@@ -58,7 +58,7 @@ def upgrade() -> None:
             """
             UPDATE users
             SET admin_role = 'super_admin'
-            WHERE role IN ('ADMIN', 'admin') AND (admin_role IS NULL OR admin_role = '')
+            WHERE LOWER(CAST(role AS TEXT)) = 'admin' AND (admin_role IS NULL OR admin_role = '')
             """
         )
     )

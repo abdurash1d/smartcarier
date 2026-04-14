@@ -200,7 +200,7 @@ export default function CompanyJobsPage() {
                     {/* Meta */}
                     <div className="flex flex-wrap items-center gap-4 text-sm text-surface-500">
                       <span>{job.location}</span>
-                      <span>{job.job_type.replace("_", " ")}</span>
+                      <span>{job.job_type?.replace("_", " ")}</span>
                       <span>{job.experience_level}</span>
                       {job.salary_min !== undefined && job.salary_max !== undefined && (
                         <span>{formatSalaryRange(job.salary_min, job.salary_max)}</span>

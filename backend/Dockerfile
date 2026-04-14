@@ -1,47 +1,66 @@
 # =============================================================================
-# SmartCareer AI - Backend Dockerfile
+# SmartCareer AI - Backend Dockerfile (PRODUCTION)
 # =============================================================================
-# Production-ready FastAPI + PostgreSQL + Redis
+# Multi-stage, non-root user, gunicorn production server
 
-FROM python:3.11-slim
+# --- Stage 1: Builder ---
+FROM python:3.11-slim AS builder
 
-# Set working directory
 WORKDIR /app
 
-# Install system dependencies
+# Install build dependencies
 RUN apt-get update && apt-get install -y \
-    postgresql-client \
     gcc \
+    libpq-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy requirements first (for better caching)
+# Copy and install requirements
 COPY requirements.txt .
-
-# Install Python dependencies
 RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir -r requirements.txt
 
-# Copy application code
-COPY . .
+# --- Stage 2: Runtime ---
+FROM python:3.11-slim AS runtime
 
-# Create uploads directory
-RUN mkdir -p /app/uploads
+WORKDIR /app
+
+# Install only runtime system dependencies
+RUN apt-get update && apt-get install -y \
+    postgresql-client \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy installed packages from builder
+COPY --from=builder /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
+COPY --from=builder /usr/local/bin /usr/local/bin
+
+# Create non-root user for security
+RUN groupadd -r appuser && useradd -r -g appuser appuser
+
+# Create necessary directories with proper permissions
+RUN mkdir -p /app/uploads/avatars && \
+    chown -R appuser:appuser /app
+
+# Copy application code
+COPY --chown=appuser:appuser . .
+
+# Switch to non-root user
+USER appuser
 
 # Expose port
 EXPOSE 8000
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-    CMD python -c "import requests; requests.get('http://localhost:8000/health')"
+    CMD curl -f http://localhost:8000/health || exit 1
 
-# Default command (can be overridden in docker-compose)
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
-
-
-
-
-
-
-
-
-
+# Production command: gunicorn + uvicorn workers
+CMD ["gunicorn", "app.main:app", \
+     "--worker-class", "uvicorn.workers.UvicornWorker", \
+     "--workers", "4", \
+     "--bind", "0.0.0.0:8000", \
+     "--timeout", "120", \
+     "--keep-alive", "5", \
+     "--access-logfile", "-", \
+     "--error-logfile", "-", \
+     "--log-level", "info"]

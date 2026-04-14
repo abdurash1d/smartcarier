@@ -318,15 +318,14 @@ async def change_password(
             detail="Current password is incorrect"
         )
     
-    # Validate new password strength
-    if len(request.new_password) < 8:
+    # Validate new password strength (full validation via model method)
+    try:
+        current_user.set_password(request.new_password)
+    except ValueError as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="New password must be at least 8 characters long"
+            detail=str(e)
         )
-    
-    # Set new password
-    current_user.set_password(request.new_password)
     db.commit()
     
     logger.info(f"Password changed for user: {current_user.id}")
@@ -559,7 +558,6 @@ async def update_privacy_settings(
     current_user.privacy_settings = settings_data.model_dump()
     db.commit()
     return {"success": True, "message": "Maxfiylik sozlamalari saqlandi"}
-
 
 
 

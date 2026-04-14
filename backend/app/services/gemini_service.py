@@ -1,6 +1,6 @@
 """
 =============================================================================
-GEMINI AI SERVICE - Google Gemini Integration (FREE!)
+GEMINI AI SERVICE - Google Gemini Integration (google-genai SDK)
 =============================================================================
 
 Bu service Google Gemini API bilan ishlaydi - BEPUL!
@@ -15,16 +15,22 @@ Gemini API kalitini olish:
 .env fayliga qo'shing:
 GEMINI_API_KEY=your-gemini-api-key
 
+SDK: pip install google-genai>=1.0.0
+
 AUTHOR: SmartCareer AI Team
-VERSION: 1.0.0
+VERSION: 2.0.0 (migrated from google-generativeai to google-genai)
 """
 
 import json
 import logging
 from typing import Dict, Any, Optional
 
-import google.generativeai as genai
-from google.generativeai.types import HarmCategory, HarmBlockThreshold
+try:
+    from google import genai
+    from google.genai import types as genai_types
+    _GENAI_AVAILABLE = True
+except ImportError:
+    _GENAI_AVAILABLE = False
 
 from app.config import settings
 
@@ -41,139 +47,121 @@ logger = logging.getLogger(__name__)
 class GeminiService:
     """
     Google Gemini AI Service - Tekin AI API!
-    
+
     Bu service:
     - Resume generatsiya qiladi
     - Cover letter yozadi
     - Job matching tahlil qiladi
     - Motivatsion xat yozadi
     """
-    
+
     def __init__(self):
         """Gemini client yaratish"""
         self.api_key = getattr(settings, 'GEMINI_API_KEY', None)
         # Use correct model name format for Gemini API
-        model_setting = getattr(settings, 'GEMINI_MODEL', 'gemini-2.0-flash')
-        # Map common names to API model names (using latest available models)
+        model_setting = getattr(settings, 'GEMINI_MODEL', 'gemini-1.5-flash')
+        # Map common names to API model names
         model_mapping = {
-            'gemini-1.5-flash': 'gemini-2.0-flash',  # Upgraded to 2.0
-            'gemini-1.5-pro': 'gemini-2.0-pro-exp',
-            'gemini-pro': 'gemini-pro-latest',
-            'gemini-flash': 'gemini-flash-latest',
+            'gemini-1.5-flash': 'gemini-1.5-flash',
+            'gemini-1.5-pro': 'gemini-1.5-pro',
+            'gemini-pro': 'gemini-pro',
+            'gemini-flash': 'gemini-1.5-flash',
             'gemini-2.0-flash': 'gemini-2.0-flash',
-            'gemini-2.5-flash': 'gemini-2.5-flash',
+            'gemini-2.0-pro': 'gemini-2.0-pro-exp',
         }
-        self.model_name = model_mapping.get(model_setting, model_setting)
+        self._model_name = model_mapping.get(model_setting, model_setting)
         self.client = None
-        self.model = None
-        
+
         self._initialize()
-    
+
     def _initialize(self):
         """Gemini client ni sozlash"""
         logger.info("=" * 60)
-        logger.info("🌟 Initializing Gemini AI Service (FREE!)")
+        logger.info("🌟 Initializing Gemini AI Service (google-genai SDK)")
         logger.info("=" * 60)
-        
+
+        if not _GENAI_AVAILABLE:
+            logger.error("❌ google-genai package not installed. Run: pip install google-genai>=1.0.0")
+            return
+
         if not self.api_key or self.api_key == "your-gemini-api-key-here":
             logger.warning("⚠️ GEMINI_API_KEY not set. Please add it to .env")
             logger.warning("   Get free key at: https://ai.google.dev/")
             return
-        
+
         try:
-            # Configure Gemini
-            genai.configure(api_key=self.api_key)
-            
-            # Safety settings - more permissive for resume content
-            safety_settings = {
-                HarmCategory.HARM_CATEGORY_HARASSMENT: HarmBlockThreshold.BLOCK_NONE,
-                HarmCategory.HARM_CATEGORY_HATE_SPEECH: HarmBlockThreshold.BLOCK_NONE,
-                HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT: HarmBlockThreshold.BLOCK_NONE,
-                HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: HarmBlockThreshold.BLOCK_NONE,
-            }
-            
-            # Create model - use short name for GenerativeModel
-            short_model_name = self.model_name.replace('models/', '')
-            self.model = genai.GenerativeModel(
-                model_name=short_model_name,
-                safety_settings=safety_settings,
-                generation_config={
-                    "temperature": 0.7,
-                    "top_p": 0.95,
-                    "top_k": 64,
-                    "max_output_tokens": 8192,
-                }
-            )
-            
-            logger.info(f"✅ Gemini model initialized: {self.model_name}")
+            self.client = genai.Client(api_key=self.api_key)
+            logger.info(f"✅ Gemini client initialized, model: {self._model_name}")
             logger.info("🎉 Gemini AI Service ready!")
             logger.info("=" * 60)
-            
+
         except Exception as e:
             logger.error(f"❌ Failed to initialize Gemini: {e}")
-            self.model = None
-    
+            self.client = None
+
     @property
     def is_available(self) -> bool:
         """Gemini ishga tayyormi?"""
-        return self.model is not None
-    
+        return self.client is not None
+
     async def generate(
-        self, 
-        prompt: str, 
+        self,
+        prompt: str,
         response_format: str = "text"
     ) -> str:
         """
         Generic AI generation method.
-        
+
         Args:
             prompt: Text prompt
             response_format: "text" or "json"
-            
+
         Returns:
             Generated text
         """
         if not self.is_available:
             raise Exception("Gemini API not configured")
-        
+
         try:
             # Add JSON instruction if needed
             if response_format == "json":
                 prompt = f"{prompt}\n\nIMPORTANT: Return ONLY valid JSON, no other text."
-            
-            # Generate response
-            response = await self.model.generate_content_async(prompt)
-            
+
+            # Generate response (async)
+            response = await self.client.aio.models.generate_content(
+                model=self._model_name,
+                contents=prompt,
+            )
+
             # Extract text
             text = response.text.strip()
-            
+
             # Clean up JSON response if needed
             if response_format == "json":
-                # Remove markdown code blocks if present
                 if text.startswith("```json"):
                     text = text.replace("```json", "").replace("```", "").strip()
                 elif text.startswith("```"):
                     text = text.replace("```", "").strip()
-            
+
             return text
-            
+
         except Exception as e:
             logger.error(f"Generation failed: {e}")
             raise
-    
+
     async def generate_resume(self, user_data: Dict[str, Any]) -> Dict[str, Any]:
         """
         AI yordamida professional rezyume yaratish
-        
+
         Args:
             user_data: Foydalanuvchi ma'lumotlari
-            
+
         Returns:
             Yaratilgan rezyume JSON formatda
         """
         if not self.is_available:
             return {"error": "Gemini API not configured", "success": False}
-        
+
         prompt = f"""
 You are a professional resume writer. Create a comprehensive, ATS-optimized resume based on the following information.
 
@@ -239,13 +227,16 @@ IMPORTANT:
 - Keep it professional and concise
 - Return ONLY valid JSON, no markdown or extra text
 """
-        
+
         try:
-            response = self.model.generate_content(prompt)
-            
+            response = await self.client.aio.models.generate_content(
+                model=self._model_name,
+                contents=prompt,
+            )
+
             # Parse JSON from response
             text = response.text.strip()
-            
+
             # Remove markdown code blocks if present
             if text.startswith("```json"):
                 text = text[7:]
@@ -253,18 +244,18 @@ IMPORTANT:
                 text = text[3:]
             if text.endswith("```"):
                 text = text[:-3]
-            
+
             resume_data = json.loads(text.strip())
-            
+
             logger.info("✅ Resume generated successfully with Gemini!")
-            
+
             return {
                 "success": True,
                 "resume": resume_data,
-                "model": self.model_name,
+                "model": self._model_name,
                 "provider": "gemini"
             }
-            
+
         except json.JSONDecodeError as e:
             logger.error(f"Failed to parse Gemini response as JSON: {e}")
             return {
@@ -278,10 +269,10 @@ IMPORTANT:
                 "success": False,
                 "error": str(e)
             }
-    
+
     async def generate_cover_letter(
-        self, 
-        resume_data: Dict[str, Any], 
+        self,
+        resume_data: Dict[str, Any],
         job_description: str,
         company_name: str
     ) -> Dict[str, Any]:
@@ -290,7 +281,7 @@ IMPORTANT:
         """
         if not self.is_available:
             return {"error": "Gemini API not configured", "success": False}
-        
+
         prompt = f"""
 You are a professional career coach. Write a compelling cover letter.
 
@@ -317,33 +308,36 @@ Return JSON format:
 
 Return ONLY valid JSON.
 """
-        
+
         try:
-            response = self.model.generate_content(prompt)
+            response = await self.client.aio.models.generate_content(
+                model=self._model_name,
+                contents=prompt,
+            )
             text = response.text.strip()
-            
+
             if text.startswith("```json"):
                 text = text[7:]
             if text.startswith("```"):
                 text = text[3:]
             if text.endswith("```"):
                 text = text[:-3]
-            
+
             result = json.loads(text.strip())
-            
+
             return {
                 "success": True,
                 **result,
                 "provider": "gemini"
             }
-            
+
         except Exception as e:
             logger.error(f"Cover letter generation error: {e}")
             return {"success": False, "error": str(e)}
-    
+
     async def analyze_job_match(
-        self, 
-        resume_data: Dict[str, Any], 
+        self,
+        resume_data: Dict[str, Any],
         job_description: str
     ) -> Dict[str, Any]:
         """
@@ -351,7 +345,7 @@ Return ONLY valid JSON.
         """
         if not self.is_available:
             return {"error": "Gemini API not configured", "success": False}
-        
+
         prompt = f"""
 Analyze the match between this resume and job description.
 
@@ -373,30 +367,34 @@ Provide analysis in JSON format:
 
 Return ONLY valid JSON.
 """
-        
+
         try:
-            response = self.model.generate_content(prompt)
+            response = await self.client.aio.models.generate_content(
+                model=self._model_name,
+                contents=prompt,
+            )
             text = response.text.strip()
-            
+
             if text.startswith("```json"):
                 text = text[7:]
             if text.startswith("```"):
                 text = text[3:]
             if text.endswith("```"):
                 text = text[:-3]
-            
+
             result = json.loads(text.strip())
-            
+
             return {
                 "success": True,
                 **result,
                 "provider": "gemini"
             }
-            
+
         except Exception as e:
             logger.error(f"Job match analysis error: {e}")
             return {"success": False, "error": str(e)}
-    
+
+
 # =============================================================================
 # GLOBAL INSTANCE
 # =============================================================================

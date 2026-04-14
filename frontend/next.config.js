@@ -2,8 +2,12 @@
 const path = require("path");
 
 const nextConfig = {
+  // Standalone output for Docker production builds (reduces image size ~70%)
+  output: "standalone",
+
   // Enable React Strict Mode for better development experience
   reactStrictMode: true,
+
 
   // Image optimization configuration
   images: {

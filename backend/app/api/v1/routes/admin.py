@@ -31,8 +31,8 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
-from sqlalchemy import func, or_
-from pydantic import BaseModel, Field
+from sqlalchemy import func, or_, text
+from pydantic import BaseModel, Field, field_validator
 
 from app.core.dependencies import (
     get_db,
@@ -105,11 +105,18 @@ class BulkResolveRequest(BaseModel):
     """Bulk resolve request."""
     error_ids: List[str] = Field(
         ...,
-        min_items=1,
-        max_items=100,
         description="Hal qilinadigan error ID'lar"
     )
     resolution_notes: Optional[str] = None
+
+    @field_validator("error_ids")
+    @classmethod
+    def validate_error_ids(cls, v: List[str]) -> List[str]:
+        if len(v) < 1:
+            raise ValueError("At least 1 error_id is required")
+        if len(v) > 100:
+            raise ValueError("Maximum 100 error_ids allowed at once")
+        return v
 
 
 class SystemHealthResponse(BaseModel):
@@ -152,6 +159,30 @@ class AdminUsersAccessResponse(BaseModel):
 class UpdateAdminRoleRequest(BaseModel):
     """Request body for assigning admin sub-role."""
     admin_role: AdminSubRole = Field(..., description="Admin sub-role to assign")
+
+
+class UserListItem(BaseModel):
+    """User item for admin list."""
+    id: UUID
+    email: str
+    full_name: str
+    role: str
+    is_active: bool
+    is_verified: bool
+    created_at: datetime
+    last_login: Optional[datetime] = None
+
+
+class UserListResponse(BaseModel):
+    """User list response."""
+    success: bool = True
+    total: int
+    users: List[UserListItem]
+
+
+class UpdateUserStatusRequest(BaseModel):
+    """Request body for updating user status."""
+    is_active: bool = Field(..., description="Account status")
 
 
 # =============================================================================
@@ -436,7 +467,7 @@ async def get_system_health(
     
     # Check database
     try:
-        db.execute("SELECT 1")
+        db.execute(text("SELECT 1"))
         components["database"] = {
             "status": "healthy",
             "type": "sqlite" if "sqlite" in str(db.bind.url) else "postgresql",
@@ -644,6 +675,101 @@ async def get_admin_dashboard(
             "timestamp": datetime.now(timezone.utc).isoformat(),
         }
     }
+
+
+# =============================================================================
+# USER MANAGEMENT ENDPOINTS
+# =============================================================================
+
+@router.get(
+    "/users",
+    response_model=UserListResponse,
+    summary="👥 Foydalanuvchilar ro'yxati",
+    description="Tizimdagi barcha foydalanuvchilarni boshqarish uchun olish",
+)
+async def list_users_for_admin(
+    admin: User = Depends(require_admin_permission("admin.users.read")),
+    db: Session = Depends(get_db),
+    role: Optional[UserRole] = Query(None, description="Role bo'yicha filter"),
+    is_active: Optional[bool] = Query(None, description="Holati bo'yicha filter"),
+    search: Optional[str] = Query(None, description="Email yoki ism bo'yicha qidirish"),
+    limit: int = Query(50, ge=1, le=100),
+    offset: int = Query(0, ge=0),
+):
+    """Get all users with filtering and search."""
+    query = db.query(User).filter(User.is_deleted == False)
+
+    if role:
+        query = query.filter(User.role == role)
+    if is_active is not None:
+        query = query.filter(User.is_active_account == is_active)
+    if search:
+        search_filter = f"%{search}%"
+        query = query.filter(
+            or_(
+                User.email.ilike(search_filter),
+                User.full_name.ilike(search_filter)
+            )
+        )
+
+    total = query.count()
+    users = query.order_by(User.created_at.desc()).offset(offset).limit(limit).all()
+
+    user_items = [
+        UserListItem(
+            id=user.id,
+            email=user.email,
+            full_name=user.full_name,
+            role=user.role.value,
+            is_active=user.is_active_account,
+            is_verified=user.is_verified,
+            created_at=user.created_at,
+            last_login=user.last_login,
+        )
+        for user in users
+    ]
+
+    return UserListResponse(total=total, users=user_items)
+
+
+@router.patch(
+    "/users/{user_id}/status",
+    summary="🚫 Foydalanuvchi holatini o'zgartirish",
+    description="Foydalanuvchini bloklash yoki faollashtirish",
+)
+async def update_user_status(
+    user_id: UUID,
+    request: UpdateUserStatusRequest,
+    admin: User = Depends(require_admin_permission("admin.users.write")),
+    db: Session = Depends(get_db),
+):
+    """Enable or disable a user account."""
+    user = db.query(User).filter(
+        User.id == user_id,
+        User.is_deleted == False
+    ).first()
+
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Foydalanuvchi topilmadi"
+        )
+
+    user.is_active_account = request.is_active
+    db.commit()
+
+    action = "activated" if request.is_active else "blocked"
+    logger.info(f"User {user.email} (ID: {user.id}) {action} by admin {admin.id}")
+
+    return {
+        "success": True,
+        "message": f"Foydalanuvchi muvaffaqiyatli {'faollashtirildi' if request.is_active else 'bloklandi'}",
+        "data": {
+            "user_id": str(user.id),
+            "is_active": user.is_active_account
+        }
+    }
+
 
 
 
