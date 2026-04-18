@@ -17,6 +17,9 @@ WORKDIR /app
 # Copy dependencies
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
+# Ensure public directory exists so runtime COPY step is stable
+# even when the project has no static assets committed yet.
+RUN mkdir -p /app/public
 
 # Build the application
 ENV NEXT_TELEMETRY_DISABLED=1
