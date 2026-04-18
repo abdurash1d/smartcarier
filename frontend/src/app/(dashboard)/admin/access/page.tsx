@@ -15,6 +15,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn, formatRelativeTime } from "@/lib/utils";
+import { useTranslation } from "@/hooks/useTranslation";
 
 type LoadState = "loading" | "ready" | "error";
 
@@ -67,6 +68,117 @@ const FALLBACK_MATRIX: AdminRoleMatrixItem[] = [
   },
 ];
 
+const accessCopy = {
+  uz: {
+    partialEndpointWarning: "Ba'zi access endpointlari javob bermadi. Qolgan ma'lumotlar yuklandi.",
+    roleUpdated: "Admin roli muvaffaqiyatli yangilandi.",
+    badge: "Ruxsatlar nazorati",
+    title: "Admin ruxsatlari va rollarni markazlashgan boshqaruv",
+    description: "Role matrix va admin foydalanuvchilarni shu yerdan boshqarasiz. super_admin bo'lsa role'larni real API orqali yangilash mumkin.",
+    refreshData: "Ma'lumotlarni yangilash",
+    noManageRoles: (role: string) => `Sizning admin rolingiz ${role}. Role o'zgartirish faqat super_admin uchun ochiq.`,
+    roleMatrix: "Rol matritsasi",
+    noPermissions: "Ruxsatlar mavjud emas.",
+    adminUsers: "Admin foydalanuvchilar",
+    adminAccessList: "Admin ruxsatlari ro'yxati",
+    noAdminUsers: "Admin userlar topilmadi yoki endpoint hali yoqilmagan.",
+    lastLogin: "Oxirgi kirish",
+    noRecentActivity: "So'nggi faollik yo'q",
+    active: "Faol",
+    inactive: "Faol emas",
+    verified: "Tasdiqlangan",
+    unverified: "Tasdiqlanmagan",
+    selectAdminRole: "Admin rolini tanlang",
+    saving: "Saqlanmoqda",
+    update: "Yangilash",
+    permissions: "Ruxsatlar",
+    roleLabels: {
+      super_admin: "Super admin",
+      operations_admin: "Operatsion admin",
+      finance_admin: "Moliya admini",
+      security_admin: "Xavfsizlik admini",
+      support_agent: "Yordam agenti",
+    } as Record<AdminAccessRole, string>,
+    labels: {
+      Users: "Foydalanuvchilar",
+      Content: "Kontent",
+      System: "Tizim",
+      Billing: "To'lovlar",
+      Security: "Xavfsizlik",
+      Support: "Yordam",
+      Permissions: "Ruxsatlar",
+      "Manage users": "Foydalanuvchilarni boshqarish",
+      "Change admin roles": "Admin rollarini o'zgartirish",
+      "Moderate jobs": "Vakansiyalarni moderatsiya qilish",
+      "Moderate companies": "Kompaniyalarni moderatsiya qilish",
+      "Manage global settings": "Global sozlamalarni boshqarish",
+      "View audit logs": "Audit loglarni ko'rish",
+      "Support and verify users": "Foydalanuvchilarga yordam berish va tasdiqlash",
+      "Moderate jobs and applications": "Vakansiya va arizalarni moderatsiya qilish",
+      "View payments": "To'lovlarni ko'rish",
+      "Process refunds": "Qaytarimlarni bajarish",
+      "Review risk alerts": "Risk ogohlantirishlarini ko'rish",
+      "Revoke sessions": "Sessiyalarni bekor qilish",
+      "View user tickets": "Foydalanuvchi murojaatlarini ko'rish",
+      "Assist users": "Foydalanuvchilarga yordam berish",
+    } as Record<string, string>,
+  },
+  ru: {
+    partialEndpointWarning: "Некоторые access endpoint'ы не ответили. Остальные данные загружены.",
+    roleUpdated: "Роль администратора успешно обновлена.",
+    badge: "Управление доступом",
+    title: "Централизованное управление ролями и правами администраторов",
+    description: "Здесь вы управляете role matrix и администраторами. Если роль super_admin, роли можно менять через реальный API.",
+    refreshData: "Обновить данные",
+    noManageRoles: (role: string) => `Ваша admin role: ${role}. Изменение ролей доступно только super_admin.`,
+    roleMatrix: "Матрица ролей",
+    noPermissions: "Прав нет.",
+    adminUsers: "Администраторы",
+    adminAccessList: "Список admin доступа",
+    noAdminUsers: "Администраторы не найдены или endpoint ещё не включён.",
+    lastLogin: "Последний вход",
+    noRecentActivity: "Нет недавней активности",
+    active: "Активен",
+    inactive: "Неактивен",
+    verified: "Подтверждён",
+    unverified: "Не подтверждён",
+    selectAdminRole: "Выберите роль администратора",
+    saving: "Сохраняем",
+    update: "Обновить",
+    permissions: "Права",
+    roleLabels: {
+      super_admin: "Суперадмин",
+      operations_admin: "Операционный админ",
+      finance_admin: "Финансовый админ",
+      security_admin: "Админ безопасности",
+      support_agent: "Специалист поддержки",
+    } as Record<AdminAccessRole, string>,
+    labels: {
+      Users: "Пользователи",
+      Content: "Контент",
+      System: "Система",
+      Billing: "Платежи",
+      Security: "Безопасность",
+      Support: "Поддержка",
+      Permissions: "Права",
+      "Manage users": "Управление пользователями",
+      "Change admin roles": "Изменение admin ролей",
+      "Moderate jobs": "Модерация вакансий",
+      "Moderate companies": "Модерация компаний",
+      "Manage global settings": "Управление глобальными настройками",
+      "View audit logs": "Просмотр audit logs",
+      "Support and verify users": "Поддержка и верификация пользователей",
+      "Moderate jobs and applications": "Модерация вакансий и откликов",
+      "View payments": "Просмотр платежей",
+      "Process refunds": "Обработка возвратов",
+      "Review risk alerts": "Проверка risk alerts",
+      "Revoke sessions": "Отзыв сессий",
+      "View user tickets": "Просмотр обращений",
+      "Assist users": "Помощь пользователям",
+    } as Record<string, string>,
+  },
+} as const;
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
@@ -77,11 +189,6 @@ function normalizeAdminRole(value: unknown): AdminAccessRole | null {
     return value as AdminAccessRole;
   }
   return null;
-}
-
-function getRoleLabel(role?: AdminAccessRole | null): string {
-  const matched = ADMIN_ROLE_OPTIONS.find((option) => option.value === role);
-  return matched?.label || "Support Agent";
 }
 
 function getRoleTone(role?: AdminAccessRole | null): string {
@@ -210,6 +317,8 @@ function parseUsers(data: unknown): AdminAccessUser[] {
 }
 
 export default function AdminAccessPage() {
+  const { locale } = useTranslation();
+  const copy = accessCopy[locale];
   const { user } = useAuth();
   const [loadState, setLoadState] = useState<LoadState>("loading");
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -256,7 +365,7 @@ export default function AdminAccessPage() {
       }
 
       if (errors > 0) {
-        setLoadError("Ba'zi access endpointlari javob bermadi. Qolgan ma'lumotlar yuklandi.");
+        setLoadError(copy.partialEndpointWarning);
       }
 
       setLoadState("ready");
@@ -302,7 +411,7 @@ export default function AdminAccessPage() {
             : item
         )
       );
-      setStatusMessage("Admin role muvaffaqiyatli yangilandi.");
+      setStatusMessage(copy.roleUpdated);
     } catch (error) {
       setLoadError(getErrorMessage(error));
     } finally {
@@ -317,14 +426,14 @@ export default function AdminAccessPage() {
           <div className="max-w-3xl">
             <div className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs font-medium text-white/80 backdrop-blur">
               <Shield className="h-3.5 w-3.5" />
-              Access governance
+              {copy.badge}
             </div>
-            <h1 className="mt-4 font-display text-3xl font-bold tracking-tight sm:text-4xl">Admin ruxsatlari va rollarni markazlashgan boshqaruv</h1>
-            <p className="mt-3 max-w-2xl text-sm text-white/75 sm:text-base">Role matrix va admin foydalanuvchilarni shu yerdan boshqarasiz. `super_admin` bo'lsa role'larni real API orqali yangilash mumkin.</p>
+            <h1 className="mt-4 font-display text-3xl font-bold tracking-tight sm:text-4xl">{copy.title}</h1>
+            <p className="mt-3 max-w-2xl text-sm text-white/75 sm:text-base">{copy.description}</p>
           </div>
           <Button variant="outline" onClick={() => void loadAccessData(true)} className="border-white/20 bg-white/10 text-white hover:bg-white/15">
             <RefreshCw className={cn("mr-2 h-4 w-4", refreshing && "animate-spin")} />
-            Refresh data
+            {copy.refreshData}
           </Button>
         </div>
       </section>
@@ -351,7 +460,7 @@ export default function AdminAccessPage() {
         <Card className="border-blue-200 bg-blue-50 dark:border-blue-500/30 dark:bg-blue-500/10">
           <CardContent className="flex items-center gap-3 p-4 text-blue-900 dark:text-blue-100">
             <KeyRound className="h-5 w-5 flex-shrink-0" />
-            <p className="text-sm">Sizning admin rolingiz `{effectiveCurrentUserRole || "not_set"}`. Role o'zgartirish faqat `super_admin` uchun ochiq.</p>
+            <p className="text-sm">{copy.noManageRoles(effectiveCurrentUserRole || "not_set")}</p>
           </CardContent>
         </Card>
       )}
@@ -359,7 +468,7 @@ export default function AdminAccessPage() {
       <section className="space-y-4">
         <div className="flex items-center gap-2">
           <Shield className="h-5 w-5 text-brand-500" />
-          <h2 className="font-display text-2xl font-bold text-surface-900 dark:text-white">Role matrix</h2>
+          <h2 className="font-display text-2xl font-bold text-surface-900 dark:text-white">{copy.roleMatrix}</h2>
         </div>
         <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-3">
           {loadState === "loading"
@@ -368,21 +477,21 @@ export default function AdminAccessPage() {
                 <Card key={item.role} className="overflow-hidden">
                   <CardHeader className="pb-3">
                     <CardTitle className="flex items-center justify-between text-lg">
-                      <span>{item.label}</span>
+                      <span>{copy.roleLabels[item.role] || item.label}</span>
                       <Badge className={getRoleTone(item.role)}>{item.role}</Badge>
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-4">
                     {item.sections.length === 0 ? (
-                      <p className="text-sm text-surface-500">Permissions mavjud emas.</p>
+                      <p className="text-sm text-surface-500">{copy.noPermissions}</p>
                     ) : (
                       item.sections.map((section) => (
                         <div key={`${item.role}-${section.key}`} className="space-y-2 rounded-xl border border-surface-200 p-3 dark:border-surface-700">
-                          <p className="text-sm font-semibold text-surface-900 dark:text-white">{section.label}</p>
+                          <p className="text-sm font-semibold text-surface-900 dark:text-white">{copy.labels[section.label] || section.label}</p>
                           <div className="space-y-1.5">
                             {section.permissions.map((permission) => (
                               <p key={permission.key} className="text-sm text-surface-600 dark:text-surface-300">
-                                - {permission.label}
+                                - {copy.labels[permission.key] || copy.labels[permission.label] || permission.label}
                               </p>
                             ))}
                           </div>
@@ -398,11 +507,11 @@ export default function AdminAccessPage() {
       <section className="space-y-4">
         <div className="flex items-center gap-2">
           <Users className="h-5 w-5 text-brand-500" />
-          <h2 className="font-display text-2xl font-bold text-surface-900 dark:text-white">Admin users</h2>
+          <h2 className="font-display text-2xl font-bold text-surface-900 dark:text-white">{copy.adminUsers}</h2>
         </div>
         <Card>
           <CardHeader>
-            <CardTitle className="text-lg">Admin access list</CardTitle>
+            <CardTitle className="text-lg">{copy.adminAccessList}</CardTitle>
           </CardHeader>
           <CardContent>
             {loadState === "loading" ? (
@@ -413,7 +522,7 @@ export default function AdminAccessPage() {
               </div>
             ) : sortedUsers.length === 0 ? (
               <div className="rounded-2xl border border-dashed border-surface-200 py-12 text-center dark:border-surface-700">
-                <p className="text-sm text-surface-500">Admin userlar topilmadi yoki endpoint hali yoqilmagan.</p>
+                <p className="text-sm text-surface-500">{copy.noAdminUsers}</p>
               </div>
             ) : (
               <div className="space-y-3">
@@ -431,12 +540,12 @@ export default function AdminAccessPage() {
                         <p className="font-semibold text-surface-900 dark:text-white">{adminUser.full_name}</p>
                         <p className="text-sm text-surface-500">{adminUser.email}</p>
                         <p className="mt-1 text-xs text-surface-500">
-                          Last login: {adminUser.last_login ? formatRelativeTime(adminUser.last_login) : "No recent activity"}
+                          {copy.lastLogin}: {adminUser.last_login ? formatRelativeTime(adminUser.last_login) : copy.noRecentActivity}
                         </p>
                       </div>
                       <div className="flex items-center gap-2">
-                        <Badge variant={adminUser.is_active ? "success" : "secondary"}>{adminUser.is_active ? "Active" : "Inactive"}</Badge>
-                        <Badge variant={adminUser.is_verified ? "success" : "warning"}>{adminUser.is_verified ? "Verified" : "Unverified"}</Badge>
+                        <Badge variant={adminUser.is_active ? "success" : "secondary"}>{adminUser.is_active ? copy.active : copy.inactive}</Badge>
+                        <Badge variant={adminUser.is_verified ? "success" : "warning"}>{adminUser.is_verified ? copy.verified : copy.unverified}</Badge>
                       </div>
                       <Select
                         value={selectedRole}
@@ -449,20 +558,20 @@ export default function AdminAccessPage() {
                         }
                       >
                         <SelectTrigger>
-                          <SelectValue placeholder="Select admin role" />
+                          <SelectValue placeholder={copy.selectAdminRole} />
                         </SelectTrigger>
                         <SelectContent>
                           {ADMIN_ROLE_OPTIONS.map((option) => (
                             <SelectItem key={`${adminUser.id}-${option.value}`} value={option.value}>
-                              {option.label}
+                              {copy.roleLabels[option.value]}
                             </SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
                       <div className="flex items-center justify-end gap-2">
-                        <Badge className={getRoleTone(adminUser.admin_role)}>{getRoleLabel(adminUser.admin_role)}</Badge>
+                        <Badge className={getRoleTone(adminUser.admin_role)}>{copy.roleLabels[adminUser.admin_role || "support_agent"]}</Badge>
                         <Button disabled={!canManageRoles || !hasChanges || isSaving} onClick={() => void updateRole(adminUser.id)}>
-                          {isSaving ? <><RefreshCw className="mr-2 h-4 w-4 animate-spin" />Saving</> : "Update"}
+                          {isSaving ? <><RefreshCw className="mr-2 h-4 w-4 animate-spin" />{copy.saving}</> : copy.update}
                         </Button>
                       </div>
                     </div>

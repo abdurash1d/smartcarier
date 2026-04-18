@@ -383,6 +383,200 @@ def _build_resume_text(content: Dict[str, Any]) -> str:
     return "\n".join(lines).strip()
 
 
+def _first_text(*values: Any) -> Optional[str]:
+    """Return the first non-empty scalar value as text."""
+    for value in values:
+        if value is None:
+            continue
+        text = str(value).strip()
+        if text:
+            return text
+    return None
+
+
+def _as_text_list(values: Any) -> List[str]:
+    """Normalize AI/user supplied arrays into a clean list of strings."""
+    if not values:
+        return []
+
+    if isinstance(values, str):
+        values = [values]
+    elif isinstance(values, dict):
+        values = values.values()
+
+    result: List[str] = []
+    for value in values:
+        if isinstance(value, dict):
+            text = _first_text(
+                value.get("description"),
+                value.get("metric"),
+                value.get("name"),
+                value.get("title"),
+            )
+        else:
+            text = _first_text(value)
+
+        if text:
+            result.append(text)
+
+    return result
+
+
+def _split_duration(duration: Any) -> tuple[Optional[str], Optional[str], bool]:
+    """Convert a free-form duration into start/end values for frontend preview."""
+    text = _first_text(duration)
+    if not text:
+        return None, None, False
+
+    parts = re.split(r"\s*(?:-|–|—|to)\s*", text, maxsplit=1, flags=re.IGNORECASE)
+    start_date = parts[0].strip() if parts else text
+    end_date = parts[1].strip() if len(parts) > 1 else None
+    is_current = bool(end_date and re.search(r"present|current|hozir", end_date, re.IGNORECASE))
+
+    return start_date or None, None if is_current else end_date, is_current
+
+
+def _normalize_ai_resume_content(
+    content: Dict[str, Any],
+    user_data: Dict[str, Any],
+    fallback_title: str,
+) -> Dict[str, Any]:
+    """Normalize provider-specific AI output into the ResumeContent shape used by the UI."""
+    if not isinstance(content, dict):
+        content = {}
+
+    personal_info = content.get("personal_info") if isinstance(content.get("personal_info"), dict) else {}
+    normalized: Dict[str, Any] = {
+        "personal_info": {
+            "name": _first_text(personal_info.get("name"), personal_info.get("full_name"), user_data.get("name")),
+            "email": _first_text(personal_info.get("email"), user_data.get("email")),
+            "phone": _first_text(personal_info.get("phone"), user_data.get("phone")),
+            "location": _first_text(personal_info.get("location"), user_data.get("location")),
+            "linkedin_url": _first_text(personal_info.get("linkedin_url"), personal_info.get("linkedin"), user_data.get("linkedin_url")),
+            "portfolio_url": _first_text(personal_info.get("portfolio_url"), personal_info.get("website"), user_data.get("portfolio_url")),
+            "professional_title": _first_text(
+                personal_info.get("professional_title"),
+                personal_info.get("title"),
+                user_data.get("professional_title"),
+                fallback_title,
+            ),
+        },
+        "summary": _first_text(content.get("summary"), content.get("professional_summary")),
+    }
+
+    raw_experience = content.get("experience") or content.get("work_experience") or user_data.get("experience") or []
+    normalized_experience: List[Dict[str, Any]] = []
+    for item in raw_experience if isinstance(raw_experience, list) else []:
+        if not isinstance(item, dict):
+            continue
+
+        start_date = _first_text(item.get("start_date"))
+        end_date = _first_text(item.get("end_date"))
+        is_current = bool(item.get("is_current"))
+        if not start_date and item.get("duration"):
+            start_date, end_date, is_current = _split_duration(item.get("duration"))
+
+        achievements = _as_text_list(item.get("achievements"))
+        responsibilities = _as_text_list(item.get("responsibilities"))
+        description = _first_text(item.get("description"))
+        if not description and responsibilities:
+            description = " ".join(responsibilities[:2])
+
+        normalized_experience.append({
+            "company": _first_text(item.get("company"), item.get("company_name")) or "",
+            "position": _first_text(item.get("position"), item.get("title"), item.get("job_title")) or fallback_title,
+            "start_date": start_date or "",
+            "end_date": end_date or "",
+            "is_current": is_current,
+            "description": description or "",
+            "achievements": achievements,
+        })
+
+    normalized["experience"] = normalized_experience
+
+    raw_education = content.get("education") or user_data.get("education") or []
+    normalized_education: List[Dict[str, Any]] = []
+    for item in raw_education if isinstance(raw_education, list) else []:
+        if not isinstance(item, dict):
+            continue
+
+        normalized_education.append({
+            "institution": _first_text(item.get("institution"), item.get("institution_name")) or "",
+            "degree": _first_text(item.get("degree"), item.get("degree_type")) or "",
+            "field": _first_text(item.get("field"), item.get("field_of_study"), item.get("major")) or "",
+            "year": _first_text(item.get("year"), item.get("graduation_date")) or "",
+            "gpa": _first_text(item.get("gpa")),
+        })
+
+    normalized["education"] = normalized_education
+
+    skills = content.get("skills") or {}
+    if isinstance(skills, dict):
+        technical = (
+            _as_text_list(skills.get("technical"))
+            or _as_text_list(skills.get("technical_skills"))
+            or _as_text_list(skills.get("tools_technologies"))
+        )
+        soft = _as_text_list(skills.get("soft")) or _as_text_list(skills.get("soft_skills"))
+        language_values = _as_text_list(skills.get("languages"))
+    else:
+        technical = _as_text_list(skills)
+        soft = []
+        language_values = []
+
+    if not technical:
+        technical = _as_text_list(user_data.get("skills"))
+
+    normalized["skills"] = {
+        "technical": technical,
+        "soft": soft,
+    }
+
+    raw_languages = content.get("languages") or []
+    languages: List[Dict[str, str]] = []
+    if isinstance(raw_languages, list):
+        for item in raw_languages:
+            if isinstance(item, dict):
+                name = _first_text(item.get("name"))
+                if name:
+                    languages.append({
+                        "name": name,
+                        "proficiency": _first_text(item.get("proficiency"), item.get("level")) or "",
+                    })
+            else:
+                name = _first_text(item)
+                if name:
+                    languages.append({"name": name, "proficiency": ""})
+    elif language_values:
+        languages = [{"name": value, "proficiency": ""} for value in language_values]
+
+    normalized["languages"] = languages
+
+    normalized["certifications"] = [
+        {
+            "name": _first_text(item.get("name")) or "",
+            "issuer": _first_text(item.get("issuer"), item.get("issuing_organization")) or "",
+            "year": _first_text(item.get("year"), item.get("date")) or "",
+        }
+        for item in (content.get("certifications") or user_data.get("certifications") or [])
+        if isinstance(item, dict)
+    ]
+
+    normalized["projects"] = [
+        {
+            "name": _first_text(item.get("name"), item.get("project_name")) or "",
+            "description": _first_text(item.get("description")) or "",
+            "url": _first_text(item.get("url")),
+            "technologies": _as_text_list(item.get("technologies")),
+        }
+        for item in (content.get("projects") or user_data.get("projects") or [])
+        if isinstance(item, dict)
+    ]
+
+    normalized["_metadata"] = content.get("_metadata", {})
+    return normalized
+
+
 def _escape_pdf_text(text: str) -> str:
     """Escape text for inclusion in a PDF content stream."""
     return text.replace("\\", "\\\\").replace("(", "\\(").replace(")", "\\)")
@@ -487,22 +681,316 @@ def _render_pdf_bytes(lines: List[str]) -> bytes:
 
 
 def _generate_pdf(resume: Resume) -> bytes:
-    """Generate PDF bytes for a resume."""
-    lines = [
-        resume.title,
-        f"Resume ID: {resume.id}",
-        f"Status: {resume.status}",
-        f"Generated At: {datetime.now(timezone.utc).isoformat()}",
-        "",
-    ]
+    """Generate a polished PDF version of a resume.
 
-    resume_text = _build_resume_text(resume.content or {})
-    if resume_text:
-        lines.extend(resume_text.splitlines())
-    else:
-        lines.append("No resume content available.")
+    ReportLab is used when available so downloaded resumes look like an actual
+    professional CV instead of a plain text dump. The legacy byte renderer is
+    kept as a safe fallback for minimal environments.
+    """
+    try:
+        import html
+        from reportlab.lib import colors
+        from reportlab.lib.enums import TA_RIGHT
+        from reportlab.lib.pagesizes import A4
+        from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
+        from reportlab.lib.units import mm
+        from reportlab.pdfbase import pdfmetrics
+        from reportlab.pdfbase.ttfonts import TTFont
+        from reportlab.platypus import (
+            HRFlowable,
+            KeepTogether,
+            ListFlowable,
+            ListItem,
+            Paragraph,
+            SimpleDocTemplate,
+            Spacer,
+            Table,
+            TableStyle,
+        )
 
-    return _render_pdf_bytes(lines)
+        buffer = io.BytesIO()
+        content = resume.content or {}
+        personal_info = content.get("personal_info") if isinstance(content.get("personal_info"), dict) else {}
+
+        # Prefer a Unicode-capable font locally; fall back to Helvetica in deploy.
+        regular_font = "Helvetica"
+        bold_font = "Helvetica-Bold"
+        for regular_path, bold_path in (
+            (r"C:\Windows\Fonts\arial.ttf", r"C:\Windows\Fonts\arialbd.ttf"),
+            ("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"),
+        ):
+            try:
+                pdfmetrics.registerFont(TTFont("SmartCareerRegular", regular_path))
+                pdfmetrics.registerFont(TTFont("SmartCareerBold", bold_path))
+                regular_font = "SmartCareerRegular"
+                bold_font = "SmartCareerBold"
+                break
+            except Exception:
+                continue
+
+        doc = SimpleDocTemplate(
+            buffer,
+            pagesize=A4,
+            rightMargin=16 * mm,
+            leftMargin=16 * mm,
+            topMargin=14 * mm,
+            bottomMargin=14 * mm,
+            title=resume.title,
+            author="SmartCareer AI",
+        )
+
+        base_styles = getSampleStyleSheet()
+        styles = {
+            "name": ParagraphStyle(
+                "Name",
+                parent=base_styles["Title"],
+                fontName=bold_font,
+                fontSize=24,
+                leading=28,
+                textColor=colors.white,
+                spaceAfter=4,
+            ),
+            "role": ParagraphStyle(
+                "Role",
+                parent=base_styles["Normal"],
+                fontName=regular_font,
+                fontSize=11,
+                leading=15,
+                textColor=colors.HexColor("#a7f3d0"),
+            ),
+            "contact": ParagraphStyle(
+                "Contact",
+                parent=base_styles["Normal"],
+                fontName=regular_font,
+                fontSize=8.5,
+                leading=12,
+                alignment=TA_RIGHT,
+                textColor=colors.HexColor("#e2e8f0"),
+            ),
+            "section": ParagraphStyle(
+                "Section",
+                parent=base_styles["Heading2"],
+                fontName=bold_font,
+                fontSize=11,
+                leading=14,
+                textColor=colors.HexColor("#0f172a"),
+                spaceBefore=10,
+                spaceAfter=5,
+                uppercase=True,
+            ),
+            "body": ParagraphStyle(
+                "Body",
+                parent=base_styles["BodyText"],
+                fontName=regular_font,
+                fontSize=9.5,
+                leading=14,
+                textColor=colors.HexColor("#334155"),
+                spaceAfter=5,
+            ),
+            "muted": ParagraphStyle(
+                "Muted",
+                parent=base_styles["BodyText"],
+                fontName=regular_font,
+                fontSize=8.5,
+                leading=12,
+                textColor=colors.HexColor("#64748b"),
+            ),
+            "item_title": ParagraphStyle(
+                "ItemTitle",
+                parent=base_styles["BodyText"],
+                fontName=bold_font,
+                fontSize=10,
+                leading=13,
+                textColor=colors.HexColor("#0f172a"),
+                spaceAfter=1,
+            ),
+            "bullet": ParagraphStyle(
+                "Bullet",
+                parent=base_styles["BodyText"],
+                fontName=regular_font,
+                fontSize=9,
+                leading=13,
+                textColor=colors.HexColor("#334155"),
+            ),
+        }
+
+        def clean(value: Any) -> str:
+            return html.escape(_first_text(value) or "")
+
+        def paragraph(value: Any, style_name: str = "body") -> Paragraph:
+            return Paragraph(clean(value).replace("\n", "<br/>"), styles[style_name])
+
+        story: List[Any] = []
+
+        name = _first_text(personal_info.get("name"), personal_info.get("full_name"), resume.title) or "Resume"
+        role = _first_text(personal_info.get("professional_title"), personal_info.get("title")) or "Professional"
+        contacts = [
+            _first_text(personal_info.get("email")),
+            _first_text(personal_info.get("phone")),
+            _first_text(personal_info.get("location")),
+            _first_text(personal_info.get("linkedin_url"), personal_info.get("linkedin")),
+            _first_text(personal_info.get("portfolio_url"), personal_info.get("website")),
+        ]
+        contact_text = "<br/>".join(html.escape(item) for item in contacts if item)
+
+        header = Table(
+            [
+                [
+                    [Paragraph(html.escape(name), styles["name"]), Paragraph(html.escape(role), styles["role"])],
+                    Paragraph(contact_text or "SmartCareer AI", styles["contact"]),
+                ]
+            ],
+            colWidths=[118 * mm, 52 * mm],
+            style=TableStyle([
+                ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#0f172a")),
+                ("BOX", (0, 0), (-1, -1), 0, colors.HexColor("#0f172a")),
+                ("LEFTPADDING", (0, 0), (-1, -1), 12),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 12),
+                ("TOPPADDING", (0, 0), (-1, -1), 12),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 12),
+                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ]),
+        )
+        story.extend([header, Spacer(1, 8)])
+
+        summary = _first_text(content.get("summary"), (content.get("professional_summary") or {}).get("text") if isinstance(content.get("professional_summary"), dict) else content.get("professional_summary"))
+        if summary:
+            story.extend([
+                paragraph("Professional Summary", "section"),
+                HRFlowable(width="100%", thickness=0.8, color=colors.HexColor("#10b981"), spaceAfter=5),
+                paragraph(summary),
+            ])
+
+        experience = content.get("experience") or content.get("work_experience") or []
+        if isinstance(experience, list) and experience:
+            story.extend([paragraph("Experience", "section"), HRFlowable(width="100%", thickness=0.8, color=colors.HexColor("#10b981"), spaceAfter=5)])
+            for item in experience:
+                if not isinstance(item, dict):
+                    continue
+                position = _first_text(item.get("position"), item.get("title"), item.get("job_title")) or "Role"
+                company = _first_text(item.get("company"), item.get("company_name"))
+                start = _first_text(item.get("start_date"))
+                end = "Present" if item.get("is_current") else _first_text(item.get("end_date"))
+                period = " - ".join(part for part in [start, end] if part)
+                title_line = " | ".join(part for part in [position, company] if part)
+                block: List[Any] = [paragraph(title_line, "item_title")]
+                if period:
+                    block.append(paragraph(period, "muted"))
+                if item.get("description"):
+                    block.append(paragraph(item.get("description")))
+                achievements = _as_text_list(item.get("achievements"))
+                if achievements:
+                    block.append(ListFlowable(
+                        [ListItem(paragraph(achievement, "bullet"), leftIndent=10) for achievement in achievements],
+                        bulletType="bullet",
+                        start="circle",
+                        leftIndent=14,
+                    ))
+                story.extend([KeepTogether(block), Spacer(1, 4)])
+
+        education = content.get("education") or []
+        if isinstance(education, list) and education:
+            story.extend([paragraph("Education", "section"), HRFlowable(width="100%", thickness=0.8, color=colors.HexColor("#10b981"), spaceAfter=5)])
+            for item in education:
+                if not isinstance(item, dict):
+                    continue
+                degree = _first_text(item.get("degree"), item.get("degree_type"))
+                field = _first_text(item.get("field"), item.get("field_of_study"), item.get("major"))
+                institution = _first_text(item.get("institution"), item.get("institution_name"))
+                year = _first_text(item.get("year"), item.get("graduation_date"))
+                story.extend([
+                    paragraph(" - ".join(part for part in [degree, field] if part) or "Education", "item_title"),
+                    paragraph(" | ".join(part for part in [institution, year] if part), "muted"),
+                    Spacer(1, 3),
+                ])
+
+        skills = content.get("skills") or {}
+        if isinstance(skills, dict):
+            technical = _as_text_list(skills.get("technical")) or _as_text_list(skills.get("technical_skills")) or _as_text_list(skills.get("tools_technologies"))
+            soft = _as_text_list(skills.get("soft")) or _as_text_list(skills.get("soft_skills"))
+        else:
+            technical = _as_text_list(skills)
+            soft = []
+        if technical or soft:
+            story.extend([paragraph("Skills", "section"), HRFlowable(width="100%", thickness=0.8, color=colors.HexColor("#10b981"), spaceAfter=5)])
+            skill_rows = []
+            if technical:
+                skill_rows.append([paragraph("Technical", "item_title"), paragraph(", ".join(technical), "body")])
+            if soft:
+                skill_rows.append([paragraph("Soft", "item_title"), paragraph(", ".join(soft), "body")])
+            story.append(Table(
+                skill_rows,
+                colWidths=[34 * mm, 136 * mm],
+                style=TableStyle([
+                    ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                    ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#f8fafc")),
+                    ("BOX", (0, 0), (-1, -1), 0.4, colors.HexColor("#e2e8f0")),
+                    ("INNERGRID", (0, 0), (-1, -1), 0.3, colors.HexColor("#e2e8f0")),
+                    ("LEFTPADDING", (0, 0), (-1, -1), 8),
+                    ("RIGHTPADDING", (0, 0), (-1, -1), 8),
+                    ("TOPPADDING", (0, 0), (-1, -1), 6),
+                    ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+                ]),
+            ))
+
+        projects = content.get("projects") or []
+        if isinstance(projects, list) and projects:
+            story.extend([paragraph("Projects", "section"), HRFlowable(width="100%", thickness=0.8, color=colors.HexColor("#10b981"), spaceAfter=5)])
+            for item in projects:
+                if not isinstance(item, dict):
+                    continue
+                story.extend([
+                    paragraph(_first_text(item.get("name"), item.get("project_name")) or "Project", "item_title"),
+                    paragraph(item.get("description")),
+                    Spacer(1, 3),
+                ])
+
+        certifications = content.get("certifications") or []
+        languages = content.get("languages") or []
+        extras: List[str] = []
+        if isinstance(certifications, list):
+            for cert in certifications:
+                if isinstance(cert, dict):
+                    extras.append(" - ".join(part for part in [_first_text(cert.get("name")), _first_text(cert.get("issuer"), cert.get("issuing_organization")), _first_text(cert.get("year"), cert.get("date"))] if part))
+        if isinstance(languages, list):
+            for language in languages:
+                if isinstance(language, dict):
+                    extras.append(" - ".join(part for part in [_first_text(language.get("name")), _first_text(language.get("proficiency"), language.get("level"))] if part))
+        if extras:
+            story.extend([paragraph("Additional", "section"), HRFlowable(width="100%", thickness=0.8, color=colors.HexColor("#10b981"), spaceAfter=5)])
+            story.append(ListFlowable(
+                [ListItem(paragraph(item, "bullet"), leftIndent=10) for item in extras if item],
+                bulletType="bullet",
+                leftIndent=14,
+            ))
+
+        def draw_footer(canvas, doc_obj):
+            canvas.saveState()
+            canvas.setFont(regular_font, 7)
+            canvas.setFillColor(colors.HexColor("#94a3b8"))
+            canvas.drawString(16 * mm, 9 * mm, f"Generated by SmartCareer AI | {datetime.now(timezone.utc).date().isoformat()}")
+            canvas.drawRightString(A4[0] - 16 * mm, 9 * mm, f"Page {doc_obj.page}")
+            canvas.restoreState()
+
+        doc.build(story, onFirstPage=draw_footer, onLaterPages=draw_footer)
+        return buffer.getvalue()
+    except Exception as exc:
+        logger.warning("Professional PDF rendering failed, using fallback renderer: %s", exc)
+        lines = [
+            resume.title,
+            f"Resume ID: {resume.id}",
+            f"Status: {resume.status}",
+            f"Generated At: {datetime.now(timezone.utc).isoformat()}",
+            "",
+        ]
+
+        resume_text = _build_resume_text(resume.content or {})
+        if resume_text:
+            lines.extend(resume_text.splitlines())
+        else:
+            lines.append("No resume content available.")
+
+        return _render_pdf_bytes(lines)
 
 
 # =============================================================================
@@ -871,25 +1359,66 @@ async def generate_ai_resume(
     """Generate a professional resume using AI."""
     
     start_time = time.time()
+    ai_service = None
+    gemini_service = None
+    tokens_used = 0
+    provider_used = (getattr(settings, "AI_PROVIDER", "gemini") or "gemini").lower()
+    model_used = settings.OPENAI_MODEL
+    openai_key_configured = bool((getattr(settings, "OPENAI_API_KEY", "") or "").strip())
+
+    class ProviderConfigurationError(Exception):
+        """Raised when the selected AI provider is not configured."""
+
+    class ProviderGenerationError(Exception):
+        """Raised when the selected AI provider cannot generate content."""
+
+    async def _generate_with_openai_provider(
+        *,
+        job_title_value: str,
+        years_experience_value: int,
+        skills_value: list[str],
+        education_level_value: str,
+        field_of_study_value: str,
+        tone_value: ResumeToneEnum,
+        user_data_value: dict[str, Any],
+    ) -> Dict[str, Any]:
+        """Generate resume content with OpenAI and normalize provider state."""
+        nonlocal ai_service, model_used, provider_used
+
+        from app.services.ai_service import AIService, AIConfigurationError, AIGenerationError
+
+        try:
+            ai_service = AIService()
+        except AIConfigurationError as e:
+            raise ProviderConfigurationError(str(e)) from e
+
+        provider_used = "openai"
+        model_used = settings.OPENAI_MODEL
+        logger.info("   Calling OpenAI API...")
+
+        try:
+            return await ai_service.generate_resume(
+                job_title=job_title_value,
+                years_experience=years_experience_value,
+                skills=skills_value,
+                education_level=education_level_value,
+                field_of_study=field_of_study_value,
+                industry=user_data_value.get("industry", "Technology"),
+                target_company=request.target_company,
+                job_description=request.job_description,
+                tone=tone_value,
+                include_projects=bool(user_data_value.get("projects")),
+                include_certifications=bool(user_data_value.get("certifications")),
+                user_input_data=user_data_value,
+            )
+        except AIGenerationError as e:
+            raise ProviderGenerationError(str(e)) from e
     
     logger.info(f"🤖 AI resume generation started for user: {current_user.id}")
     logger.info(f"   Template: {request.template.value}")
     logger.info(f"   Target job: {request.target_job_title or 'Not specified'}")
     
     try:
-        # Import AI service
-        from app.services.ai_service import AIService, AIConfigurationError, AIGenerationError
-        
-        # Initialize AI service
-        try:
-            ai_service = AIService()
-        except AIConfigurationError as e:
-            logger.error(f"AI service not configured: {e}")
-            return AIResumeGenerateResponse(
-                success=False,
-                message=f"AI service is not configured: {e}. Please add your OpenAI API key."
-            )
-        
         # Extract data from user_data
         user_data = request.user_data
         
@@ -931,23 +1460,79 @@ async def generate_ai_resume(
         }
         tone = request.tone or tone_map.get(request.template, ResumeToneEnum.PROFESSIONAL)
         
-        # Generate resume content using AI
-        logger.info("   Calling OpenAI API...")
-        
-        content = await ai_service.generate_resume(
-            job_title=job_title,
-            years_experience=years_experience,
-            skills=skills,
-            education_level=education_level,
-            field_of_study=field_of_study,
-            industry=user_data.get("industry", "Technology"),
-            target_company=request.target_company,
-            job_description=request.job_description,
-            tone=tone,
-            include_projects=bool(user_data.get("projects")),
-            include_certifications=bool(user_data.get("certifications")),
-            user_input_data=user_data,  # Pass all user data
-        )
+        # Generate resume content using the configured provider.
+        if provider_used == "gemini":
+            from app.services.gemini_service import gemini_service as configured_gemini_service
+
+            gemini_service = configured_gemini_service
+            if not getattr(gemini_service, "is_available", False):
+                if openai_key_configured:
+                    logger.warning("Gemini unavailable, falling back to OpenAI provider.")
+                    content = await _generate_with_openai_provider(
+                        job_title_value=job_title,
+                        years_experience_value=years_experience,
+                        skills_value=skills,
+                        education_level_value=education_level,
+                        field_of_study_value=field_of_study,
+                        tone_value=tone,
+                        user_data_value=user_data,
+                    )
+                else:
+                    raise ProviderConfigurationError(
+                        "Gemini API key is not configured. Please set GEMINI_API_KEY in your .env file."
+                    )
+            else:
+                logger.info("   Calling Gemini API...")
+                gemini_payload = {
+                    **user_data,
+                    "job_title": job_title,
+                    "target_job_title": request.target_job_title,
+                    "target_company": request.target_company,
+                    "job_description": request.job_description,
+                    "tone": tone.value,
+                    "template": request.template.value,
+                    "years_experience": years_experience,
+                    "education_level": education_level,
+                    "field_of_study": field_of_study,
+                    "industry": user_data.get("industry", "Technology"),
+                    "language": request.language,
+                }
+                gemini_result = await gemini_service.generate_resume(gemini_payload)
+                if not gemini_result.get("success"):
+                    gemini_error = gemini_result.get("error") or "Gemini resume generation failed"
+                    if openai_key_configured:
+                        logger.warning("Gemini generation failed (%s). Falling back to OpenAI.", gemini_error)
+                        content = await _generate_with_openai_provider(
+                            job_title_value=job_title,
+                            years_experience_value=years_experience,
+                            skills_value=skills,
+                            education_level_value=education_level,
+                            field_of_study_value=field_of_study,
+                            tone_value=tone,
+                            user_data_value=user_data,
+                        )
+                    else:
+                        if "leaked" in str(gemini_error).lower():
+                            raise ProviderGenerationError(
+                                "Gemini API key is blocked as leaked. Create a new GEMINI_API_KEY at https://ai.google.dev/ and update backend/.env."
+                            )
+                        raise ProviderGenerationError(gemini_error)
+                else:
+                    content = gemini_result.get("resume") or {}
+                    model_used = gemini_result.get("model") or settings.GEMINI_MODEL
+
+        else:
+            content = await _generate_with_openai_provider(
+                job_title_value=job_title,
+                years_experience_value=years_experience,
+                skills_value=skills,
+                education_level_value=education_level,
+                field_of_study_value=field_of_study,
+                tone_value=tone,
+                user_data_value=user_data,
+            )
+
+        content = _normalize_ai_resume_content(content, user_data, job_title)
         
         # Add template metadata to content
         if isinstance(content, dict):
@@ -955,6 +1540,8 @@ async def generate_ai_resume(
                 "template": request.template.value,
                 "generated_at": datetime.now(timezone.utc).isoformat(),
                 "language": request.language,
+                "provider": provider_used,
+                "model": model_used,
             }
         
         # Calculate ATS score (simple implementation)
@@ -965,14 +1552,30 @@ async def generate_ai_resume(
         cover_letter = None
         if request.include_cover_letter:
             try:
-                cover_letter = await ai_service.generate_cover_letter(
-                    resume_text=_build_resume_text(content),
-                    job_description=request.job_description
-                    or f"Tailored application for the {job_title} role.",
-                    company_name=request.target_company or "the target company",
-                    tone=tone.value,
-                )
-            except AIGenerationError as e:
+                if provider_used == "gemini" and gemini_service is not None:
+                    cover_letter_result = await gemini_service.generate_cover_letter(
+                        resume_data=content,
+                        job_description=request.job_description
+                        or f"Tailored application for the {job_title} role.",
+                        company_name=request.target_company or "the target company",
+                    )
+                    if cover_letter_result.get("success"):
+                        cover_letter = cover_letter_result.get("cover_letter")
+                    else:
+                        raise ProviderGenerationError(
+                            cover_letter_result.get("error") or "Gemini cover letter generation failed"
+                        )
+                elif ai_service is not None:
+                    from app.services.ai_service import AIGenerationError
+
+                    cover_letter = await ai_service.generate_cover_letter(
+                        resume_text=_build_resume_text(content),
+                        job_description=request.job_description
+                        or f"Tailored application for the {job_title} role.",
+                        company_name=request.target_company or "the target company",
+                        tone=tone.value,
+                    )
+            except Exception as e:
                 logger.warning(f"Cover letter generation failed: {e}")
         
         # Create resume in database
@@ -983,7 +1586,7 @@ async def generate_ai_resume(
             content=content,
             status=ResumeStatus.DRAFT.value,
             ai_generated=True,
-            ai_model_used=settings.OPENAI_MODEL,
+            ai_model_used=model_used,
             ats_score=ats_score,
         )
         
@@ -999,9 +1602,10 @@ async def generate_ai_resume(
         # Calculate processing time
         processing_time = time.time() - start_time
         
-        # Get token usage
-        usage = ai_service.get_usage_summary()
-        tokens_used = usage.get("total_tokens", 0)
+        # Get token usage when the provider exposes it.
+        if ai_service is not None:
+            usage = ai_service.get_usage_summary()
+            tokens_used = usage.get("total_tokens", 0)
         
         logger.info(f"✅ AI resume generated: {resume.id}")
         logger.info(f"   Processing time: {processing_time:.2f}s")
@@ -1019,11 +1623,18 @@ async def generate_ai_resume(
             ats_suggestions=ats_suggestions,
             template_used=request.template.value,
             tokens_used=tokens_used,
-            model_used=settings.OPENAI_MODEL,
+            model_used=model_used,
             processing_time_seconds=round(processing_time, 2),
         )
         
-    except AIGenerationError as e:
+    except ProviderConfigurationError as e:
+        logger.error(f"AI service not configured: {e}")
+        provider_hint = "GEMINI_API_KEY" if provider_used == "gemini" else "OPENAI_API_KEY"
+        return AIResumeGenerateResponse(
+            success=False,
+            message=f"AI service is not configured: {e}. Please check {provider_hint} in your .env file."
+        )
+    except ProviderGenerationError as e:
         logger.error(f"AI generation error: {e}")
         return AIResumeGenerateResponse(
             success=False,
@@ -1268,7 +1879,7 @@ async def get_resume_download(
     db: Session = Depends(get_db)
 ):
     """Alias GET endpoint for compatibility with older clients/tests."""
-    return await download_resume_pdf(resume_id=resume_id, current_user=current_user, db=db)
+    return await get_resume_pdf(resume_id=resume_id, current_user=current_user, db=db)
 
 
 @router.get(

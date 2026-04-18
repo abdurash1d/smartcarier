@@ -359,6 +359,17 @@ export const uz = {
       viewDocs: "Hujjatlarni ko'rish",
       new: "Yangi",
       ai: "AI",
+      jobPostings: "Vakansiyalar",
+      applicants: "Nomzodlar",
+      overview: "Umumiy ko'rinish",
+      systemHealth: "Tizim holati",
+      users: "Foydalanuvchilar",
+      errors: "Xatolar",
+      access: "Ruxsatlar",
+      savedJobs: "Saqlangan ishlar",
+      notifications: "Bildirishnomalar",
+      profileSettings: "Profil sozlamalari",
+      accountSettings: "Akkaunt sozlamalari",
     },
     
     // Profile completion
@@ -377,6 +388,13 @@ export const uz = {
       thisWeek: "bu hafta",
       nextTomorrow: "Keyingi: Ertaga",
       fromLastWeek: "o'tgan haftadan",
+      resumeCount: "{{count}} ta rezyume",
+      pendingCount: "{{count}} ta kutilmoqda",
+      noApplications: "Ariza yo'q",
+      interviewCount: "{{count}} ta intervyu",
+      noInterviews: "Intervyu yo'q",
+      acceptedCount: "{{count}} ta qabul qilindi",
+      underReview: "Ko'rib chiqilmoqda",
     },
     
     // Quick actions
@@ -406,6 +424,7 @@ export const uz = {
       hoursAgo: "soat oldin",
       dayAgo: "kun oldin",
       daysAgo: "kun oldin",
+      empty: "Hozircha faoliyat mavjud emas",
     },
     
     // Recommended jobs
@@ -413,6 +432,7 @@ export const uz = {
       title: "Siz uchun tavsiya etilgan",
       browseAll: "Hammasini ko'rish",
       match: "mos",
+      empty: "Hozircha ish imkoniyatlari mavjud emas",
     },
     
     // Upcoming interview
@@ -423,6 +443,13 @@ export const uz = {
       reschedule: "Qayta rejalashtirish",
       joinMeeting: "Uchrashuvga qo'shilish",
       tomorrow: "Ertaga",
+      formatNotSet: "Format belgilanmagan",
+      videoInterview: "Video intervyu",
+      phoneInterview: "Telefon intervyu",
+      inPersonInterview: "Shaxsan intervyu",
+      meetingLink: "Uchrashuv havolasi",
+      noMeetingLink: "Uchrashuv havolasi mavjud emas",
+      empty: "Hozircha rejalashtirilgan intervyu mavjud emas.",
     },
     
     resumes: {
@@ -448,6 +475,7 @@ export const uz = {
       search: "Ish qidirish",
       filters: "Filtrlar",
       noJobs: "Ish topilmadi",
+      jobFallback: "Ish joyi",
       apply: "Ariza berish",
       applied: "Ariza berilgan",
       saved: "Saqlangan",
@@ -915,12 +943,20 @@ export const uz = {
   },
 
   // Company Dashboard
+  notificationsPage: {
+    markAllRead: "Barchasini o'qildi deb belgilash",
+    empty: "Bildirishnoma yo'q",
+    allNotifications: "Barcha bildirishnomalar",
+  },
+
   companyDashboard: {
     welcome: "Xush kelibsiz",
     subtitle: "HR Boshqaruv paneli - barcha nomzodlar va vakansiyalarni boshqaring",
     newJob: "Yangi vakansiya",
     activeJobs: "Faol vakansiyalar",
     totalApplications: "Jami arizalar",
+    totalJobs: "Jami vakansiyalar",
+    totalViews: "Jami ko'rishlar",
     thisWeek: "bu hafta",
     interviewScheduled: "Suhbatga chaqirilgan",
     hiredThisMonth: "Bu oy ishga olindi",
@@ -935,6 +971,10 @@ export const uz = {
     rejected: "Rad etildi",
     activeJobsTitle: "Faol vakansiyalar",
     applications: "Arizalar",
+    views: "ko'rishlar",
+    noApplications: "Hozircha arizalar yo'q",
+    createFirstJob: "Yangi vakansiya yaratish",
+    noActiveJobs: "Faol vakansiya yo'q",
     viewAllJobs: "Barchasi ko'rish",
     aiRecommendations: "AI tavsiyalari",
     aiRecommendationsDesc: "AI tomonidan tanlangan eng mos nomzodlar",
@@ -942,6 +982,8 @@ export const uz = {
     contact: "Bog'lanish",
     viewProfile: "Profil",
     createJob: "Vakansiya yaratish",
+    bestCandidatesTitle: "Eng yaxshi nomzodlarni toping",
+    bestCandidatesDesc: "Yangi vakansiya yarating va AI yordamida eng mos nomzodlarni toping",
     createJobDesc: "Yangi ish e'loni qo'shish",
     candidates: "Nomzodlar",
     candidatesDesc: "Arizalarni ko'rish",
@@ -949,6 +991,26 @@ export const uz = {
     analyticsDesc: "HR statistikasi",
     companyProfile: "Kompaniya profili",
     companyProfileDesc: "Ma'lumotlarni tahrirlash",
+  },
+
+  companyJobsPage: {
+    title: "Vakansiyalar",
+    subtitle: "Ish e'lonlaringizni yarating va boshqaring",
+    postNewJob: "Yangi vakansiya e'lon qilish",
+    activeJobs: "Faol vakansiyalar",
+    totalApplications: "Jami arizalar",
+    totalViews: "Jami ko'rishlar",
+    drafts: "Qoralamalar",
+    noJobsTitle: "Hali vakansiya yo'q",
+    noJobsDescription: "Malakali nomzodlardan ariza olishni boshlash uchun birinchi vakansiyangizni yarating.",
+    postFirstJob: "Birinchi vakansiyani e'lon qilish",
+    applicants: "nomzod",
+    views: "ko'rish",
+    posted: "E'lon qilingan",
+    viewApplicants: "Nomzodlarni ko'rish",
+    publish: "E'lon qilish",
+    closeJob: "Vakansiyani yopish",
+    deleteConfirm: "\"{{title}}\" vakansiyasini o'chirishni tasdiqlaysizmi?",
   },
 
   // New Job Page

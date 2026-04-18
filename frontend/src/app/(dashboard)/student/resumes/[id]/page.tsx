@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
@@ -8,40 +8,29 @@ import {
   ArrowLeft,
   Edit,
   Download,
-  Globe,
-  Archive,
-  Trash2,
-  Mail,
-  Phone,
-  MapPin,
-  Linkedin,
-  ExternalLink,
-  Briefcase,
-  GraduationCap,
-  Code,
-  Award,
-  Languages,
   FolderOpen,
   Sparkles,
-  Eye,
-  Clock,
   Loader2,
   AlertCircle,
-  CheckCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { resumeApi } from "@/lib/api";
-import { formatDate, formatRelativeTime } from "@/lib/utils";
+import { formatRelativeTime } from "@/lib/utils";
 import type { Resume } from "@/types/api";
 import { toast } from "sonner";
+import { ResumePreview } from "@/components/resume/ResumePreview";
 
 const statusConfig = {
   draft: { label: "Qoralama", color: "bg-surface-100 text-surface-600" },
   published: { label: "Nashr etilgan", color: "bg-green-100 text-green-700" },
   archived: { label: "Arxivlangan", color: "bg-surface-200 text-surface-500" },
 };
+
+function sanitizeFilename(value: string) {
+  return (value || "resume").replace(/[\\/:*?"<>|]+/g, "_").replace(/\s+/g, "_");
+}
 
 export default function ResumeDetailPage() {
   const router = useRouter();
@@ -73,13 +62,14 @@ export default function ResumeDetailPage() {
     setIsDownloading(true);
     try {
       const res = await resumeApi.download(resumeId);
-      const url = window.URL.createObjectURL(new Blob([res.data]));
+      const url = window.URL.createObjectURL(new Blob([res.data], { type: "application/pdf" }));
       const link = document.createElement("a");
       link.href = url;
-      link.setAttribute("download", `${resume.title}.pdf`);
+      link.setAttribute("download", `${sanitizeFilename(resume.title)}.pdf`);
       document.body.appendChild(link);
       link.click();
       link.remove();
+      window.URL.revokeObjectURL(url);
       toast.success("Resume yuklab olindi!");
     } catch {
       toast.error("PDF yuklab olishda xatolik yuz berdi.");
@@ -118,8 +108,6 @@ export default function ResumeDetailPage() {
     );
   }
 
-  const c = resume.content;
-  const pi = c?.personal_info;
   const status = statusConfig[resume.status] || statusConfig.draft;
 
   return (
@@ -194,241 +182,9 @@ export default function ResumeDetailPage() {
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.1 }}
-        className="overflow-hidden rounded-2xl border border-surface-200 bg-white shadow-sm"
+        className="overflow-hidden rounded-[28px] border border-surface-200 bg-white shadow-xl"
       >
-        {/* Resume Header */}
-        <div className="border-b-4 border-purple-500 bg-gradient-to-r from-purple-50 to-indigo-50 p-8">
-          <h2 className="text-3xl font-bold text-surface-900">
-            {pi?.name || resume.title}
-          </h2>
-          {pi?.professional_title && (
-            <p className="mt-1 text-xl text-purple-600">{pi.professional_title}</p>
-          )}
-          <div className="mt-4 flex flex-wrap gap-4 text-sm text-surface-600">
-            {pi?.email && (
-              <span className="flex items-center gap-1">
-                <Mail className="h-4 w-4" /> {pi.email}
-              </span>
-            )}
-            {pi?.phone && (
-              <span className="flex items-center gap-1">
-                <Phone className="h-4 w-4" /> {pi.phone}
-              </span>
-            )}
-            {pi?.location && (
-              <span className="flex items-center gap-1">
-                <MapPin className="h-4 w-4" /> {pi.location}
-              </span>
-            )}
-            {pi?.linkedin_url && (
-              <a
-                href={pi.linkedin_url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-1 text-blue-600 hover:underline"
-              >
-                <Linkedin className="h-4 w-4" /> LinkedIn
-              </a>
-            )}
-            {pi?.portfolio_url && (
-              <a
-                href={pi.portfolio_url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-1 text-purple-600 hover:underline"
-              >
-                <ExternalLink className="h-4 w-4" /> Portfolio
-              </a>
-            )}
-          </div>
-        </div>
-
-        <div className="p-8 space-y-8">
-          {/* Summary */}
-          {c?.summary && (
-            <section>
-              <h3 className="mb-3 flex items-center gap-2 text-lg font-bold text-surface-900">
-                <div className="h-6 w-1 rounded-full bg-purple-500" />
-                Qisqacha ma'lumot
-              </h3>
-              <p className="text-surface-600 leading-relaxed">{c.summary}</p>
-            </section>
-          )}
-
-          {/* Experience */}
-          {c?.experience && c.experience.length > 0 && (
-            <section>
-              <h3 className="mb-4 flex items-center gap-2 text-lg font-bold text-surface-900">
-                <Briefcase className="h-5 w-5 text-purple-500" />
-                Ish tajribasi
-              </h3>
-              <div className="space-y-5">
-                {c.experience.map((exp, i) => (
-                  <div key={i} className="border-l-2 border-purple-200 pl-4">
-                    <div className="flex items-start justify-between">
-                      <div>
-                        <h4 className="font-semibold text-surface-900">{exp.position}</h4>
-                        <p className="text-purple-600">{exp.company}</p>
-                      </div>
-                      <p className="text-sm text-surface-500 whitespace-nowrap">
-                        {exp.start_date} — {exp.is_current ? "Hozirgi vaqt" : exp.end_date}
-                      </p>
-                    </div>
-                    <p className="mt-2 text-sm text-surface-600">{exp.description}</p>
-                    {exp.achievements && exp.achievements.length > 0 && (
-                      <ul className="mt-2 space-y-1">
-                        {exp.achievements.map((a, ai) => (
-                          <li key={ai} className="flex items-start gap-2 text-sm text-surface-600">
-                            <CheckCircle className="mt-0.5 h-3.5 w-3.5 flex-shrink-0 text-green-500" />
-                            {a}
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </section>
-          )}
-
-          {/* Education */}
-          {c?.education && c.education.length > 0 && (
-            <section>
-              <h3 className="mb-4 flex items-center gap-2 text-lg font-bold text-surface-900">
-                <GraduationCap className="h-5 w-5 text-purple-500" />
-                Ta'lim
-              </h3>
-              <div className="space-y-4">
-                {c.education.map((edu, i) => (
-                  <div key={i} className="border-l-2 border-purple-200 pl-4">
-                    <h4 className="font-semibold text-surface-900">
-                      {edu.degree} — {edu.field}
-                    </h4>
-                    <p className="text-purple-600">{edu.institution}</p>
-                    <p className="text-sm text-surface-500">{edu.year}</p>
-                    {edu.gpa && (
-                      <p className="text-sm text-surface-500">GPA: {edu.gpa}</p>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </section>
-          )}
-
-          {/* Skills */}
-          {c?.skills && (c.skills.technical?.length || c.skills.soft?.length) ? (
-            <section>
-              <h3 className="mb-4 flex items-center gap-2 text-lg font-bold text-surface-900">
-                <Code className="h-5 w-5 text-purple-500" />
-                Ko'nikmalar
-              </h3>
-              <div className="space-y-3">
-                {c.skills.technical && c.skills.technical.length > 0 && (
-                  <div>
-                    <p className="mb-2 text-sm font-medium text-surface-600">Texnik</p>
-                    <div className="flex flex-wrap gap-2">
-                      {c.skills.technical.map((s) => (
-                        <span key={s} className="rounded-full bg-purple-100 px-3 py-1 text-xs font-medium text-purple-700">
-                          {s}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                )}
-                {c.skills.soft && c.skills.soft.length > 0 && (
-                  <div>
-                    <p className="mb-2 text-sm font-medium text-surface-600">Ijtimoiy</p>
-                    <div className="flex flex-wrap gap-2">
-                      {c.skills.soft.map((s) => (
-                        <span key={s} className="rounded-full bg-cyan-100 px-3 py-1 text-xs font-medium text-cyan-700">
-                          {s}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            </section>
-          ) : null}
-
-          {/* Languages */}
-          {c?.languages && c.languages.length > 0 && (
-            <section>
-              <h3 className="mb-3 flex items-center gap-2 text-lg font-bold text-surface-900">
-                <Languages className="h-5 w-5 text-purple-500" />
-                Tillar
-              </h3>
-              <div className="flex flex-wrap gap-3">
-                {c.languages.map((lang, i) => (
-                  <div key={i} className="rounded-xl border border-surface-200 px-4 py-2 text-sm">
-                    <span className="font-medium text-surface-900">{lang.name}</span>
-                    <span className="ml-2 text-surface-500">— {lang.proficiency}</span>
-                  </div>
-                ))}
-              </div>
-            </section>
-          )}
-
-          {/* Certifications */}
-          {c?.certifications && c.certifications.length > 0 && (
-            <section>
-              <h3 className="mb-3 flex items-center gap-2 text-lg font-bold text-surface-900">
-                <Award className="h-5 w-5 text-purple-500" />
-                Sertifikatlar
-              </h3>
-              <div className="space-y-2">
-                {c.certifications.map((cert, i) => (
-                  <div key={i} className="flex items-center gap-3 rounded-xl border border-surface-200 p-3">
-                    <CheckCircle className="h-5 w-5 flex-shrink-0 text-green-500" />
-                    <div>
-                      <p className="font-medium text-surface-900">{cert.name}</p>
-                      <p className="text-sm text-surface-500">{cert.issuer} · {cert.year}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </section>
-          )}
-
-          {/* Projects */}
-          {c?.projects && c.projects.length > 0 && (
-            <section>
-              <h3 className="mb-4 flex items-center gap-2 text-lg font-bold text-surface-900">
-                <FolderOpen className="h-5 w-5 text-purple-500" />
-                Loyihalar
-              </h3>
-              <div className="space-y-4">
-                {c.projects.map((proj, i) => (
-                  <div key={i} className="rounded-xl border border-surface-200 p-4">
-                    <div className="flex items-start justify-between">
-                      <h4 className="font-semibold text-surface-900">{proj.name}</h4>
-                      {proj.url && (
-                        <a
-                          href={proj.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-purple-600 hover:underline"
-                        >
-                          <ExternalLink className="h-4 w-4" />
-                        </a>
-                      )}
-                    </div>
-                    <p className="mt-1 text-sm text-surface-600">{proj.description}</p>
-                    {proj.technologies && proj.technologies.length > 0 && (
-                      <div className="mt-2 flex flex-wrap gap-1">
-                        {proj.technologies.map((t) => (
-                          <span key={t} className="rounded bg-surface-100 px-2 py-0.5 text-xs text-surface-600">
-                            {t}
-                          </span>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </section>
-          )}
-        </div>
+        <ResumePreview content={resume.content} title={resume.title} />
       </motion.div>
     </div>
   );

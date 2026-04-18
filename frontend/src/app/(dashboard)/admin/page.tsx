@@ -44,6 +44,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import { cn, formatRelativeTime } from "@/lib/utils";
+import { useTranslation } from "@/hooks/useTranslation";
 
 type LoadState = "loading" | "ready" | "error";
 
@@ -63,6 +64,147 @@ const containerVariants = {
 const itemVariants = { hidden: { opacity: 0, y: 18 }, visible: { opacity: 1, y: 0 } };
 
 const sectionIds = { overview: "overview", health: "health", users: "users", errors: "errors" } as const;
+
+const adminCopy = {
+  uz: {
+    partialEndpointWarning: "Ba'zi admin endpointlari javob bermadi, lekin qolgan ma'lumotlar yuklandi.",
+    totalUsers: "Jami foydalanuvchilar",
+    totalUsersSubtitle: "Platformadagi jami foydalanuvchilar",
+    activeTrend: (count: number) => `${count} faol / 7 kun`,
+    newUsersToday: "Bugungi yangi foydalanuvchilar",
+    newUsersTodaySubtitle: "Bugun ro'yxatdan o'tganlar",
+    contentTotalsMetric: "Ishlar / rezyumelar / arizalar",
+    contentVolume: "Kontent hajmi",
+    errorsLast24h: "Oxirgi 24 soatdagi xatolar",
+    monitoringSignal: "Monitoring signali",
+    heroBadge: "Admin nazorat markazi",
+    heroTitle: "Platformani kuzating, xatolarni tez bartaraf qiling va foydalanuvchi faolligini boshqaring",
+    heroDescription: "Bu panel backend admin endpointlariga ulanadi va real vaqtda platformaning holati, foydalanuvchilar soni hamda xatolar statistikasi haqida ma'lumot beradi.",
+    refreshData: "Ma'lumotlarni yangilash",
+    jumpToErrors: "Xatolarga o'tish",
+    overview: "Umumiy",
+    overviewTitle: "Asosiy ko'rsatkichlar",
+    overviewDescription: "Eng muhim KPI'lar bitta ekranda. Bu yerda siz platforma umumiy holatini tez baholaysiz.",
+    health: "Holat",
+    healthTitle: "Tizim holati",
+    healthDescription: "Backend sog'ligi, AI va email servislarining konfiguratsiyasi, hamda error rate holati.",
+    users: "Foydalanuvchilar",
+    usersTitle: "Foydalanuvchi statistikasi",
+    usersDescription: "Ro'l bo'yicha taqsimot, aktivlik va yangi ro'yxatdan o'tganlar ko'rsatkichlari.",
+    userBreakdown: "Foydalanuvchilar taqsimoti",
+    active7d: "7 kun faol",
+    verified: "Tasdiqlangan",
+    contentTotals: "Kontent jamlanmasi",
+    resumes: "Rezyumelar",
+    jobs: "Vakansiyalar",
+    applications: "Arizalar",
+    errors: "Xatolar",
+    errorsTitle: "Xatolar monitoringi va hal qilish",
+    errorsDescription: "So'nggi xatolar, severity taqsimoti va resolve action bilan ishlash.",
+    recentUnresolvedErrors: "So'nggi yopilmagan xatolar",
+    resolveHelp: "Resolve tugmasi orqali muammoni yopishingiz mumkin.",
+    noErrors: "Hech qanday yopilmagan xato topilmadi",
+    noErrorsDescription: "Hozircha monitoring paneli toza.",
+    time: "Vaqt",
+    error: "Xato",
+    severity: "Daraja",
+    endpoint: "Endpoint",
+    action: "Harakat",
+    unknown: "Noma'lum",
+    resolve: "Yopish",
+    resolved: "Yopilgan",
+    open: "Ochiq",
+    severityBreakdown: "Darajalar taqsimoti",
+    noSeverityStats: "Severity statistikasi hozircha yo'q.",
+    topCategories: "Top kategoriyalar",
+    noCategoryStats: "Category statistikasi mavjud emas.",
+    errorResolve: "Xatoni yopish",
+    selectedError: "Tanlangan xato",
+    message: "Xabar",
+    resolutionNotes: "Yechim izohi",
+    notesPlaceholder: "Nima tuzatildi? Jamoa uchun kontekst yozing.",
+    cancel: "Bekor qilish",
+    resolving: "Yopilmoqda",
+    markResolved: "Yopilgan deb belgilash",
+    status: { healthy: "Sog'lom", unhealthy: "Nosoz", warning: "Ogohlantirish" },
+    healthComponents: {
+      database: "Ma'lumotlar bazasi",
+      ai_service: "AI servisi",
+      email_service: "Email servisi",
+      error_rate: "Xato darajasi",
+      memory: "Xotira",
+    } as Record<string, string>,
+  },
+  ru: {
+    partialEndpointWarning: "Некоторые admin endpoint'ы не ответили, но остальные данные загружены.",
+    totalUsers: "Всего пользователей",
+    totalUsersSubtitle: "Все пользователи платформы",
+    activeTrend: (count: number) => `${count} активны / 7 дней`,
+    newUsersToday: "Новые пользователи сегодня",
+    newUsersTodaySubtitle: "Зарегистрировались сегодня",
+    contentTotalsMetric: "Вакансии / резюме / отклики",
+    contentVolume: "Объём контента",
+    errorsLast24h: "Ошибки за 24 часа",
+    monitoringSignal: "Сигнал мониторинга",
+    heroBadge: "Центр администрирования",
+    heroTitle: "Следите за платформой, быстро устраняйте ошибки и управляйте активностью пользователей",
+    heroDescription: "Эта панель подключена к backend admin endpoint'ам и показывает состояние платформы, количество пользователей и статистику ошибок в реальном времени.",
+    refreshData: "Обновить данные",
+    jumpToErrors: "Перейти к ошибкам",
+    overview: "Обзор",
+    overviewTitle: "Ключевые показатели",
+    overviewDescription: "Главные KPI на одном экране, чтобы быстро оценить состояние платформы.",
+    health: "Состояние",
+    healthTitle: "Состояние системы",
+    healthDescription: "Состояние backend, конфигурация AI и email сервисов, а также уровень ошибок.",
+    users: "Пользователи",
+    usersTitle: "Статистика пользователей",
+    usersDescription: "Распределение по ролям, активность и новые регистрации.",
+    userBreakdown: "Распределение пользователей",
+    active7d: "Активны 7 дней",
+    verified: "Подтверждены",
+    contentTotals: "Итоги контента",
+    resumes: "Резюме",
+    jobs: "Вакансии",
+    applications: "Отклики",
+    errors: "Ошибки",
+    errorsTitle: "Мониторинг и обработка ошибок",
+    errorsDescription: "Последние ошибки, распределение по severity и закрытие инцидентов.",
+    recentUnresolvedErrors: "Последние открытые ошибки",
+    resolveHelp: "Нажмите Resolve, чтобы закрыть проблему.",
+    noErrors: "Открытых ошибок не найдено",
+    noErrorsDescription: "Панель мониторинга сейчас чистая.",
+    time: "Время",
+    error: "Ошибка",
+    severity: "Уровень",
+    endpoint: "Endpoint",
+    action: "Действие",
+    unknown: "Неизвестно",
+    resolve: "Закрыть",
+    resolved: "Закрыта",
+    open: "Открыта",
+    severityBreakdown: "Распределение по уровню",
+    noSeverityStats: "Статистики по severity пока нет.",
+    topCategories: "Топ категорий",
+    noCategoryStats: "Статистика категорий недоступна.",
+    errorResolve: "Закрыть ошибку",
+    selectedError: "Выбранная ошибка",
+    message: "Сообщение",
+    resolutionNotes: "Комментарий к решению",
+    notesPlaceholder: "Что исправлено? Добавьте контекст для команды.",
+    cancel: "Отмена",
+    resolving: "Закрываем",
+    markResolved: "Отметить как закрытую",
+    status: { healthy: "Исправно", unhealthy: "Неисправно", warning: "Предупреждение" },
+    healthComponents: {
+      database: "База данных",
+      ai_service: "AI сервис",
+      email_service: "Email сервис",
+      error_rate: "Уровень ошибок",
+      memory: "Память",
+    } as Record<string, string>,
+  },
+} as const;
 
 const healthIconMap: Record<string, React.ElementType> = {
   database: Database,
@@ -109,6 +251,8 @@ function SectionTitle({ eyebrow, title, description }: { eyebrow: string; title:
 }
 
 export default function AdminDashboardPage() {
+  const { locale } = useTranslation();
+  const copy = adminCopy[locale];
   const [data, setData] = useState<LoadedData>({ dashboard: null, health: null, userStats: null, errorStats: null, errors: [] });
   const [loadState, setLoadState] = useState<LoadState>("loading");
   const [refreshing, setRefreshing] = useState(false);
@@ -140,7 +284,7 @@ export default function AdminDashboardPage() {
       setData(nextData);
 
       const failedCount = [dashboardResult, healthResult, usersResult, statsResult, errorsResult].filter((r) => r.status === "rejected").length;
-      if (failedCount > 0) setLoadError("Ba'zi admin endpointlari javob bermadi, lekin qolgan ma'lumotlar yuklandi.");
+      if (failedCount > 0) setLoadError(copy.partialEndpointWarning);
       setLoadState("ready");
     } catch (error) {
       setLoadState("error");
@@ -154,45 +298,45 @@ export default function AdminDashboardPage() {
 
   const overviewCards = useMemo(() => [
     {
-      title: "Total users",
+      title: copy.totalUsers,
       value: data.dashboard?.overview.total_users ?? 0,
-      subtitle: "Platformadagi jami foydalanuvchilar",
+      subtitle: copy.totalUsersSubtitle,
       icon: Users,
       accent: "bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-300",
-      trend: data.userStats ? `${data.userStats.users.active_last_7_days} active / 7d` : undefined,
+      trend: data.userStats ? copy.activeTrend(data.userStats.users.active_last_7_days) : undefined,
     },
     {
-      title: "New users today",
+      title: copy.newUsersToday,
       value: data.dashboard?.overview.new_users_today ?? 0,
-      subtitle: "Bugun ro'yxatdan o'tganlar",
+      subtitle: copy.newUsersTodaySubtitle,
       icon: UserCheck,
       accent: "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300",
     },
     {
-      title: "Jobs / resumes / applications",
+      title: copy.contentTotalsMetric,
       value: data.dashboard ? `${data.dashboard.overview.total_jobs} / ${data.dashboard.overview.total_resumes} / ${data.dashboard.overview.total_applications}` : "0 / 0 / 0",
-      subtitle: "Kontent hajmi",
+      subtitle: copy.contentVolume,
       icon: BarChart3,
       accent: "bg-violet-100 text-violet-700 dark:bg-violet-500/20 dark:text-violet-300",
     },
     {
-      title: "Errors last 24h",
+      title: copy.errorsLast24h,
       value: data.dashboard?.errors.total_24h ?? data.errorStats?.total_errors ?? 0,
-      subtitle: "Monitoring signali",
+      subtitle: copy.monitoringSignal,
       icon: AlertTriangle,
       accent: "bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300",
     },
-  ], [data.dashboard, data.errorStats, data.userStats]);
+  ], [copy, data.dashboard, data.errorStats, data.userStats]);
 
   const healthItems = useMemo(() => {
     if (!data.health?.components) return [];
     return Object.entries(data.health.components).map(([key, details]) => ({
       key,
-      label: key.replace(/_/g, " ").replace(/\b\w/g, (letter) => letter.toUpperCase()),
+      label: copy.healthComponents[key] || key.replace(/_/g, " ").replace(/\b\w/g, (letter) => letter.toUpperCase()),
       details,
       icon: healthIconMap[key] || Shield,
     }));
-  }, [data.health]);
+  }, [copy, data.health]);
 
   const severityEntries = useMemo(() => Object.entries(data.errorStats?.errors_by_severity || {}).sort((a, b) => b[1] - a[1]), [data.errorStats]);
   const categoryEntries = useMemo(() => Object.entries(data.errorStats?.errors_by_category || {}).sort((a, b) => b[1] - a[1]), [data.errorStats]);
@@ -222,13 +366,13 @@ export default function AdminDashboardPage() {
       <motion.section variants={itemVariants} className="overflow-hidden rounded-[2rem] border border-surface-200 bg-[radial-gradient(circle_at_top_left,_rgba(59,130,246,0.18),_transparent_32%),linear-gradient(135deg,_rgba(15,23,42,0.96),_rgba(30,41,59,0.92))] p-6 text-white shadow-2xl dark:border-surface-700 sm:p-8">
         <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
           <div className="max-w-3xl">
-            <div className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs font-medium text-white/80 backdrop-blur"><Shield className="h-3.5 w-3.5" />Admin control center</div>
-            <h1 className="mt-4 font-display text-3xl font-bold tracking-tight sm:text-4xl">Platformani kuzating, xatolarni tez bartaraf qiling va foydalanuvchi faolligini boshqaring</h1>
-            <p className="mt-3 max-w-2xl text-sm text-white/75 sm:text-base">Bu panel backend admin endpointlariga ulanadi va real vaqtda platformaning holati, foydalanuvchilar soni hamda xatolar statistikasi haqida ma&apos;lumot beradi.</p>
+            <div className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs font-medium text-white/80 backdrop-blur"><Shield className="h-3.5 w-3.5" />{copy.heroBadge}</div>
+            <h1 className="mt-4 font-display text-3xl font-bold tracking-tight sm:text-4xl">{copy.heroTitle}</h1>
+            <p className="mt-3 max-w-2xl text-sm text-white/75 sm:text-base">{copy.heroDescription}</p>
           </div>
           <div className="flex flex-wrap gap-3">
-            <Button variant="outline" onClick={() => void loadAdminData(true)} className="border-white/20 bg-white/10 text-white hover:bg-white/15"><RefreshCw className={cn("mr-2 h-4 w-4", refreshing && "animate-spin")} />Refresh data</Button>
-            <Link href="#errors"><Button className="bg-white text-slate-900 hover:bg-slate-100">Jump to errors<ArrowRight className="ml-2 h-4 w-4" /></Button></Link>
+            <Button variant="outline" onClick={() => void loadAdminData(true)} className="border-white/20 bg-white/10 text-white hover:bg-white/15"><RefreshCw className={cn("mr-2 h-4 w-4", refreshing && "animate-spin")} />{copy.refreshData}</Button>
+            <Link href="#errors"><Button className="bg-white text-slate-900 hover:bg-slate-100">{copy.jumpToErrors}<ArrowRight className="ml-2 h-4 w-4" /></Button></Link>
           </div>
         </div>
       </motion.section>
@@ -236,7 +380,7 @@ export default function AdminDashboardPage() {
       {loadError && <motion.div variants={itemVariants}><Card className="border-amber-200 bg-amber-50 dark:border-amber-500/30 dark:bg-amber-500/10"><CardContent className="flex items-center gap-3 p-4 text-amber-900 dark:text-amber-100"><AlertTriangle className="h-5 w-5 flex-shrink-0" /><p className="text-sm">{loadError}</p></CardContent></Card></motion.div>}
 
       <motion.section variants={itemVariants} id={sectionIds.overview} className="space-y-4 scroll-mt-24">
-          <SectionTitle eyebrow="Overview" title="Asosiy ko'rsatkichlar" description="Eng muhim KPI&apos;lar bitta ekranda. Bu yerda siz platforma umumiy holatini tez baholaysiz." />
+          <SectionTitle eyebrow={copy.overview} title={copy.overviewTitle} description={copy.overviewDescription} />
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           {loadState === "loading" ? Array.from({ length: 4 }).map((_, index) => <Skeleton key={index} className="h-36 rounded-2xl" />) : overviewCards.map((card) => <MetricCard key={card.title} title={card.title} value={card.value} subtitle={card.subtitle} icon={card.icon} accent={card.accent} trend={card.trend} />)}
         </div>
@@ -244,7 +388,7 @@ export default function AdminDashboardPage() {
 
       <div className="grid gap-6 xl:grid-cols-[1.6fr_0.9fr]">
         <motion.section variants={itemVariants} id={sectionIds.health} className="space-y-4 scroll-mt-24">
-          <SectionTitle eyebrow="Health" title="System health" description="Backend sog'ligi, AI va email servislarining konfiguratsiyasi, hamda error rate holati." />
+          <SectionTitle eyebrow={copy.health} title={copy.healthTitle} description={copy.healthDescription} />
           <div className="grid gap-4 md:grid-cols-2">
             {loadState === "loading" ? (
               Array.from({ length: 4 }).map((_, index) => (
@@ -266,7 +410,7 @@ export default function AdminDashboardPage() {
                             <p className="text-sm font-medium text-surface-500">{item.label}</p>
                           </div>
                           <p className="mt-2 text-lg font-semibold text-surface-900 dark:text-white">
-                            {String(item.details.status)}
+                            {copy.status[String(item.details.status || "warning").toLowerCase() as keyof typeof copy.status] || String(item.details.status)}
                           </p>
                           <div className="mt-2 flex flex-wrap gap-2 text-xs text-surface-500">
                             {Object.entries(item.details)
@@ -295,14 +439,14 @@ export default function AdminDashboardPage() {
         </motion.section>
 
         <motion.section variants={itemVariants} id={sectionIds.users} className="space-y-4 scroll-mt-24">
-          <SectionTitle eyebrow="Users" title="Foydalanuvchi statistikasi" description="Ro&apos;l bo&apos;yicha taqsimot, aktivlik va yangi ro&apos;yxatdan o&apos;tganlar ko&apos;rsatkichlari." />
+          <SectionTitle eyebrow={copy.users} title={copy.usersTitle} description={copy.usersDescription} />
           <Card>
-            <CardHeader><CardTitle className="text-lg">User breakdown</CardTitle></CardHeader>
+            <CardHeader><CardTitle className="text-lg">{copy.userBreakdown}</CardTitle></CardHeader>
             <CardContent className="space-y-4">
               {loadState === "loading" ? <div className="space-y-3"><Skeleton className="h-20 rounded-xl" /><Skeleton className="h-20 rounded-xl" /><Skeleton className="h-20 rounded-xl" /></div> : (<>
                 <div className="grid grid-cols-2 gap-3">
-                  <div className="rounded-2xl bg-surface-50 p-4 dark:bg-surface-900/60"><p className="text-xs uppercase tracking-wide text-surface-500">Active 7d</p><p className="mt-1 text-2xl font-bold text-surface-900 dark:text-white">{data.userStats?.users.active_last_7_days ?? 0}</p></div>
-                  <div className="rounded-2xl bg-surface-50 p-4 dark:bg-surface-900/60"><p className="text-xs uppercase tracking-wide text-surface-500">Verified</p><p className="mt-1 text-2xl font-bold text-surface-900 dark:text-white">{data.userStats?.users.verified ?? 0}</p></div>
+                  <div className="rounded-2xl bg-surface-50 p-4 dark:bg-surface-900/60"><p className="text-xs uppercase tracking-wide text-surface-500">{copy.active7d}</p><p className="mt-1 text-2xl font-bold text-surface-900 dark:text-white">{data.userStats?.users.active_last_7_days ?? 0}</p></div>
+                  <div className="rounded-2xl bg-surface-50 p-4 dark:bg-surface-900/60"><p className="text-xs uppercase tracking-wide text-surface-500">{copy.verified}</p><p className="mt-1 text-2xl font-bold text-surface-900 dark:text-white">{data.userStats?.users.verified ?? 0}</p></div>
                 </div>
                 <div className="space-y-3">
                   {Object.entries(data.userStats?.users.by_role || {}).map(([role, value]) => {
@@ -317,11 +461,11 @@ export default function AdminDashboardPage() {
                   })}
                 </div>
                 <div className="rounded-2xl border border-dashed border-surface-200 p-4 dark:border-surface-700">
-                  <p className="text-sm font-medium text-surface-900 dark:text-white">Content totals</p>
+                  <p className="text-sm font-medium text-surface-900 dark:text-white">{copy.contentTotals}</p>
                   <div className="mt-3 grid grid-cols-3 gap-3 text-sm">
-                    <div><p className="text-surface-500">Resumes</p><p className="font-semibold text-surface-900 dark:text-white">{data.userStats?.content.total_resumes ?? 0}</p></div>
-                    <div><p className="text-surface-500">Jobs</p><p className="font-semibold text-surface-900 dark:text-white">{data.userStats?.content.total_jobs ?? 0}</p></div>
-                    <div><p className="text-surface-500">Applications</p><p className="font-semibold text-surface-900 dark:text-white">{data.userStats?.content.total_applications ?? 0}</p></div>
+                    <div><p className="text-surface-500">{copy.resumes}</p><p className="font-semibold text-surface-900 dark:text-white">{data.userStats?.content.total_resumes ?? 0}</p></div>
+                    <div><p className="text-surface-500">{copy.jobs}</p><p className="font-semibold text-surface-900 dark:text-white">{data.userStats?.content.total_jobs ?? 0}</p></div>
+                    <div><p className="text-surface-500">{copy.applications}</p><p className="font-semibold text-surface-900 dark:text-white">{data.userStats?.content.total_applications ?? 0}</p></div>
                   </div>
                 </div>
               </>)}
@@ -331,18 +475,18 @@ export default function AdminDashboardPage() {
       </div>
 
       <motion.section variants={itemVariants} id={sectionIds.errors} className="space-y-4 scroll-mt-24">
-        <SectionTitle eyebrow="Errors" title="Error monitoring and resolution" description="So'nggi errorlar, severity taqsimoti va resolve action bilan ishlash." />
+        <SectionTitle eyebrow={copy.errors} title={copy.errorsTitle} description={copy.errorsDescription} />
         <div className="grid gap-6 xl:grid-cols-[1.4fr_0.8fr]">
           <Card className="overflow-hidden">
             <CardHeader className="flex flex-row items-center justify-between gap-3">
-              <div><CardTitle className="text-lg">Recent unresolved errors</CardTitle><p className="text-sm text-surface-500">Resolve tugmasi orqali muammoni yopishingiz mumkin.</p></div>
+              <div><CardTitle className="text-lg">{copy.recentUnresolvedErrors}</CardTitle><p className="text-sm text-surface-500">{copy.resolveHelp}</p></div>
               <Badge variant="warning">{data.dashboard?.errors.total_24h ?? data.errorStats?.total_errors ?? 0} / 24h</Badge>
             </CardHeader>
             <CardContent>
-              {loadState === "loading" ? <div className="space-y-3">{Array.from({ length: 5 }).map((_, index) => <Skeleton key={index} className="h-20 rounded-xl" />)}</div> : data.errors.length === 0 ? <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-surface-200 py-12 text-center dark:border-surface-700"><CheckCircle2 className="h-10 w-10 text-green-600" /><p className="mt-3 font-medium text-surface-900 dark:text-white">Hech qanday unresolved error topilmadi</p><p className="mt-1 text-sm text-surface-500">Hozircha monitoring paneli toza.</p></div> : (
+              {loadState === "loading" ? <div className="space-y-3">{Array.from({ length: 5 }).map((_, index) => <Skeleton key={index} className="h-20 rounded-xl" />)}</div> : data.errors.length === 0 ? <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-surface-200 py-12 text-center dark:border-surface-700"><CheckCircle2 className="h-10 w-10 text-green-600" /><p className="mt-3 font-medium text-surface-900 dark:text-white">{copy.noErrors}</p><p className="mt-1 text-sm text-surface-500">{copy.noErrorsDescription}</p></div> : (
                 <div className="overflow-hidden rounded-2xl border border-surface-200 dark:border-surface-700">
                   <div className="grid grid-cols-[1.1fr_1fr_0.8fr_0.8fr_0.8fr] gap-3 border-b border-surface-200 bg-surface-50 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-surface-500 dark:border-surface-700 dark:bg-surface-900/60">
-                    <span>Time</span><span>Error</span><span>Severity</span><span>Endpoint</span><span>Action</span>
+                    <span>{copy.time}</span><span>{copy.error}</span><span>{copy.severity}</span><span>{copy.endpoint}</span><span>{copy.action}</span>
                   </div>
                   <div className="divide-y divide-surface-200 dark:divide-surface-700">
                     {data.errors.map((errorItem) => (
@@ -350,8 +494,8 @@ export default function AdminDashboardPage() {
                         <div><p className="font-medium text-surface-900 dark:text-white">{formatRelativeTime(errorItem.timestamp)}</p><p className="mt-1 text-xs text-surface-500">{errorItem.category}</p></div>
                         <div className="min-w-0"><p className="truncate font-medium text-surface-900 dark:text-white">{errorItem.error_type}</p><p className="mt-1 max-h-10 overflow-hidden text-xs text-surface-500">{errorItem.error_message}</p></div>
                         <div><Badge variant={errorItem.severity === "critical" ? "error" : errorItem.severity === "warning" ? "warning" : "secondary"}>{errorItem.severity}</Badge></div>
-                        <div className="min-w-0 text-surface-500"><p className="truncate">{errorItem.endpoint || errorItem.path || "Unknown"}</p><p className="mt-1 text-xs">{errorItem.method || "-"}</p></div>
-                        <div className="flex items-center gap-2"><Button variant="outline" size="sm" onClick={() => openResolveDialog(errorItem)}>Resolve</Button><Badge variant={errorItem.resolved ? "success" : "warning"}>{errorItem.resolved ? "Resolved" : "Open"}</Badge></div>
+                        <div className="min-w-0 text-surface-500"><p className="truncate">{errorItem.endpoint || errorItem.path || copy.unknown}</p><p className="mt-1 text-xs">{errorItem.method || "-"}</p></div>
+                        <div className="flex items-center gap-2"><Button variant="outline" size="sm" onClick={() => openResolveDialog(errorItem)}>{copy.resolve}</Button><Badge variant={errorItem.resolved ? "success" : "warning"}>{errorItem.resolved ? copy.resolved : copy.open}</Badge></div>
                       </div>
                     ))}
                   </div>
@@ -362,16 +506,16 @@ export default function AdminDashboardPage() {
 
           <div className="space-y-6">
             <Card>
-              <CardHeader><CardTitle className="text-lg">Severity breakdown</CardTitle></CardHeader>
+              <CardHeader><CardTitle className="text-lg">{copy.severityBreakdown}</CardTitle></CardHeader>
               <CardContent className="space-y-4">
-                {loadState === "loading" ? <div className="space-y-3"><Skeleton className="h-16 rounded-xl" /><Skeleton className="h-16 rounded-xl" /><Skeleton className="h-16 rounded-xl" /></div> : severityEntries.length > 0 ? severityEntries.map(([severity, value]) => { const max = severityEntries[0]?.[1] || 1; const percent = Math.round((value / max) * 100); return <div key={severity} className="space-y-2"><div className="flex items-center justify-between text-sm"><span className="font-medium text-surface-700 dark:text-surface-200">{severity}</span><span className="text-surface-500">{value}</span></div><div className="h-2 rounded-full bg-surface-100 dark:bg-surface-700"><div className="h-2 rounded-full bg-gradient-to-r from-amber-500 to-red-500" style={{ width: `${percent}%` }} /></div></div>; }) : <p className="text-sm text-surface-500">Severity statistikasi hozircha yo&apos;q.</p>}
+                {loadState === "loading" ? <div className="space-y-3"><Skeleton className="h-16 rounded-xl" /><Skeleton className="h-16 rounded-xl" /><Skeleton className="h-16 rounded-xl" /></div> : severityEntries.length > 0 ? severityEntries.map(([severity, value]) => { const max = severityEntries[0]?.[1] || 1; const percent = Math.round((value / max) * 100); return <div key={severity} className="space-y-2"><div className="flex items-center justify-between text-sm"><span className="font-medium text-surface-700 dark:text-surface-200">{severity}</span><span className="text-surface-500">{value}</span></div><div className="h-2 rounded-full bg-surface-100 dark:bg-surface-700"><div className="h-2 rounded-full bg-gradient-to-r from-amber-500 to-red-500" style={{ width: `${percent}%` }} /></div></div>; }) : <p className="text-sm text-surface-500">{copy.noSeverityStats}</p>}
               </CardContent>
             </Card>
 
             <Card>
-              <CardHeader><CardTitle className="text-lg">Top categories</CardTitle></CardHeader>
+              <CardHeader><CardTitle className="text-lg">{copy.topCategories}</CardTitle></CardHeader>
               <CardContent className="space-y-3">
-                {loadState === "loading" ? <div className="space-y-3"><Skeleton className="h-14 rounded-xl" /><Skeleton className="h-14 rounded-xl" /><Skeleton className="h-14 rounded-xl" /></div> : categoryEntries.length > 0 ? categoryEntries.slice(0, 5).map(([category, value]) => <div key={category} className="flex items-center justify-between rounded-xl bg-surface-50 px-4 py-3 dark:bg-surface-900/60"><span className="font-medium text-surface-700 dark:text-surface-200">{category}</span><Badge variant="secondary">{value}</Badge></div>) : <p className="text-sm text-surface-500">Category statistikasi mavjud emas.</p>}
+                {loadState === "loading" ? <div className="space-y-3"><Skeleton className="h-14 rounded-xl" /><Skeleton className="h-14 rounded-xl" /><Skeleton className="h-14 rounded-xl" /></div> : categoryEntries.length > 0 ? categoryEntries.slice(0, 5).map(([category, value]) => <div key={category} className="flex items-center justify-between rounded-xl bg-surface-50 px-4 py-3 dark:bg-surface-900/60"><span className="font-medium text-surface-700 dark:text-surface-200">{category}</span><Badge variant="secondary">{value}</Badge></div>) : <p className="text-sm text-surface-500">{copy.noCategoryStats}</p>}
               </CardContent>
             </Card>
           </div>
@@ -381,13 +525,13 @@ export default function AdminDashboardPage() {
       <Dialog open={!!selectedError} onOpenChange={(open) => !open && setSelectedError(null)}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
-            <DialogTitle>Error resolve</DialogTitle>
-            <DialogDescription>{selectedError ? `${selectedError.error_type} - ${selectedError.category}` : "Selected error"}</DialogDescription>
+            <DialogTitle>{copy.errorResolve}</DialogTitle>
+            <DialogDescription>{selectedError ? `${selectedError.error_type} - ${selectedError.category}` : copy.selectedError}</DialogDescription>
           </DialogHeader>
-          {selectedError && <div className="space-y-4"><div className="grid gap-3 sm:grid-cols-2"><div className="rounded-xl bg-surface-50 p-3 dark:bg-surface-900/60"><p className="text-xs uppercase tracking-wide text-surface-500">Message</p><p className="mt-1 text-sm text-surface-900 dark:text-white">{selectedError.error_message}</p></div><div className="rounded-xl bg-surface-50 p-3 dark:bg-surface-900/60"><p className="text-xs uppercase tracking-wide text-surface-500">Endpoint</p><p className="mt-1 text-sm text-surface-900 dark:text-white">{selectedError.endpoint || selectedError.path || "-"}</p></div></div><div className="space-y-2"><p className="text-sm font-medium text-surface-900 dark:text-white">Resolution notes</p><Textarea value={resolutionNotes} onChange={(event) => setResolutionNotes(event.target.value)} placeholder="What was fixed? Add context for the team." rows={5} /></div></div>}
+          {selectedError && <div className="space-y-4"><div className="grid gap-3 sm:grid-cols-2"><div className="rounded-xl bg-surface-50 p-3 dark:bg-surface-900/60"><p className="text-xs uppercase tracking-wide text-surface-500">{copy.message}</p><p className="mt-1 text-sm text-surface-900 dark:text-white">{selectedError.error_message}</p></div><div className="rounded-xl bg-surface-50 p-3 dark:bg-surface-900/60"><p className="text-xs uppercase tracking-wide text-surface-500">{copy.endpoint}</p><p className="mt-1 text-sm text-surface-900 dark:text-white">{selectedError.endpoint || selectedError.path || "-"}</p></div></div><div className="space-y-2"><p className="text-sm font-medium text-surface-900 dark:text-white">{copy.resolutionNotes}</p><Textarea value={resolutionNotes} onChange={(event) => setResolutionNotes(event.target.value)} placeholder={copy.notesPlaceholder} rows={5} /></div></div>}
           <DialogFooter>
-            <Button variant="outline" onClick={() => setSelectedError(null)} disabled={resolving}>Cancel</Button>
-            <Button onClick={() => void handleResolve()} disabled={resolving}>{resolving ? <><RefreshCw className="mr-2 h-4 w-4 animate-spin" />Resolving</> : "Mark as resolved"}</Button>
+            <Button variant="outline" onClick={() => setSelectedError(null)} disabled={resolving}>{copy.cancel}</Button>
+            <Button onClick={() => void handleResolve()} disabled={resolving}>{resolving ? <><RefreshCw className="mr-2 h-4 w-4 animate-spin" />{copy.resolving}</> : copy.markResolved}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

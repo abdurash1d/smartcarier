@@ -23,7 +23,7 @@ VERSION: 2.0.0 (migrated from google-generativeai to google-genai)
 
 import json
 import logging
-from typing import Dict, Any, Optional
+from typing import Dict, Any, List, Optional
 
 try:
     from google import genai
@@ -58,21 +58,99 @@ class GeminiService:
     def __init__(self):
         """Gemini client yaratish"""
         self.api_key = getattr(settings, 'GEMINI_API_KEY', None)
-        # Use correct model name format for Gemini API
-        model_setting = getattr(settings, 'GEMINI_MODEL', 'gemini-1.5-flash')
-        # Map common names to API model names
-        model_mapping = {
-            'gemini-1.5-flash': 'gemini-1.5-flash',
-            'gemini-1.5-pro': 'gemini-1.5-pro',
-            'gemini-pro': 'gemini-pro',
-            'gemini-flash': 'gemini-1.5-flash',
-            'gemini-2.0-flash': 'gemini-2.0-flash',
-            'gemini-2.0-pro': 'gemini-2.0-pro-exp',
-        }
-        self._model_name = model_mapping.get(model_setting, model_setting)
+        model_setting = getattr(settings, 'GEMINI_MODEL', 'gemini-2.5-flash')
+        self._model_name = self._normalize_model_name(model_setting)
+        self._model_candidates = self._build_model_candidates(self._model_name)
         self.client = None
 
         self._initialize()
+
+    @staticmethod
+    def _normalize_model_name(model_name: str) -> str:
+        """Map common aliases to canonical Gemini model names."""
+        model_mapping = {
+            "gemini-2.5-flash": "gemini-2.5-flash",
+            "gemini-2.5-pro": "gemini-2.5-pro",
+            "gemini-2.0-flash": "gemini-2.0-flash",
+            "gemini-2.0-flash-exp": "gemini-2.0-flash-exp",
+            "gemini-2.0-pro": "gemini-2.0-pro-exp",
+            "gemini-2.0-pro-exp": "gemini-2.0-pro-exp",
+            "gemini-1.5-flash": "gemini-1.5-flash",
+            "gemini-1.5-pro": "gemini-1.5-pro",
+            "gemini-flash": "gemini-2.5-flash",
+            "gemini-pro": "gemini-2.5-pro",
+        }
+        return model_mapping.get((model_name or "").strip(), (model_name or "").strip())
+
+    def _build_model_candidates(self, preferred_model: str) -> List[str]:
+        """Build a robust fallback order so old model names don't break runtime."""
+        ordered = [
+            preferred_model,
+            "gemini-2.5-flash",
+            "gemini-2.5-pro",
+            "gemini-2.0-flash",
+            "gemini-2.0-flash-exp",
+            "gemini-2.0-pro-exp",
+            "gemini-1.5-flash",
+            "gemini-1.5-pro",
+        ]
+        deduped: List[str] = []
+        for model in ordered:
+            normalized = self._normalize_model_name(model)
+            if normalized and normalized not in deduped:
+                deduped.append(normalized)
+        return deduped
+
+    @staticmethod
+    def _is_model_unavailable_error(error: Exception) -> bool:
+        """Detect provider errors caused by invalid/deprecated model names."""
+        message = str(error).lower()
+        return (
+            "not_found" in message
+            or "is not found" in message
+            or "not supported for generatecontent" in message
+            or "unknown model" in message
+        )
+
+    async def _generate_with_fallback(self, prompt: str):
+        """
+        Call Gemini with automatic model fallback.
+
+        Returns:
+            tuple(response, used_model)
+        """
+        if not self.client:
+            raise Exception("Gemini API not configured")
+
+        last_error: Optional[Exception] = None
+
+        for model in self._model_candidates:
+            try:
+                response = await self.client.aio.models.generate_content(
+                    model=model,
+                    contents=prompt,
+                )
+
+                if model != self._model_name:
+                    logger.warning(
+                        "Gemini model switched from %s to %s due to compatibility.",
+                        self._model_name,
+                        model,
+                    )
+                    self._model_name = model
+
+                return response, model
+            except Exception as e:
+                last_error = e
+                if self._is_model_unavailable_error(e):
+                    logger.warning("Gemini model %s unavailable, trying fallback model.", model)
+                    continue
+                raise
+
+        raise Exception(
+            f"No compatible Gemini model found. Tried: {', '.join(self._model_candidates)}. "
+            f"Last error: {last_error}"
+        )
 
     def _initialize(self):
         """Gemini client ni sozlash"""
@@ -127,11 +205,7 @@ class GeminiService:
             if response_format == "json":
                 prompt = f"{prompt}\n\nIMPORTANT: Return ONLY valid JSON, no other text."
 
-            # Generate response (async)
-            response = await self.client.aio.models.generate_content(
-                model=self._model_name,
-                contents=prompt,
-            )
+            response, _ = await self._generate_with_fallback(prompt)
 
             # Extract text
             text = response.text.strip()
@@ -229,10 +303,7 @@ IMPORTANT:
 """
 
         try:
-            response = await self.client.aio.models.generate_content(
-                model=self._model_name,
-                contents=prompt,
-            )
+            response, used_model = await self._generate_with_fallback(prompt)
 
             # Parse JSON from response
             text = response.text.strip()
@@ -252,7 +323,7 @@ IMPORTANT:
             return {
                 "success": True,
                 "resume": resume_data,
-                "model": self._model_name,
+                "model": used_model,
                 "provider": "gemini"
             }
 
@@ -310,10 +381,7 @@ Return ONLY valid JSON.
 """
 
         try:
-            response = await self.client.aio.models.generate_content(
-                model=self._model_name,
-                contents=prompt,
-            )
+            response, used_model = await self._generate_with_fallback(prompt)
             text = response.text.strip()
 
             if text.startswith("```json"):
@@ -328,6 +396,7 @@ Return ONLY valid JSON.
             return {
                 "success": True,
                 **result,
+                "model": used_model,
                 "provider": "gemini"
             }
 
@@ -369,10 +438,7 @@ Return ONLY valid JSON.
 """
 
         try:
-            response = await self.client.aio.models.generate_content(
-                model=self._model_name,
-                contents=prompt,
-            )
+            response, used_model = await self._generate_with_fallback(prompt)
             text = response.text.strip()
 
             if text.startswith("```json"):
@@ -387,6 +453,7 @@ Return ONLY valid JSON.
             return {
                 "success": True,
                 **result,
+                "model": used_model,
                 "provider": "gemini"
             }
 

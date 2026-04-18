@@ -32,33 +32,35 @@ import { UserAvatar } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { NotificationBell } from "@/components/NotificationBell";
+import { useTranslation } from "@/hooks/useTranslation";
+import { LanguageSwitcher } from "@/components/ui/language-switcher";
 
 interface NavItem {
-  name: string;
+  labelKey: string;
   href: string;
   icon: React.ElementType;
   badge?: number;
 }
 
 const studentNavItems: NavItem[] = [
-  { name: "My Resumes", href: "/student/resumes", icon: FileText },
-  { name: "Job Search", href: "/student/jobs", icon: Briefcase },
-  { name: "Applications", href: "/student/applications", icon: ClipboardList },
-  { name: "Settings", href: "/student/settings", icon: Settings },
+  { labelKey: "dashboard.sidebar.myResumes", href: "/student/resumes", icon: FileText },
+  { labelKey: "dashboard.sidebar.findJobs", href: "/student/jobs", icon: Briefcase },
+  { labelKey: "dashboard.sidebar.myApplications", href: "/student/applications", icon: ClipboardList },
+  { labelKey: "dashboard.sidebar.settings", href: "/student/settings", icon: Settings },
 ];
 
 const companyNavItems: NavItem[] = [
-  { name: "Job Postings", href: "/company/jobs", icon: Briefcase },
-  { name: "Applicants", href: "/company/applicants", icon: Users },
-  { name: "Settings", href: "/company/settings", icon: Settings },
+  { labelKey: "dashboard.sidebar.jobPostings", href: "/company/jobs", icon: Briefcase },
+  { labelKey: "dashboard.sidebar.applicants", href: "/company/applicants", icon: Users },
+  { labelKey: "dashboard.sidebar.settings", href: "/company/settings", icon: Settings },
 ];
 
 const adminNavItems: NavItem[] = [
-  { name: "Overview", href: "/admin#overview", icon: Activity },
-  { name: "System Health", href: "/admin#health", icon: Server },
-  { name: "Users", href: "/admin#users", icon: Users },
-  { name: "Errors", href: "/admin#errors", icon: AlertTriangle },
-  { name: "Access", href: "/admin/access", icon: KeyRound },
+  { labelKey: "dashboard.sidebar.overview", href: "/admin#overview", icon: Activity },
+  { labelKey: "dashboard.sidebar.systemHealth", href: "/admin#health", icon: Server },
+  { labelKey: "dashboard.sidebar.users", href: "/admin#users", icon: Users },
+  { labelKey: "dashboard.sidebar.errors", href: "/admin#errors", icon: AlertTriangle },
+  { labelKey: "dashboard.sidebar.access", href: "/admin/access", icon: KeyRound },
 ];
 
 interface DashboardLayoutProps {
@@ -68,6 +70,7 @@ interface DashboardLayoutProps {
 export function DashboardLayout({ children }: DashboardLayoutProps) {
   const pathname = usePathname()!;
   const { user, logout, isStudent, isCompany, isAdmin } = useAuth();
+  const { t } = useTranslation();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [currentHash, setCurrentHash] = useState("");
@@ -92,7 +95,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
   const effectiveHash = currentHash || (pathname === "/admin" ? "#overview" : "");
 
   const userMenuLink = isAdmin ? "/admin#overview" : isCompany ? "/company/settings" : "/student/settings";
-  const userMenuLabel = isAdmin ? "Overview" : "Settings";
+  const userMenuLabel = isAdmin ? t("dashboard.sidebar.overview") : t("dashboard.sidebar.settings");
   const UserMenuIcon = isAdmin ? LayoutDashboard : Settings;
 
   const activeNavName = useMemo(() => {
@@ -107,8 +110,8 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
       return effectiveHash === `#${itemHash}`;
     });
 
-    return activeItem?.name || "Dashboard";
-  }, [effectiveHash, navItems, pathname]);
+    return activeItem ? t(activeItem.labelKey) : t("dashboard.title");
+  }, [effectiveHash, navItems, pathname, t]);
 
   const isNavItemActive = (item: NavItem) => {
     const [itemPath, itemHash] = item.href.split("#");
@@ -165,17 +168,17 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
             <div className="mx-4 mt-4 rounded-xl bg-gradient-to-br from-brand-500 to-brand-600 p-4 text-white">
               <div className="flex items-center gap-2 mb-2">
                 <Zap className="h-5 w-5" />
-                <span className="font-semibold">AI Resume Builder</span>
+                <span className="font-semibold">{t("dashboard.sidebar.createAIResume")}</span>
               </div>
               <p className="text-sm text-brand-100 mb-3">
-                Generate a professional resume in seconds
+                {t("dashboard.quickActions.createAIResumeDesc")}
               </p>
               <Link
                 href="/student/resumes/new"
                 className="flex items-center justify-center gap-2 rounded-lg bg-white px-3 py-2 text-sm font-medium text-brand-600 hover:bg-brand-50 transition-colors"
               >
                 <PlusCircle className="h-4 w-4" />
-                Create with AI
+                {t("dashboard.resumes.createAI")}
               </Link>
             </div>
           )}
@@ -186,7 +189,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
               const isActive = isNavItemActive(item);
               return (
                 <Link
-                  key={item.name}
+                  key={item.href}
                   href={item.href}
                   className={cn(
                     "flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors",
@@ -196,7 +199,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                   )}
                 >
                   <item.icon className={cn("h-5 w-5", isActive ? "text-brand-500" : "")} />
-                  {item.name}
+                  {t(item.labelKey)}
                   {item.badge && (
                     <span className="ml-auto flex h-5 w-5 items-center justify-center rounded-full bg-brand-500 text-xs text-white">
                       {item.badge}
@@ -244,6 +247,9 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
 
           {/* Right side actions */}
           <div className="flex items-center gap-3">
+            {/* Language Switcher */}
+            <LanguageSwitcher variant="minimal" />
+
             {/* Dark Mode Toggle */}
             <ThemeToggle />
             
@@ -290,7 +296,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                         className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-500/10"
                       >
                         <LogOut className="h-4 w-4" />
-                        Sign out
+                        {t("nav.logout")}
                       </button>
                     </div>
                   </div>

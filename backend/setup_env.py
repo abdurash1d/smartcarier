@@ -68,7 +68,7 @@ REFRESH_TOKEN_EXPIRE_DAYS=7
 # -----------------------------------------------------------------------------
 # Get your key: https://ai.google.dev/
 GEMINI_API_KEY=
-GEMINI_MODEL=gemini-2.0-flash-exp
+GEMINI_MODEL=gemini-2.5-flash
 AI_PROVIDER=gemini
 
 # -----------------------------------------------------------------------------

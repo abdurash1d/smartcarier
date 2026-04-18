@@ -112,9 +112,9 @@ class Settings(BaseSettings):
     GEMINI_API_KEY: str = ""
     
     # Gemini model tanlash
-    # "gemini-1.5-flash" - Tez va bepul
-    # "gemini-1.5-pro" - Kuchliroq
-    GEMINI_MODEL: str = "gemini-1.5-flash"
+    # "gemini-2.5-flash" - Tavsiya etiladi (tez va zamonaviy)
+    # "gemini-2.5-pro" - Kuchliroq
+    GEMINI_MODEL: str = "gemini-2.5-flash"
     
     # AI provider tanlash: "gemini" yoki "openai"
     AI_PROVIDER: str = "gemini"

@@ -26,6 +26,7 @@ VERSION: 1.0.0
 
 import logging
 from datetime import datetime, timezone
+from time import time
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks, Request, Query
@@ -67,6 +68,8 @@ from app.config import settings
 # =============================================================================
 
 logger = logging.getLogger(__name__)
+
+_LOCAL_OAUTH_STATES: dict[str, float] = {}
 
 # =============================================================================
 # ROUTER
@@ -191,11 +194,33 @@ def _require_oauth_state_store(provider: str):
     return redis_client
 
 
+def _local_oauth_state_enabled() -> bool:
+    """Allow OAuth state fallback only for local development."""
+    return bool(settings.DEBUG and not settings.REDIS_ENABLED)
+
+
+def _oauth_state_key(provider: str, state: str) -> str:
+    return f"oauth_state:{provider.lower()}:{state}"
+
+
+def _cleanup_local_oauth_states(now: float) -> None:
+    expired_keys = [key for key, expires_at in _LOCAL_OAUTH_STATES.items() if expires_at <= now]
+    for key in expired_keys:
+        _LOCAL_OAUTH_STATES.pop(key, None)
+
+
 def _store_oauth_state(provider: str, state: str) -> None:
     """Persist OAuth state for later callback validation."""
+    if _local_oauth_state_enabled():
+        now = time()
+        _cleanup_local_oauth_states(now)
+        _LOCAL_OAUTH_STATES[_oauth_state_key(provider, state)] = now + settings.OAUTH_STATE_TTL_SECONDS
+        logger.info("Using local in-memory OAuth state storage for development")
+        return
+
     redis_client = _require_oauth_state_store(provider)
     redis_client.set(
-        f"oauth_state:{provider.lower()}:{state}",
+        _oauth_state_key(provider, state),
         "1",
         ex=settings.OAUTH_STATE_TTL_SECONDS,
     )
@@ -203,9 +228,22 @@ def _store_oauth_state(provider: str, state: str) -> None:
 
 def _consume_oauth_state(provider: str, state: str) -> None:
     """Validate and consume a previously stored OAuth state token."""
-    redis_client = _require_oauth_state_store(provider)
-    state_key = f"oauth_state:{provider.lower()}:{state}"
+    state_key = _oauth_state_key(provider, state)
     provider_label = provider.title()
+
+    if _local_oauth_state_enabled():
+        now = time()
+        _cleanup_local_oauth_states(now)
+        expires_at = _LOCAL_OAUTH_STATES.pop(state_key, None)
+        if expires_at is None or expires_at <= now:
+            raise _oauth_error(
+                status.HTTP_400_BAD_REQUEST,
+                "INVALID_OAUTH_STATE",
+                f"Invalid or expired {provider_label} OAuth state.",
+            )
+        return
+
+    redis_client = _require_oauth_state_store(provider)
 
     try:
         if not redis_client.exists(state_key):
@@ -1062,8 +1100,6 @@ async def linkedin_oauth_callback(
             error_code="LINKEDIN_OAUTH_AUTHENTICATION_FAILED",
             message="OAuth authentication failed",
         )
-
-
 
 
 

@@ -243,7 +243,7 @@ export const resumeApi = {
   archive: (id: string) => api.post(`/resumes/${id}/archive`),
   
   download: (id: string) =>
-    api.get(`/resumes/${id}/download`, { responseType: "blob" }),
+    api.get(`/resumes/${id}/pdf`, { responseType: "blob" }),
   
   analytics: (id: string) => api.get(`/resumes/${id}/analytics`),
 };
