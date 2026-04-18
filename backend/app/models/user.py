@@ -326,7 +326,14 @@ class User(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin):
     
     # Role: Determines what the user can do
     role = Column(
-        SQLEnum(UserRole, name='user_role_enum', create_type=True),
+        # Persist enum values ("student", "company", "admin") to match
+        # existing PostgreSQL enum type created by Alembic migrations.
+        SQLEnum(
+            UserRole,
+            name='user_role_enum',
+            create_type=True,
+            values_callable=lambda enum_cls: [member.value for member in enum_cls],
+        ),
         nullable=False,
         default=UserRole.STUDENT,
         index=True,            # Often filter by role
