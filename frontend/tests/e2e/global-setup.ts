@@ -1,5 +1,6 @@
 import { request } from '@playwright/test';
 import { execFileSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import path from 'node:path';
 
 type Json = Record<string, any>;
@@ -10,6 +11,38 @@ const RAW_API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000';
 const API_URL = RAW_API_URL.replace(/\/api\/v1\/?$/, '');
 const ROOT_DIR = path.resolve(process.cwd(), '..');
 const BACKEND_DIR = path.join(ROOT_DIR, 'backend');
+const WEAK_SECRET_KEYS = new Set([
+  '',
+  'your-super-secret-key-change-in-production',
+  'CHANGE-THIS-TO-RANDOM-32-CHAR-STRING-USE-COMMAND-BELOW',
+  'generate-a-secure-random-key-here',
+  'secret',
+  'changeme',
+  'change-me',
+  'test-secret',
+  'test-secret-key-for-ci',
+]);
+
+function isStrongSecretKey(secretKey: string): boolean {
+  return secretKey.length >= 32 && !WEAK_SECRET_KEYS.has(secretKey);
+}
+
+function resolveSeedSecretKey(): string {
+  const envSecret = (process.env.SECRET_KEY || '').trim();
+  if (isStrongSecretKey(envSecret)) {
+    return envSecret;
+  }
+
+  // Deterministic across the same repo/branch context while avoiding weak defaults.
+  const deterministicSeed = [
+    'smartcareer-e2e-admin-seed-secret-v1',
+    process.env.GITHUB_REPOSITORY || '',
+    process.env.GITHUB_REF || '',
+    ROOT_DIR,
+  ].join('|');
+
+  return createHash('sha256').update(deterministicSeed).digest('hex');
+}
 
 function ensureAdminAccount() {
   const script = `
@@ -65,6 +98,7 @@ finally:
     : [process.env.DATABASE_URL || 'sqlite:///./smartcareer.db'];
 
   let lastError: unknown = null;
+  const seedSecretKey = resolveSeedSecretKey();
 
   for (const databaseUrl of candidateDatabaseUrls) {
     try {
@@ -74,6 +108,7 @@ finally:
         env: {
           ...process.env,
           DATABASE_URL: databaseUrl,
+          SECRET_KEY: seedSecretKey,
           PYTHONUTF8: '1',
         },
       });
