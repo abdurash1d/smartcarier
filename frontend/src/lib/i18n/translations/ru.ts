@@ -359,6 +359,17 @@ export const ru = {
       viewDocs: "Документация",
       new: "Новое",
       ai: "AI",
+      jobPostings: "Вакансии",
+      applicants: "Кандидаты",
+      overview: "Обзор",
+      systemHealth: "Состояние системы",
+      users: "Пользователи",
+      errors: "Ошибки",
+      access: "Доступ",
+      savedJobs: "Сохранённые вакансии",
+      notifications: "Уведомления",
+      profileSettings: "Настройки профиля",
+      accountSettings: "Настройки аккаунта",
     },
     
     // Profile completion
@@ -377,6 +388,13 @@ export const ru = {
       thisWeek: "на этой неделе",
       nextTomorrow: "Следующее: Завтра",
       fromLastWeek: "с прошлой недели",
+      resumeCount: "{{count}} резюме",
+      pendingCount: "{{count}} ожидают",
+      noApplications: "Откликов нет",
+      interviewCount: "{{count}} собеседований",
+      noInterviews: "Собеседований нет",
+      acceptedCount: "{{count}} принято",
+      underReview: "На рассмотрении",
     },
     
     // Quick actions
@@ -406,6 +424,7 @@ export const ru = {
       hoursAgo: "часов назад",
       dayAgo: "день назад",
       daysAgo: "дней назад",
+      empty: "Активности пока нет",
     },
     
     // Recommended jobs
@@ -413,6 +432,7 @@ export const ru = {
       title: "Рекомендовано для вас",
       browseAll: "Смотреть все",
       match: "совп.",
+      empty: "Вакансий пока нет",
     },
     
     // Upcoming interview
@@ -423,6 +443,13 @@ export const ru = {
       reschedule: "Перенести",
       joinMeeting: "Присоединиться",
       tomorrow: "Завтра",
+      formatNotSet: "Формат не указан",
+      videoInterview: "Видео собеседование",
+      phoneInterview: "Телефонное собеседование",
+      inPersonInterview: "Очное собеседование",
+      meetingLink: "Ссылка на встречу",
+      noMeetingLink: "Ссылка на встречу отсутствует",
+      empty: "Запланированных собеседований пока нет.",
     },
     
     resumes: {
@@ -448,6 +475,7 @@ export const ru = {
       search: "Поиск работы",
       filters: "Фильтры",
       noJobs: "Вакансии не найдены",
+      jobFallback: "Вакансия",
       apply: "Откликнуться",
       applied: "Отклик отправлен",
       saved: "Сохранено",
@@ -915,12 +943,20 @@ export const ru = {
   },
 
   // Company Dashboard
+  notificationsPage: {
+    markAllRead: "Отметить всё как прочитанное",
+    empty: "Уведомлений нет",
+    allNotifications: "Все уведомления",
+  },
+
   companyDashboard: {
     welcome: "Добро пожаловать",
     subtitle: "HR Панель управления - управляйте кандидатами и вакансиями",
     newJob: "Новая вакансия",
     activeJobs: "Активные вакансии",
     totalApplications: "Всего откликов",
+    totalJobs: "Всего вакансий",
+    totalViews: "Всего просмотров",
     thisWeek: "на этой неделе",
     interviewScheduled: "Собеседований назначено",
     hiredThisMonth: "Принято в этом месяце",
@@ -935,6 +971,10 @@ export const ru = {
     rejected: "Отказ",
     activeJobsTitle: "Активные вакансии",
     applications: "Откликов",
+    views: "просмотров",
+    noApplications: "Пока нет откликов",
+    createFirstJob: "Создать новую вакансию",
+    noActiveJobs: "Активных вакансий нет",
     viewAllJobs: "Смотреть все",
     aiRecommendations: "AI рекомендации",
     aiRecommendationsDesc: "Лучшие кандидаты, подобранные AI",
@@ -942,6 +982,8 @@ export const ru = {
     contact: "Связаться",
     viewProfile: "Профиль",
     createJob: "Создать вакансию",
+    bestCandidatesTitle: "Найдите лучших кандидатов",
+    bestCandidatesDesc: "Создайте вакансию и находите самых подходящих кандидатов с помощью AI",
     createJobDesc: "Добавить новое объявление",
     candidates: "Кандидаты",
     candidatesDesc: "Просмотр откликов",
@@ -949,6 +991,26 @@ export const ru = {
     analyticsDesc: "HR статистика",
     companyProfile: "Профиль компании",
     companyProfileDesc: "Редактировать данные",
+  },
+
+  companyJobsPage: {
+    title: "Вакансии",
+    subtitle: "Создавайте и управляйте своими вакансиями",
+    postNewJob: "Опубликовать вакансию",
+    activeJobs: "Активные вакансии",
+    totalApplications: "Всего откликов",
+    totalViews: "Всего просмотров",
+    drafts: "Черновики",
+    noJobsTitle: "Вакансий пока нет",
+    noJobsDescription: "Создайте первую вакансию, чтобы начать получать отклики от подходящих кандидатов.",
+    postFirstJob: "Опубликовать первую вакансию",
+    applicants: "кандидатов",
+    views: "просмотров",
+    posted: "Опубликовано",
+    viewApplicants: "Смотреть кандидатов",
+    publish: "Опубликовать",
+    closeJob: "Закрыть вакансию",
+    deleteConfirm: "Вы подтверждаете удаление вакансии \"{{title}}\"?",
   },
 
   // New Job Page

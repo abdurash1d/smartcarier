@@ -26,9 +26,10 @@ VERSION: 1.0.0
 
 import logging
 from datetime import datetime, timezone
+from time import time
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks, Request
+from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks, Request, Query
 from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
@@ -68,6 +69,8 @@ from app.config import settings
 
 logger = logging.getLogger(__name__)
 
+_LOCAL_OAUTH_STATES: dict[str, float] = {}
+
 # =============================================================================
 # ROUTER
 # =============================================================================
@@ -103,6 +106,7 @@ def create_token_response(user: User) -> TokenResponse:
         full_name=user.full_name,
         phone=user.phone,
         role=user.role.value,
+        admin_role=user.effective_admin_role.value if user.effective_admin_role else None,
         is_verified=user.is_verified,
         avatar_url=user.avatar_url,
         bio=user.bio,
@@ -156,6 +160,109 @@ def normalize_user_id(user_id: str) -> UUID | str:
         return UUID(str(user_id))
     except (ValueError, TypeError, AttributeError):
         return user_id
+
+
+def _oauth_error(status_code: int, error_code: str, message: str) -> HTTPException:
+    """Build a stable OAuth error payload."""
+    return HTTPException(
+        status_code=status_code,
+        detail={
+            "error": error_code,
+            "message": message,
+        },
+    )
+
+
+def _require_oauth_state_store(provider: str):
+    """
+    Require secure state storage for OAuth flows.
+
+    OAuth state must be validated server-side. If Redis/state storage is not
+    available, the flow must fail closed instead of silently bypassing CSRF
+    protection.
+    """
+    from app.core.redis_client import get_redis
+
+    provider_label = provider.title()
+    redis_client = get_redis()
+    if redis_client is None:
+        raise _oauth_error(
+            status.HTTP_503_SERVICE_UNAVAILABLE,
+            "OAUTH_STATE_STORAGE_UNAVAILABLE",
+            f"{provider_label} OAuth is temporarily unavailable because secure state storage is not available.",
+        )
+    return redis_client
+
+
+def _local_oauth_state_enabled() -> bool:
+    """Allow OAuth state fallback only for local development."""
+    return bool(settings.DEBUG and not settings.REDIS_ENABLED)
+
+
+def _oauth_state_key(provider: str, state: str) -> str:
+    return f"oauth_state:{provider.lower()}:{state}"
+
+
+def _cleanup_local_oauth_states(now: float) -> None:
+    expired_keys = [key for key, expires_at in _LOCAL_OAUTH_STATES.items() if expires_at <= now]
+    for key in expired_keys:
+        _LOCAL_OAUTH_STATES.pop(key, None)
+
+
+def _store_oauth_state(provider: str, state: str) -> None:
+    """Persist OAuth state for later callback validation."""
+    if _local_oauth_state_enabled():
+        now = time()
+        _cleanup_local_oauth_states(now)
+        _LOCAL_OAUTH_STATES[_oauth_state_key(provider, state)] = now + settings.OAUTH_STATE_TTL_SECONDS
+        logger.info("Using local in-memory OAuth state storage for development")
+        return
+
+    redis_client = _require_oauth_state_store(provider)
+    redis_client.set(
+        _oauth_state_key(provider, state),
+        "1",
+        ex=settings.OAUTH_STATE_TTL_SECONDS,
+    )
+
+
+def _consume_oauth_state(provider: str, state: str) -> None:
+    """Validate and consume a previously stored OAuth state token."""
+    state_key = _oauth_state_key(provider, state)
+    provider_label = provider.title()
+
+    if _local_oauth_state_enabled():
+        now = time()
+        _cleanup_local_oauth_states(now)
+        expires_at = _LOCAL_OAUTH_STATES.pop(state_key, None)
+        if expires_at is None or expires_at <= now:
+            raise _oauth_error(
+                status.HTTP_400_BAD_REQUEST,
+                "INVALID_OAUTH_STATE",
+                f"Invalid or expired {provider_label} OAuth state.",
+            )
+        return
+
+    redis_client = _require_oauth_state_store(provider)
+
+    try:
+        if not redis_client.exists(state_key):
+            raise _oauth_error(
+                status.HTTP_400_BAD_REQUEST,
+                "INVALID_OAUTH_STATE",
+                f"Invalid or expired {provider_label} OAuth state.",
+            )
+
+        redis_client.delete(state_key)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.warning(f"Failed to validate OAuth state ({provider}): {e}")
+        raise _oauth_error(
+            status.HTTP_503_SERVICE_UNAVAILABLE,
+            "OAUTH_STATE_VALIDATION_FAILED",
+            f"{provider_label} OAuth state validation is temporarily unavailable.",
+        )
 
 
 async def send_password_reset_email(email: str, user_name: str, token: str):
@@ -715,6 +822,7 @@ async def get_current_user_profile(
         full_name=current_user.full_name,
         phone=current_user.phone,
         role=current_user.role.value,
+        admin_role=current_user.effective_admin_role.value if current_user.effective_admin_role else None,
         is_verified=current_user.is_verified,
         avatar_url=current_user.avatar_url,
         bio=current_user.bio,
@@ -742,7 +850,6 @@ async def google_oauth_authorize(redirect: bool = False):
     """
     from app.services.oauth_service import oauth_service
     import secrets
-    from app.core.redis_client import get_redis
     
     if not oauth_service.is_configured()["google"]:
         raise HTTPException(
@@ -753,17 +860,8 @@ async def google_oauth_authorize(redirect: bool = False):
     # Generate CSRF state token
     state = secrets.token_urlsafe(32)
 
-    # Store state for CSRF validation (Redis preferred)
-    try:
-        redis_client = get_redis()
-        if redis_client:
-            redis_client.set(
-                f"oauth_state:google:{state}",
-                "1",
-                ex=settings.OAUTH_STATE_TTL_SECONDS,
-            )
-    except Exception as e:
-        logger.warning(f"Failed to store OAuth state (google): {e}")
+    # Store state for CSRF validation. Fail closed if state storage is missing.
+    _store_oauth_state("google", state)
     
     # Get authorization URL
     auth_url = oauth_service.get_google_auth_url(state)
@@ -773,7 +871,6 @@ async def google_oauth_authorize(redirect: bool = False):
     
     return {
         "auth_url": auth_url,
-        "state": state,
     }
 
 
@@ -783,22 +880,16 @@ async def google_oauth_authorize(redirect: bool = False):
     description="Handle Google OAuth callback and create/login user"
 )
 async def google_oauth_callback(
-    code: str,
-    state: str,
+    code: str = Query(..., min_length=1),
+    state: str = Query(..., min_length=1),
     db: Session = Depends(get_db)
 ):
     """Handle Google OAuth callback."""
     from app.services.oauth_service import oauth_service
-    from app.core.redis_client import get_redis
     
     try:
         # Validate CSRF state
-        redis_client = get_redis()
-        if redis_client:
-            state_key = f"oauth_state:google:{state}"
-            if not redis_client.exists(state_key):
-                raise ValueError("Invalid or expired OAuth state")
-            redis_client.delete(state_key)
+        _consume_oauth_state("google", state)
 
         # Get user info from Google
         user_info = await oauth_service.get_google_user_info(code)
@@ -862,16 +953,20 @@ async def google_oauth_callback(
         return RedirectResponse(url=f"{settings.FRONTEND_URL}/oauth/callback#{fragment}")
         
     except ValueError as e:
-        logger.error(f"Google OAuth callback error: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(e)
+        logger.warning(f"Google OAuth callback validation error: {e}")
+        raise _oauth_error(
+            status.HTTP_400_BAD_REQUEST,
+            "GOOGLE_OAUTH_INVALID_REQUEST",
+            str(e),
         )
+    except HTTPException:
+        raise
     except Exception as e:
         logger.exception(f"Google OAuth callback error: {e}")
-        raise HTTPException(
+        raise _oauth_error(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="OAuth authentication failed"
+            error_code="GOOGLE_OAUTH_AUTHENTICATION_FAILED",
+            message="OAuth authentication failed",
         )
 
 
@@ -888,7 +983,6 @@ async def linkedin_oauth_authorize(redirect: bool = False):
     """
     from app.services.oauth_service import oauth_service
     import secrets
-    from app.core.redis_client import get_redis
     
     if not oauth_service.is_configured()["linkedin"]:
         raise HTTPException(
@@ -899,17 +993,8 @@ async def linkedin_oauth_authorize(redirect: bool = False):
     # Generate CSRF state token
     state = secrets.token_urlsafe(32)
 
-    # Store state for CSRF validation
-    try:
-        redis_client = get_redis()
-        if redis_client:
-            redis_client.set(
-                f"oauth_state:linkedin:{state}",
-                "1",
-                ex=settings.OAUTH_STATE_TTL_SECONDS,
-            )
-    except Exception as e:
-        logger.warning(f"Failed to store OAuth state (linkedin): {e}")
+    # Store state for CSRF validation. Fail closed if state storage is missing.
+    _store_oauth_state("linkedin", state)
     
     # Get authorization URL
     auth_url = oauth_service.get_linkedin_auth_url(state)
@@ -919,7 +1004,6 @@ async def linkedin_oauth_authorize(redirect: bool = False):
     
     return {
         "auth_url": auth_url,
-        "state": state,
     }
 
 
@@ -929,22 +1013,16 @@ async def linkedin_oauth_authorize(redirect: bool = False):
     description="Handle LinkedIn OAuth callback and create/login user"
 )
 async def linkedin_oauth_callback(
-    code: str,
-    state: str,
+    code: str = Query(..., min_length=1),
+    state: str = Query(..., min_length=1),
     db: Session = Depends(get_db)
 ):
     """Handle LinkedIn OAuth callback."""
     from app.services.oauth_service import oauth_service
-    from app.core.redis_client import get_redis
     
     try:
         # Validate CSRF state
-        redis_client = get_redis()
-        if redis_client:
-            state_key = f"oauth_state:linkedin:{state}"
-            if not redis_client.exists(state_key):
-                raise ValueError("Invalid or expired OAuth state")
-            redis_client.delete(state_key)
+        _consume_oauth_state("linkedin", state)
 
         # Get user info from LinkedIn
         user_info = await oauth_service.get_linkedin_user_info(code)
@@ -1007,22 +1085,21 @@ async def linkedin_oauth_callback(
         return RedirectResponse(url=f"{settings.FRONTEND_URL}/oauth/callback#{fragment}")
         
     except ValueError as e:
-        logger.error(f"LinkedIn OAuth callback error: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(e)
+        logger.warning(f"LinkedIn OAuth callback validation error: {e}")
+        raise _oauth_error(
+            status.HTTP_400_BAD_REQUEST,
+            "LINKEDIN_OAUTH_INVALID_REQUEST",
+            str(e),
         )
+    except HTTPException:
+        raise
     except Exception as e:
         logger.exception(f"LinkedIn OAuth callback error: {e}")
-        raise HTTPException(
+        raise _oauth_error(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="OAuth authentication failed"
+            error_code="LINKEDIN_OAUTH_AUTHENTICATION_FAILED",
+            message="OAuth authentication failed",
         )
-
-
-
-
-
 
 
 

@@ -298,6 +298,7 @@ class UserResponse(BaseModel):
     full_name: str
     phone: Optional[str] = None
     role: str
+    admin_role: Optional[str] = None
     is_verified: bool
     avatar_url: Optional[str] = None
     bio: Optional[str] = None

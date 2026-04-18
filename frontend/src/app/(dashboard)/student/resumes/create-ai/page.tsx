@@ -1,6 +1,6 @@
-/**
+﻿/**
  * =============================================================================
- * AI RESUME BUILDER - 🔥 MOST IMPORTANT PAGE
+ * AI RESUME BUILDER - MOST IMPORTANT PAGE
  * =============================================================================
  *
  * Features:
@@ -13,7 +13,7 @@
 
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -41,7 +41,6 @@ import {
   Download,
   ZoomIn,
   ZoomOut,
-  FileText,
   Eye,
   Save,
   Wand2,
@@ -66,6 +65,10 @@ import { cn } from "@/lib/utils";
 import { useResume } from "@/hooks/useResume";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
+import { resumeApi } from "@/lib/api";
+import type { Resume, ResumeContent } from "@/types/api";
+import { ResumePreview } from "@/components/resume/ResumePreview";
+import { getSkillSuggestions } from "@/lib/resume/skillProfiles";
 
 // =============================================================================
 // TYPES & SCHEMAS
@@ -168,18 +171,6 @@ const tones = [
   { id: "technical", name: "Texnik", description: "Tafsilotlarga e'tibor beruvchi" },
 ];
 
-const commonSkills = {
-  technical: [
-    "JavaScript", "TypeScript", "Python", "React", "Node.js", "PostgreSQL",
-    "Docker", "AWS", "Git", "REST API", "GraphQL", "MongoDB", "Java", "C++",
-    "Machine Learning", "Data Analysis", "Figma", "Photoshop"
-  ],
-  soft: [
-    "Communication", "Leadership", "Problem Solving", "Teamwork", "Time Management",
-    "Critical Thinking", "Adaptability", "Creativity", "Attention to Detail"
-  ],
-};
-
 // =============================================================================
 // MAIN COMPONENT
 // =============================================================================
@@ -192,6 +183,8 @@ export default function AIResumeBuilderPage() {
   const [selectedTemplate, setSelectedTemplate] = useState("modern");
   const [selectedTone, setSelectedTone] = useState("professional");
   const [isGenerated, setIsGenerated] = useState(false);
+  const [generatedResume, setGeneratedResume] = useState<Resume | null>(null);
+  const [isDownloadingPdf, setIsDownloadingPdf] = useState(false);
   const [previewZoom, setPreviewZoom] = useState(100);
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const [skillInput, setSkillInput] = useState({ technical: "", soft: "" });
@@ -237,6 +230,23 @@ export default function AIResumeBuilderPage() {
   });
 
   const formData = watch();
+  const roleSignal = useMemo(() => {
+    const title = formData.professionalTitle || "";
+    const positions = (formData.experiences || []).map((exp) => exp.position || "").join(" ");
+    const fields = (formData.education || []).map((edu) => edu.field || "").join(" ");
+    return `${title} ${positions} ${fields}`.trim();
+  }, [formData.professionalTitle, formData.experiences, formData.education]);
+
+  const { profile: activeSkillProfile, technical: technicalSkillSuggestions, soft: softSkillSuggestions } =
+    useMemo(
+      () =>
+        getSkillSuggestions(
+          roleSignal,
+          formData.technicalSkills || [],
+          formData.softSkills || []
+        ),
+      [formData.softSkills, formData.technicalSkills, roleSignal]
+    );
 
   // Field arrays
   const {
@@ -354,47 +364,40 @@ export default function AIResumeBuilderPage() {
   // Generate Resume using AI API
   const handleGenerate = async () => {
     try {
-      const payload = {
-        personal_info: {
-          full_name: formData.fullName,
+      type GenerateResumePayload = Parameters<typeof generateResume>[0];
+
+      const payload: GenerateResumePayload = {
+        user_data: {
+          name: formData.fullName,
           email: formData.email,
           phone: formData.phone,
-          location: formData.location,
+          location: formData.location || undefined,
           professional_title: formData.professionalTitle,
-          linkedin_url: formData.linkedinUrl,
-          portfolio_url: formData.portfolioUrl,
+          linkedin_url: formData.linkedinUrl || undefined,
+          portfolio_url: formData.portfolioUrl || undefined,
+          skills: [...formData.technicalSkills, ...formData.softSkills].filter(Boolean),
+          experience: formData.experiences.map((exp) => ({
+            company: exp.company,
+            position: exp.position,
+            duration: exp.isCurrent
+              ? `${exp.startDate} - Present`
+              : `${exp.startDate}${exp.endDate ? ` - ${exp.endDate}` : ""}`,
+            description: exp.description,
+          })),
+          education: formData.education.map((edu) => ({
+            institution: edu.institution,
+            degree: edu.degree,
+            field: edu.field,
+            year: edu.year,
+          })),
         },
-        experience: formData.experiences.map((exp) => ({
-          company: exp.company,
-          position: exp.position,
-          start_date: exp.startDate,
-          end_date: exp.isCurrent ? null : exp.endDate,
-          is_current: exp.isCurrent,
-          description: exp.description,
-        })),
-        education: formData.education.map((edu) => ({
-          institution: edu.institution,
-          degree: edu.degree,
-          field: edu.field,
-          year: edu.year,
-        })),
-        skills: {
-          technical: formData.technicalSkills,
-          soft: formData.softSkills,
-        },
-        languages: formData.languages.map((l) => ({
-          name: l.name,
-          proficiency: l.proficiency,
-        })),
-        certifications: formData.certifications,
-        projects: formData.projects,
-        template: selectedTemplate,
-        tone: selectedTone,
-        title: `${formData.professionalTitle} Resume`,
+        template: selectedTemplate as GenerateResumePayload["template"],
+        tone: selectedTone as GenerateResumePayload["tone"],
       };
 
-      const result = await generateResume(payload as any);
+      const result = await generateResume(payload);
       if (result) {
+        setGeneratedResume(result);
         setIsGenerated(true);
         localStorage.removeItem("resume_draft");
         confetti({
@@ -403,11 +406,74 @@ export default function AIResumeBuilderPage() {
           origin: { y: 0.6 },
           colors: ["#a855f7", "#6366f1", "#06b6d4"],
         });
-        setTimeout(() => router.push("/student/resumes"), 2000);
       }
     } catch (error) {
       // error already shown by hook
     }
+  };
+
+  const handleDownloadGenerated = async () => {
+    if (!generatedResume) {
+      toast.info("Avval resumeni AI orqali yarating.");
+      return;
+    }
+
+    setIsDownloadingPdf(true);
+    try {
+      const response = await resumeApi.download(generatedResume.id);
+      const blob = new Blob([response.data], { type: "application/pdf" });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      const filename = `${generatedResume.title || "resume"}`.replace(/[\\/:*?"<>|]+/g, "_");
+      link.href = url;
+      link.download = `${filename}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+      toast.success("Resume PDF yuklab olindi.");
+    } catch {
+      toast.error("PDF yuklab olishda xatolik yuz berdi.");
+    } finally {
+      setIsDownloadingPdf(false);
+    }
+  };
+
+  const previewContent: ResumeContent = {
+    personal_info: {
+      name: formData.fullName,
+      email: formData.email,
+      phone: formData.phone,
+      location: formData.location,
+      professional_title: formData.professionalTitle,
+      linkedin_url: formData.linkedinUrl,
+      portfolio_url: formData.portfolioUrl,
+    },
+    experience: formData.experiences
+      .filter((exp) => exp.company || exp.position || exp.description)
+      .map((exp) => ({
+        company: exp.company,
+        position: exp.position,
+        start_date: exp.startDate,
+        end_date: exp.endDate,
+        is_current: exp.isCurrent,
+        description: exp.description,
+      })),
+    education: formData.education
+      .filter((edu) => edu.institution || edu.degree || edu.field)
+      .map((edu) => ({
+        institution: edu.institution,
+        degree: edu.degree,
+        field: edu.field,
+        year: edu.year,
+      })),
+    skills: {
+      technical: formData.technicalSkills,
+      soft: formData.softSkills,
+    },
+    languages: formData.languages.filter((language) => language.name),
+    certifications: formData.certifications.filter((cert) => cert.name),
+    projects: formData.projects.filter((project) => project.name),
   };
 
   // Progress calculation
@@ -736,6 +802,11 @@ export default function AIResumeBuilderPage() {
                 {/* Technical Skills */}
                 <div>
                   <Label>Texnik ko'nikmalar</Label>
+                  {activeSkillProfile && (
+                    <p className="mt-1 text-xs text-emerald-700">
+                      Kasbga mos tavsiyalar: {activeSkillProfile.label}
+                    </p>
+                  )}
                   <div className="mt-2 flex gap-2">
                     <Input
                       placeholder="Ko'nikma qo'shing..."
@@ -761,17 +832,14 @@ export default function AIResumeBuilderPage() {
                         className="cursor-pointer hover:bg-red-100 hover:text-red-700"
                         onClick={() => removeSkill("technical", skill)}
                       >
-                        {skill} ×
+                        {skill} x
                       </Badge>
                     ))}
                   </div>
                   <div className="mt-2">
                     <p className="text-xs text-surface-500 mb-2">Tavsiya etilgan ko'nikmalar:</p>
                     <div className="flex flex-wrap gap-1">
-                      {commonSkills.technical
-                        .filter((s) => !formData.technicalSkills?.includes(s))
-                        .slice(0, 10)
-                        .map((skill) => (
+                      {technicalSkillSuggestions.map((skill) => (
                           <button
                             key={skill}
                             type="button"
@@ -818,16 +886,14 @@ export default function AIResumeBuilderPage() {
                         className="cursor-pointer hover:bg-red-100 hover:text-red-700"
                         onClick={() => removeSkill("soft", skill)}
                       >
-                        {skill} ×
+                        {skill} x
                       </Badge>
                     ))}
                   </div>
                   <div className="mt-2">
                     <p className="text-xs text-surface-500 mb-2">Tavsiya etilgan ko'nikmalar:</p>
                     <div className="flex flex-wrap gap-1">
-                      {commonSkills.soft
-                        .filter((s) => !formData.softSkills?.includes(s))
-                        .map((skill) => (
+                      {softSkillSuggestions.map((skill) => (
                           <button
                             key={skill}
                             type="button"
@@ -1075,8 +1141,17 @@ export default function AIResumeBuilderPage() {
               <ZoomIn className="h-4 w-4" />
             </Button>
             <div className="mx-2 h-6 w-px bg-surface-200" />
-            <Button variant="outline" size="sm">
-              <Download className="mr-2 h-4 w-4" />
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleDownloadGenerated}
+              disabled={!generatedResume || isDownloadingPdf}
+            >
+              {isDownloadingPdf ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Download className="mr-2 h-4 w-4" />
+              )}
               PDF yuklash
             </Button>
           </div>
@@ -1093,134 +1168,11 @@ export default function AIResumeBuilderPage() {
               minHeight: "297mm",
             }}
           >
-            {/* Resume Preview - Modern Template */}
-            <div className="p-8">
-              {/* Header */}
-              <div className="border-b-2 border-purple-500 pb-6">
-                <h1 className="text-3xl font-bold text-surface-900">
-                  {formData.fullName || "Ismingiz"}
-                </h1>
-                <p className="mt-1 text-xl text-purple-600">
-                  {formData.professionalTitle || "Professional unvon"}
-                </p>
-                <div className="mt-4 flex flex-wrap gap-4 text-sm text-surface-600">
-                  {formData.email && (
-                    <span className="flex items-center gap-1">
-                      <Mail className="h-4 w-4" /> {formData.email}
-                    </span>
-                  )}
-                  {formData.phone && (
-                    <span className="flex items-center gap-1">
-                      <Phone className="h-4 w-4" /> {formData.phone}
-                    </span>
-                  )}
-                  {formData.location && (
-                    <span className="flex items-center gap-1">
-                      <MapPin className="h-4 w-4" /> {formData.location}
-                    </span>
-                  )}
-                </div>
-              </div>
-
-              {/* Experience */}
-              {formData.experiences?.some((e) => e.company) && (
-                <div className="mt-6">
-                  <h2 className="mb-4 flex items-center gap-2 text-lg font-bold text-surface-900">
-                    <Briefcase className="h-5 w-5 text-purple-500" />
-                    Tajriba
-                  </h2>
-                  <div className="space-y-4">
-                    {formData.experiences
-                      .filter((e) => e.company)
-                      .map((exp, i) => (
-                        <div key={i} className="border-l-2 border-purple-200 pl-4">
-                          <h3 className="font-semibold text-surface-900">{exp.position}</h3>
-                          <p className="text-purple-600">{exp.company}</p>
-                          <p className="text-sm text-surface-500">
-                            {exp.startDate} - {exp.isCurrent ? "Hozirgi vaqt" : exp.endDate}
-                          </p>
-                          <p className="mt-2 text-sm text-surface-600">{exp.description}</p>
-                        </div>
-                      ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Education */}
-              {formData.education?.some((e) => e.institution) && (
-                <div className="mt-6">
-                  <h2 className="mb-4 flex items-center gap-2 text-lg font-bold text-surface-900">
-                    <GraduationCap className="h-5 w-5 text-purple-500" />
-                    Ta'lim
-                  </h2>
-                  <div className="space-y-4">
-                    {formData.education
-                      .filter((e) => e.institution)
-                      .map((edu, i) => (
-                        <div key={i} className="border-l-2 border-purple-200 pl-4">
-                          <h3 className="font-semibold text-surface-900">
-                            {edu.degree} — {edu.field}
-                          </h3>
-                          <p className="text-purple-600">{edu.institution}</p>
-                          <p className="text-sm text-surface-500">{edu.year}</p>
-                        </div>
-                      ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Skills */}
-              {(formData.technicalSkills?.length > 0 || formData.softSkills?.length > 0) && (
-                <div className="mt-6">
-                  <h2 className="mb-4 flex items-center gap-2 text-lg font-bold text-surface-900">
-                    <Code className="h-5 w-5 text-purple-500" />
-                    Ko'nikmalar
-                  </h2>
-                  <div className="space-y-3">
-                    {formData.technicalSkills?.length > 0 && (
-                      <div>
-                        <h3 className="text-sm font-medium text-surface-600">Texnik</h3>
-                        <div className="mt-1 flex flex-wrap gap-2">
-                          {formData.technicalSkills.map((skill) => (
-                            <span
-                              key={skill}
-                              className="rounded-full bg-purple-100 px-3 py-1 text-xs text-purple-700"
-                            >
-                              {skill}
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                    {formData.softSkills?.length > 0 && (
-                      <div>
-                        <h3 className="text-sm font-medium text-surface-600">Ijtimoiy ko'nikmalar</h3>
-                        <div className="mt-1 flex flex-wrap gap-2">
-                          {formData.softSkills.map((skill) => (
-                            <span
-                              key={skill}
-                              className="rounded-full bg-cyan-100 px-3 py-1 text-xs text-cyan-700"
-                            >
-                              {skill}
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {/* Placeholder when empty */}
-              {!formData.fullName && (
-                <div className="mt-8 flex flex-col items-center justify-center py-16 text-center">
-                  <FileText className="h-16 w-16 text-surface-300" />
-                  <p className="mt-4 text-lg font-medium text-surface-400">
-                    Resume ko'rinishini ko'rish uchun ma'lumotlarni to'ldiring
-                  </p>
-                </div>
-              )}
-            </div>
+            <ResumePreview
+              content={previewContent}
+              title={formData.fullName || "SmartCareer Resume"}
+              isPlaceholder={!formData.fullName}
+            />
           </div>
         </div>
 
@@ -1247,7 +1199,7 @@ export default function AIResumeBuilderPage() {
                   <CheckCircle className="h-10 w-10 text-green-600" />
                 </motion.div>
                 <h2 className="font-display text-2xl font-bold text-surface-900">
-                  Resume yaratildi! 🎉
+                  Resume yaratildi!
                 </h2>
                 <p className="mt-2 text-surface-500">
                   AI yordamida resume tayyor
@@ -1256,8 +1208,23 @@ export default function AIResumeBuilderPage() {
                   <Button variant="outline" onClick={() => setIsGenerated(false)}>
                     Tahrirlash
                   </Button>
-                  <Button className="bg-gradient-to-r from-purple-500 to-indigo-600">
-                    <Download className="mr-2 h-4 w-4" />
+                  <Button
+                    variant="outline"
+                    onClick={() => generatedResume && router.push(`/student/resumes/${generatedResume.id}`)}
+                    disabled={!generatedResume}
+                  >
+                    Ko&apos;rish
+                  </Button>
+                  <Button
+                    className="bg-gradient-to-r from-emerald-500 to-cyan-600"
+                    onClick={handleDownloadGenerated}
+                    disabled={!generatedResume || isDownloadingPdf}
+                  >
+                    {isDownloadingPdf ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      <Download className="mr-2 h-4 w-4" />
+                    )}
                     PDF yuklash
                   </Button>
                 </div>

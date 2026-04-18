@@ -89,6 +89,7 @@ async def get_my_profile(
         full_name=current_user.full_name,
         phone=current_user.phone,
         role=current_user.role.value,
+        admin_role=current_user.effective_admin_role.value if current_user.effective_admin_role else None,
         is_verified=current_user.is_verified,
         is_active=current_user.is_active_account,
         avatar_url=current_user.avatar_url,
@@ -145,6 +146,7 @@ async def update_my_profile(
         full_name=current_user.full_name,
         phone=current_user.phone,
         role=current_user.role.value,
+        admin_role=current_user.effective_admin_role.value if current_user.effective_admin_role else None,
         is_verified=current_user.is_verified,
         is_active=current_user.is_active_account,
         avatar_url=current_user.avatar_url,
@@ -211,6 +213,7 @@ async def get_user(
         full_name=user.full_name,
         phone=None,  # Hide phone for public profile
         role=user.role.value,
+        admin_role=user.effective_admin_role.value if user.effective_admin_role else None,
         is_verified=user.is_verified,
         is_active=user.is_active_account,
         avatar_url=user.avatar_url,
@@ -270,6 +273,7 @@ async def list_users(
             full_name=user.full_name,
             phone=user.phone,
             role=user.role.value,
+            admin_role=user.effective_admin_role.value if user.effective_admin_role else None,
             is_verified=user.is_verified,
             is_active=user.is_active_account,
             avatar_url=user.avatar_url,
@@ -314,15 +318,14 @@ async def change_password(
             detail="Current password is incorrect"
         )
     
-    # Validate new password strength
-    if len(request.new_password) < 8:
+    # Validate new password strength (full validation via model method)
+    try:
+        current_user.set_password(request.new_password)
+    except ValueError as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="New password must be at least 8 characters long"
+            detail=str(e)
         )
-    
-    # Set new password
-    current_user.set_password(request.new_password)
     db.commit()
     
     logger.info(f"Password changed for user: {current_user.id}")
@@ -420,6 +423,7 @@ async def upload_avatar(
         full_name=current_user.full_name,
         phone=current_user.phone,
         role=current_user.role.value,
+        admin_role=current_user.effective_admin_role.value if current_user.effective_admin_role else None,
         is_verified=current_user.is_verified,
         is_active=current_user.is_active_account,
         avatar_url=current_user.avatar_url,
@@ -554,8 +558,6 @@ async def update_privacy_settings(
     current_user.privacy_settings = settings_data.model_dump()
     db.commit()
     return {"success": True, "message": "Maxfiylik sozlamalari saqlandi"}
-
-
 
 
 

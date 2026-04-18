@@ -13,7 +13,11 @@
 import axios, { AxiosError, AxiosInstance, InternalAxiosRequestConfig } from "axios";
 import { useAuthStore } from "@/store/authStore";
 import type {
+  AdminAccessUsersResponse,
+  AdminRoleMatrixResponse,
   AutoApplyRequest,
+  AdminUpdateAdminRoleRequest,
+  AdminUpdateAdminRoleResponse,
   ApplicationStatusUpdateRequest,
   AdminBulkResolveResponse,
   AdminDashboardResponse,
@@ -239,7 +243,7 @@ export const resumeApi = {
   archive: (id: string) => api.post(`/resumes/${id}/archive`),
   
   download: (id: string) =>
-    api.get(`/resumes/${id}/download`, { responseType: "blob" }),
+    api.get(`/resumes/${id}/pdf`, { responseType: "blob" }),
   
   analytics: (id: string) => api.get(`/resumes/${id}/analytics`),
 };
@@ -323,6 +327,10 @@ export const adminApi = {
       error_ids: errorIds,
       resolution_notes,
     }),
+  roleMatrix: () => api.get<AdminRoleMatrixResponse>("/admin/access/roles-matrix"),
+  adminUsers: () => api.get<AdminAccessUsersResponse>("/admin/access/admin-users"),
+  updateAdminRole: (userId: string, data: AdminUpdateAdminRoleRequest) =>
+    api.patch<AdminUpdateAdminRoleResponse>(`/admin/access/admin-users/${userId}/role`, data),
 };
 
 // User endpoints
@@ -357,9 +365,10 @@ export const aiApi = {
     api.post("/ai/generate-resume", data),
   
   generateCoverLetter: (data: {
-    job_title: string;
+    resume_text: string;
+    job_description: string;
     company_name: string;
-    resume_id: string;
+    hiring_manager?: string;
     tone?: string;
   }) => api.post("/ai/generate-cover-letter", data),
   

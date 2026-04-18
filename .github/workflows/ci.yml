@@ -40,8 +40,8 @@ jobs:
           pytest --cov=app --cov-report=xml --cov-report=term-missing --cov-fail-under=50
         env:
           DATABASE_URL: sqlite:///./test.db
-          JWT_SECRET_KEY: test-secret-key-for-ci
-          SECRET_KEY: test-secret-key-for-ci
+          JWT_SECRET_KEY: ci-jwt-secret-key-0123456789abcdef0123456789
+          SECRET_KEY: ci-app-secret-key-0123456789abcdef0123456789
           # Ensure rate limiting is enabled in CI so brute-force protection tests
           # validate the intended behavior regardless of DEBUG defaults.
           RATE_LIMIT_ENABLED: "true"
@@ -175,14 +175,21 @@ jobs:
       - name: Start backend server
         working-directory: ./backend
         run: |
-          python setup_env.py
+          alembic upgrade head
           uvicorn app.main:app --host 0.0.0.0 --port 8000 --log-level debug > backend-uvicorn.log 2>&1 &
-          sleep 10
+          for i in {1..30}; do
+            if curl -fsS http://127.0.0.1:8000/readyz > /dev/null; then
+              echo "Backend is ready"
+              break
+            fi
+            sleep 2
+          done
+          curl -fsS http://127.0.0.1:8000/readyz > /dev/null
         env:
           DATABASE_URL: postgresql://test:test@localhost:5432/smartcareer_test
-          JWT_SECRET_KEY: test-jwt-secret
-          SECRET_KEY: test-secret
-          # In CI we rely on Base.metadata.create_all() to create tables for the fresh Postgres DB.
+          JWT_SECRET_KEY: ci-e2e-jwt-secret-0123456789abcdef0123456789
+          SECRET_KEY: ci-e2e-app-secret-0123456789abcdef0123456789
+          # Keep debug mode for richer logs in CI; schema is created by Alembic above.
           SMARTCAREER_DEBUG: "true"
           # E2E hits auth endpoints many times across projects (chromium/firefox/webkit/mobile).
           # Disable rate limiting in CI to avoid flaky lockouts.

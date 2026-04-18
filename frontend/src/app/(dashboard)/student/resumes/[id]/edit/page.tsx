@@ -1,142 +1,236 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { useRouter, useParams } from "next/navigation";
+import { useEffect, useState } from "react";
+import { useParams, useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import {
+  AlertCircle,
   ArrowLeft,
-  Save,
+  ArrowRight,
+  Award,
+  Briefcase,
+  CheckCircle,
+  Code,
+  Download,
+  Eye,
+  Globe,
+  GraduationCap,
   Loader2,
   Plus,
+  Save,
   Trash2,
   User,
-  Briefcase,
-  GraduationCap,
-  Code,
-  Globe,
-  Award,
-  AlertCircle,
-  CheckCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ResumePreview } from "@/components/resume/ResumePreview";
 import { resumeApi } from "@/lib/api";
+import { cn } from "@/lib/utils";
 import type { Resume, ResumeContent } from "@/types/api";
 import { toast } from "sonner";
-import { cn } from "@/lib/utils";
 
-const TABS = [
+type ExperienceItem = NonNullable<ResumeContent["experience"]>[number];
+type EducationItem = NonNullable<ResumeContent["education"]>[number];
+type LanguageItem = NonNullable<ResumeContent["languages"]>[number];
+type CertificationItem = NonNullable<ResumeContent["certifications"]>[number];
+
+const STEPS = [
   { id: "personal", label: "Shaxsiy", icon: User },
   { id: "experience", label: "Tajriba", icon: Briefcase },
   { id: "education", label: "Ta'lim", icon: GraduationCap },
   { id: "skills", label: "Ko'nikmalar", icon: Code },
   { id: "languages", label: "Tillar", icon: Globe },
   { id: "certifications", label: "Sertifikatlar", icon: Award },
-];
+] as const;
+
+function sanitizeFilename(value: string) {
+  return (value || "resume").replace(/[\\/:*?"<>|]+/g, "_").replace(/\s+/g, "_");
+}
+
+function normalizeResumeContent(raw?: ResumeContent): ResumeContent {
+  return {
+    personal_info: raw?.personal_info || {},
+    summary: raw?.summary || "",
+    experience: raw?.experience || [],
+    education: raw?.education || [],
+    skills: {
+      technical: raw?.skills?.technical || [],
+      soft: raw?.skills?.soft || [],
+    },
+    languages: raw?.languages || [],
+    certifications: raw?.certifications || [],
+    projects: raw?.projects || [],
+  };
+}
 
 export default function ResumeEditPage() {
   const router = useRouter();
   const params = useParams();
-  const resumeId = params!.id as string;
+  const resumeId = String(params?.id || "");
 
-  const [resume, setResume] = useState<Resume | null>(null);
-  const [title, setTitle] = useState("");
-  const [content, setContent] = useState<ResumeContent>({});
+  const [step, setStep] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
-  const [activeTab, setActiveTab] = useState("personal");
+  const [isDownloading, setIsDownloading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [resume, setResume] = useState<Resume | null>(null);
+  const [title, setTitle] = useState("");
+  const [content, setContent] = useState<ResumeContent>(normalizeResumeContent());
 
   useEffect(() => {
     const fetchResume = async () => {
       try {
         setIsLoading(true);
-        const res = await resumeApi.get(resumeId);
-        const data: Resume = res.data?.data || res.data;
-        setResume(data);
-        setTitle(data.title);
-        setContent(data.content || {});
+        setError(null);
+        const response = await resumeApi.get(resumeId);
+        const loaded: Resume = response.data?.data || response.data;
+        setResume(loaded);
+        setTitle(loaded.title || "Resume");
+        setContent(normalizeResumeContent(loaded.content));
       } catch {
-        setError("Resume topilmadi.");
+        setError("Resume topilmadi yoki yuklashda xatolik yuz berdi.");
       } finally {
         setIsLoading(false);
       }
     };
-    if (resumeId) fetchResume();
+
+    if (resumeId) {
+      void fetchResume();
+    }
   }, [resumeId]);
 
-  const handleSave = async () => {
+  const updatePersonal = (field: keyof NonNullable<ResumeContent["personal_info"]>, value: string) => {
+    setContent((previous) => ({
+      ...previous,
+      personal_info: { ...previous.personal_info, [field]: value },
+    }));
+  };
+
+  const addExperience = () => {
+    setContent((previous) => ({
+      ...previous,
+      experience: [
+        ...(previous.experience || []),
+        { company: "", position: "", start_date: "", end_date: "", is_current: false, description: "", achievements: [] },
+      ],
+    }));
+  };
+
+  const updateExperience = (index: number, field: keyof ExperienceItem, value: string | boolean | string[]) => {
+    const next = [...(content.experience || [])];
+    next[index] = { ...next[index], [field]: value };
+    setContent((previous) => ({ ...previous, experience: next }));
+  };
+
+  const removeExperience = (index: number) => {
+    setContent((previous) => ({
+      ...previous,
+      experience: (previous.experience || []).filter((_, itemIndex) => itemIndex !== index),
+    }));
+  };
+
+  const addEducation = () => {
+    setContent((previous) => ({
+      ...previous,
+      education: [...(previous.education || []), { institution: "", degree: "", field: "", year: "" }],
+    }));
+  };
+
+  const updateEducation = (index: number, field: keyof EducationItem, value: string) => {
+    const next = [...(content.education || [])];
+    next[index] = { ...next[index], [field]: value };
+    setContent((previous) => ({ ...previous, education: next }));
+  };
+
+  const removeEducation = (index: number) => {
+    setContent((previous) => ({
+      ...previous,
+      education: (previous.education || []).filter((_, itemIndex) => itemIndex !== index),
+    }));
+  };
+
+  const updateLanguage = (index: number, field: keyof LanguageItem, value: string) => {
+    const next = [...(content.languages || [])];
+    next[index] = { ...next[index], [field]: value };
+    setContent((previous) => ({ ...previous, languages: next }));
+  };
+
+  const updateCertification = (index: number, field: keyof CertificationItem, value: string) => {
+    const next = [...(content.certifications || [])];
+    next[index] = { ...next[index], [field]: value };
+    setContent((previous) => ({ ...previous, certifications: next }));
+  };
+
+  const saveResume = async (publish = false): Promise<boolean> => {
+    if (!title.trim()) {
+      toast.error("Resume nomi kiritilishi kerak");
+      return false;
+    }
+
+    if (!content.personal_info?.name || !content.personal_info?.email) {
+      toast.error("To'liq ism va email majburiy.");
+      setStep(0);
+      return false;
+    }
+
     setIsSaving(true);
     try {
       await resumeApi.update(resumeId, { title, content });
-      toast.success("Resume saqlandi!");
+      if (publish && resume?.status !== "published") {
+        await resumeApi.publish(resumeId);
+      }
+
+      setResume((previous) => previous ? { ...previous, title, content, status: publish ? "published" : previous.status } : previous);
+      toast.success(publish ? "Resume yangilandi va nashr etildi!" : "Resume yangilandi!");
+      return true;
     } catch {
       toast.error("Saqlashda xatolik yuz berdi.");
+      return false;
     } finally {
       setIsSaving(false);
     }
   };
 
-  const updatePersonalInfo = (field: string, value: string) => {
-    setContent((prev) => ({
-      ...prev,
-      personal_info: { ...prev.personal_info, [field]: value },
-    }));
+  const downloadResumePdf = async () => {
+    setIsDownloading(true);
+    try {
+      const response = await resumeApi.download(resumeId);
+      const url = window.URL.createObjectURL(new Blob([response.data], { type: "application/pdf" }));
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `${sanitizeFilename(title)}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+      toast.success("Resume PDF yuklab olindi.");
+    } catch {
+      toast.error("PDF yuklab olishda xatolik yuz berdi.");
+    } finally {
+      setIsDownloading(false);
+    }
   };
 
-  const updateExperience = (index: number, field: string, value: any) => {
-    const updated = [...(content.experience || [])];
-    updated[index] = { ...updated[index], [field]: value };
-    setContent((prev) => ({ ...prev, experience: updated }));
+  const handleSave = async (publish = false) => {
+    await saveResume(publish);
   };
 
-  const addExperience = () => {
-    setContent((prev) => ({
-      ...prev,
-      experience: [
-        ...(prev.experience || []),
-        { company: "", position: "", start_date: "", description: "" },
-      ],
-    }));
-  };
-
-  const removeExperience = (index: number) => {
-    const updated = (content.experience || []).filter((_, i) => i !== index);
-    setContent((prev) => ({ ...prev, experience: updated }));
-  };
-
-  const updateEducation = (index: number, field: string, value: string) => {
-    const updated = [...(content.education || [])];
-    updated[index] = { ...updated[index], [field]: value };
-    setContent((prev) => ({ ...prev, education: updated }));
-  };
-
-  const addEducation = () => {
-    setContent((prev) => ({
-      ...prev,
-      education: [
-        ...(prev.education || []),
-        { institution: "", degree: "", field: "", year: "" },
-      ],
-    }));
-  };
-
-  const removeEducation = (index: number) => {
-    const updated = (content.education || []).filter((_, i) => i !== index);
-    setContent((prev) => ({ ...prev, education: updated }));
+  const handleSaveAndDownload = async () => {
+    const ok = await saveResume(true);
+    if (ok) {
+      await downloadResumePdf();
+    }
   };
 
   if (isLoading) {
     return (
-      <div className="mx-auto max-w-3xl space-y-6 p-6">
-        <Skeleton className="h-8 w-32" />
-        <Skeleton className="h-12 w-full" />
-        <div className="space-y-4">
-          {[1, 2, 3].map((i) => (
-            <Skeleton key={i} className="h-12 w-full" />
-          ))}
+      <div className="mx-auto max-w-7xl space-y-6 p-4 md:p-6">
+        <Skeleton className="h-24 w-full rounded-3xl" />
+        <div className="grid gap-6 lg:grid-cols-[minmax(0,520px)_1fr]">
+          <Skeleton className="h-[760px] w-full rounded-3xl" />
+          <Skeleton className="h-[760px] w-full rounded-3xl" />
         </div>
       </div>
     );
@@ -144,453 +238,343 @@ export default function ResumeEditPage() {
 
   if (error || !resume) {
     return (
-      <div className="flex flex-col items-center justify-center py-24 text-center">
-        <AlertCircle className="h-16 w-16 text-red-400" />
-        <h2 className="mt-4 text-xl font-bold">{error || "Resume topilmadi"}</h2>
-        <Button className="mt-6" onClick={() => router.back()} variant="outline">
-          <ArrowLeft className="mr-2 h-4 w-4" /> Orqaga
+      <div className="flex min-h-[60vh] flex-col items-center justify-center px-6 text-center">
+        <AlertCircle className="h-14 w-14 text-red-500" />
+        <h2 className="mt-4 text-xl font-bold text-slate-900">{error || "Resume topilmadi"}</h2>
+        <p className="mt-2 max-w-md text-sm text-slate-500">Resume yuklanmadi. Orqaga qaytib boshqa resume tanlab ko&apos;ring.</p>
+        <Button className="mt-6" variant="outline" onClick={() => router.back()}>
+          <ArrowLeft className="mr-2 h-4 w-4" />
+          Orqaga
         </Button>
       </div>
     );
   }
 
+  const currentStep = STEPS[step];
+  const CurrentIcon = currentStep.icon;
+
   return (
-    <div className="mx-auto max-w-3xl space-y-6 p-4 md:p-6">
-      {/* Header */}
-      <motion.div
-        initial={{ opacity: 0, y: -10 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="flex items-center justify-between"
-      >
-        <Button variant="ghost" onClick={() => router.back()} className="gap-2 text-surface-600">
-          <ArrowLeft className="h-4 w-4" />
-          Orqaga
-        </Button>
-        <Button
-          onClick={handleSave}
-          disabled={isSaving}
-          className="bg-gradient-to-r from-purple-500 to-indigo-600"
-        >
-          {isSaving ? (
-            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-          ) : (
-            <Save className="mr-2 h-4 w-4" />
-          )}
-          Saqlash
-        </Button>
-      </motion.div>
+    <div className="min-h-screen bg-[radial-gradient(circle_at_top_left,#ecfeff,transparent_34%),linear-gradient(135deg,#f8fafc,#eef2ff)] p-4 md:p-6">
+      <div className="mx-auto max-w-7xl space-y-6">
+        <div className="flex flex-col gap-4 rounded-[28px] border border-white/70 bg-white/85 p-5 shadow-xl shadow-slate-200/60 backdrop-blur md:flex-row md:items-center md:justify-between">
+          <div className="flex items-center gap-4">
+            <Button variant="ghost" onClick={() => router.push(`/student/resumes/${resumeId}`)} className="gap-2 text-surface-600">
+              <ArrowLeft className="h-4 w-4" />
+              Orqaga
+            </Button>
+            <div>
+              <p className="text-xs font-black uppercase tracking-[0.26em] text-emerald-700">Professional CV Editor</p>
+              <h1 className="font-display text-2xl font-black text-slate-950">Resume tahrirlash</h1>
+              <p className="text-sm text-slate-500">O&apos;zgarishlarni real vaqtda previewda ko&apos;ring va tayyor PDF yuklab oling.</p>
+            </div>
+          </div>
 
-      {/* Title */}
-      <div>
-        <Label>Resume nomi</Label>
-        <Input
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          className="mt-1 text-lg font-medium"
-          placeholder="Resume nomi"
-        />
-      </div>
+          <div className="flex flex-wrap gap-2">
+            <Button variant="outline" onClick={() => void handleSave(false)} disabled={isSaving || isDownloading}>
+              {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+              Saqlash
+            </Button>
+            <Button onClick={() => void handleSaveAndDownload()} disabled={isSaving || isDownloading} className="bg-gradient-to-r from-emerald-500 to-cyan-600">
+              {isDownloading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
+              Saqlab PDF yuklash
+            </Button>
+          </div>
+        </div>
 
-      {/* Tabs */}
-      <div className="flex gap-1 overflow-x-auto rounded-xl border border-surface-200 bg-surface-50 p-1">
-        {TABS.map((tab) => {
-          const Icon = tab.icon;
-          return (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={cn(
-                "flex flex-shrink-0 items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium transition-all",
-                activeTab === tab.id
-                  ? "bg-white text-purple-600 shadow-sm"
-                  : "text-surface-600 hover:text-surface-900"
+        <div className="grid gap-6 lg:grid-cols-[minmax(0,520px)_1fr]">
+          <div className="space-y-5">
+            <div className="rounded-[24px] border border-white/70 bg-white/90 p-5 shadow-lg shadow-slate-200/50">
+              <Label>Resume nomi</Label>
+              <Input
+                value={title}
+                onChange={(event) => setTitle(event.target.value)}
+                placeholder="Resume nomi"
+                className="mt-2 text-lg font-semibold"
+              />
+            </div>
+
+            <div className="flex items-center gap-1 overflow-x-auto rounded-[24px] border border-white/70 bg-white/90 p-2 shadow-lg shadow-slate-200/40">
+              {STEPS.map((item, index) => {
+                const Icon = item.icon;
+                return (
+                  <button
+                    key={item.id}
+                    onClick={() => setStep(index)}
+                    className={cn(
+                      "flex flex-shrink-0 items-center gap-1.5 rounded-2xl px-3 py-2 text-sm font-bold transition-all",
+                      index === step
+                        ? "bg-slate-950 text-white shadow-lg shadow-slate-300"
+                        : index < step
+                          ? "bg-emerald-100 text-emerald-800"
+                          : "bg-slate-100 text-slate-500 hover:bg-slate-200"
+                    )}
+                  >
+                    {index < step ? <CheckCircle className="h-4 w-4" /> : <Icon className="h-4 w-4" />}
+                    <span className="hidden sm:inline">{item.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+
+            <motion.div
+              key={step}
+              initial={{ opacity: 0, x: 18 }}
+              animate={{ opacity: 1, x: 0 }}
+              className="rounded-[28px] border border-white/70 bg-white/95 p-6 shadow-xl shadow-slate-200/60"
+            >
+              <div className="mb-5 flex items-center gap-3">
+                <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-700">
+                  <CurrentIcon className="h-5 w-5" />
+                </div>
+                <div>
+                  <h2 className="font-display text-xl font-black text-slate-950">{currentStep.label}</h2>
+                  <p className="text-sm text-slate-500">Ma&apos;lumotlarni yangilang va CV sifatini real vaqtda ko&apos;rib boring.</p>
+                </div>
+              </div>
+
+              {step === 0 && (
+                <div className="space-y-4">
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <Field label="To'liq ism *" value={content.personal_info?.name || ""} onChange={(value) => updatePersonal("name", value)} placeholder="Ism Familiya" />
+                    <Field label="Professional unvon" value={content.personal_info?.professional_title || ""} onChange={(value) => updatePersonal("professional_title", value)} placeholder="Frontend Developer" />
+                    <Field label="Email *" value={content.personal_info?.email || ""} onChange={(value) => updatePersonal("email", value)} placeholder="email@misol.com" />
+                    <Field label="Telefon" value={content.personal_info?.phone || ""} onChange={(value) => updatePersonal("phone", value)} placeholder="+998 90 123 4567" />
+                    <Field label="Joylashuv" value={content.personal_info?.location || ""} onChange={(value) => updatePersonal("location", value)} placeholder="Toshkent, O'zbekiston" />
+                    <Field label="LinkedIn" value={content.personal_info?.linkedin_url || ""} onChange={(value) => updatePersonal("linkedin_url", value)} placeholder="https://linkedin.com/in/..." />
+                    <div className="sm:col-span-2">
+                      <Field label="Portfolio" value={content.personal_info?.portfolio_url || ""} onChange={(value) => updatePersonal("portfolio_url", value)} placeholder="https://portfolio.uz" />
+                    </div>
+                  </div>
+                  <TextArea
+                    label="Professional summary"
+                    value={content.summary || ""}
+                    onChange={(value) => setContent((previous) => ({ ...previous, summary: value }))}
+                    placeholder="2-3 gapda tajribangiz, kuchli tomonlaringiz va qaysi rolga mos ekaningizni yozing."
+                  />
+                </div>
               )}
-            >
-              <Icon className="h-4 w-4" />
-              {tab.label}
-            </button>
-          );
-        })}
+
+              {step === 1 && (
+                <div className="space-y-5">
+                  {(content.experience || []).map((experience, index) => (
+                    <div key={index} className="relative rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
+                      <button onClick={() => removeExperience(index)} className="absolute right-3 top-3 text-slate-400 hover:text-red-500">
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        <Field label="Kompaniya" value={experience.company} onChange={(value) => updateExperience(index, "company", value)} placeholder="Kompaniya nomi" />
+                        <Field label="Lavozim" value={experience.position} onChange={(value) => updateExperience(index, "position", value)} placeholder="Software Engineer" />
+                        <Field label="Boshlanish" type="month" value={experience.start_date} onChange={(value) => updateExperience(index, "start_date", value)} />
+                        <div>
+                          <Field label="Tugash" type="month" value={experience.end_date || ""} onChange={(value) => updateExperience(index, "end_date", value)} disabled={experience.is_current} />
+                          <label className="mt-2 flex items-center gap-2 text-sm text-slate-600">
+                            <input type="checkbox" checked={!!experience.is_current} onChange={(event) => updateExperience(index, "is_current", event.target.checked)} />
+                            Hozirda ishlayapman
+                          </label>
+                        </div>
+                        <div className="sm:col-span-2">
+                          <TextArea label="Tavsif" value={experience.description} onChange={(value) => updateExperience(index, "description", value)} placeholder="Mas'uliyat va natijalarni raqamlar bilan yozing." />
+                        </div>
+                        <div className="sm:col-span-2">
+                          <TextArea
+                            label="Yutuqlar (har qator alohida)"
+                            value={(experience.achievements || []).join("\n")}
+                            onChange={(value) => updateExperience(index, "achievements", value.split("\n").map((item) => item.trim()).filter(Boolean))}
+                            placeholder="Masalan: Sahifa yuklanishini 35% tezlashtirdim"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                  <Button type="button" variant="outline" className="w-full" onClick={addExperience}>
+                    <Plus className="mr-2 h-4 w-4" /> Tajriba qo&apos;shish
+                  </Button>
+                </div>
+              )}
+
+              {step === 2 && (
+                <div className="space-y-5">
+                  {(content.education || []).map((education, index) => (
+                    <div key={index} className="relative rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
+                      <button onClick={() => removeEducation(index)} className="absolute right-3 top-3 text-slate-400 hover:text-red-500">
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        <div className="sm:col-span-2">
+                          <Field label="O'quv yurti" value={education.institution} onChange={(value) => updateEducation(index, "institution", value)} placeholder="Universitet nomi" />
+                        </div>
+                        <Field label="Daraja" value={education.degree} onChange={(value) => updateEducation(index, "degree", value)} placeholder="Bachelor" />
+                        <Field label="Yo'nalish" value={education.field || ""} onChange={(value) => updateEducation(index, "field", value)} placeholder="Computer Science" />
+                        <Field label="Bitirish yili" value={education.year} onChange={(value) => updateEducation(index, "year", value)} placeholder="2026" />
+                        <Field label="GPA" value={education.gpa || ""} onChange={(value) => updateEducation(index, "gpa", value)} placeholder="3.8" />
+                      </div>
+                    </div>
+                  ))}
+                  <Button type="button" variant="outline" className="w-full" onClick={addEducation}>
+                    <Plus className="mr-2 h-4 w-4" /> Ta&apos;lim qo&apos;shish
+                  </Button>
+                </div>
+              )}
+
+              {step === 3 && (
+                <div className="space-y-4">
+                  <TextArea
+                    label="Texnik ko'nikmalar (vergul bilan)"
+                    value={(content.skills?.technical || []).join(", ")}
+                    onChange={(value) => setContent((previous) => ({ ...previous, skills: { ...previous.skills, technical: value.split(",").map((item) => item.trim()).filter(Boolean) } }))}
+                    placeholder="JavaScript, TypeScript, React, Node.js"
+                  />
+                  <TextArea
+                    label="Soft skills (vergul bilan)"
+                    value={(content.skills?.soft || []).join(", ")}
+                    onChange={(value) => setContent((previous) => ({ ...previous, skills: { ...previous.skills, soft: value.split(",").map((item) => item.trim()).filter(Boolean) } }))}
+                    placeholder="Communication, Teamwork, Critical Thinking"
+                  />
+                </div>
+              )}
+
+              {step === 4 && (
+                <div className="space-y-4">
+                  {(content.languages || []).map((language, index) => (
+                    <div key={index} className="flex gap-3">
+                      <Input value={language.name} onChange={(event) => updateLanguage(index, "name", event.target.value)} placeholder="Til nomi" />
+                      <Input value={language.proficiency} onChange={(event) => updateLanguage(index, "proficiency", event.target.value)} placeholder="Daraja" />
+                      <button onClick={() => setContent((previous) => ({ ...previous, languages: (previous.languages || []).filter((_, itemIndex) => itemIndex !== index) }))} className="text-slate-400 hover:text-red-500">
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
+                  ))}
+                  <Button type="button" variant="outline" className="w-full" onClick={() => setContent((previous) => ({ ...previous, languages: [...(previous.languages || []), { name: "", proficiency: "" }] }))}>
+                    <Plus className="mr-2 h-4 w-4" /> Til qo&apos;shish
+                  </Button>
+                </div>
+              )}
+
+              {step === 5 && (
+                <div className="space-y-4">
+                  {(content.certifications || []).map((certification, index) => (
+                    <div key={index} className="relative rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
+                      <button onClick={() => setContent((previous) => ({ ...previous, certifications: (previous.certifications || []).filter((_, itemIndex) => itemIndex !== index) }))} className="absolute right-3 top-3 text-slate-400 hover:text-red-500">
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                      <div className="grid gap-3 sm:grid-cols-3">
+                        <div className="sm:col-span-2">
+                          <Field label="Sertifikat nomi" value={certification.name} onChange={(value) => updateCertification(index, "name", value)} placeholder="AWS Certified" />
+                        </div>
+                        <Field label="Yil" value={certification.year} onChange={(value) => updateCertification(index, "year", value)} placeholder="2025" />
+                        <div className="sm:col-span-3">
+                          <Field label="Tashkilot" value={certification.issuer} onChange={(value) => updateCertification(index, "issuer", value)} placeholder="Amazon Web Services" />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                  <Button type="button" variant="outline" className="w-full" onClick={() => setContent((previous) => ({ ...previous, certifications: [...(previous.certifications || []), { name: "", issuer: "", year: "" }] }))}>
+                    <Plus className="mr-2 h-4 w-4" /> Sertifikat qo&apos;shish
+                  </Button>
+                </div>
+              )}
+            </motion.div>
+
+            <div className="flex justify-between rounded-[24px] border border-white/70 bg-white/90 p-3 shadow-lg shadow-slate-200/40">
+              <Button variant="outline" onClick={() => step > 0 ? setStep(step - 1) : router.push(`/student/resumes/${resumeId}`)} className="gap-2">
+                <ArrowLeft className="h-4 w-4" />
+                {step > 0 ? "Oldingi" : "Bekor qilish"}
+              </Button>
+
+              {step < STEPS.length - 1 ? (
+                <Button onClick={() => setStep(step + 1)} className="gap-2 bg-slate-950 hover:bg-slate-800">
+                  Keyingi
+                  <ArrowRight className="h-4 w-4" />
+                </Button>
+              ) : (
+                <div className="flex gap-2">
+                  <Button variant="outline" onClick={() => void handleSave(false)} disabled={isSaving || isDownloading}>
+                    {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+                    Yangilash
+                  </Button>
+                  <Button onClick={() => void handleSave(true)} disabled={isSaving || isDownloading} className="bg-slate-950 hover:bg-slate-800">
+                    {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle className="mr-2 h-4 w-4" />}
+                    Nashr etish
+                  </Button>
+                </div>
+              )}
+            </div>
+          </div>
+
+          <aside className="rounded-[28px] border border-white/70 bg-white/90 p-4 shadow-xl shadow-slate-200/60 lg:sticky lg:top-6 lg:h-[calc(100vh-3rem)] lg:overflow-auto">
+            <div className="mb-4 flex items-center justify-between">
+              <div className="flex items-center gap-2 text-sm font-bold text-slate-700">
+                <Eye className="h-4 w-4 text-emerald-700" />
+                Jonli professional ko&apos;rinish
+              </div>
+              <Button variant="outline" size="sm" onClick={() => void handleSaveAndDownload()} disabled={isSaving || isDownloading}>
+                {isDownloading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
+                PDF
+              </Button>
+            </div>
+            <div className="origin-top overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl">
+              <div className="mx-auto w-[210mm] max-w-none scale-[0.54] origin-top-left lg:scale-[0.58] xl:scale-[0.68]">
+                <ResumePreview content={content} title={title} isPlaceholder={!content.personal_info?.name} />
+              </div>
+            </div>
+          </aside>
+        </div>
       </div>
+    </div>
+  );
+}
 
-      {/* Tab Content */}
-      <motion.div
-        key={activeTab}
-        initial={{ opacity: 0, x: 10 }}
-        animate={{ opacity: 1, x: 0 }}
-        className="rounded-2xl border border-surface-200 bg-white p-6 shadow-sm"
-      >
-        {/* PERSONAL INFO */}
-        {activeTab === "personal" && (
-          <div className="space-y-4">
-            <h3 className="font-bold text-surface-900">Shaxsiy ma'lumotlar</h3>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div>
-                <Label>To'liq ism</Label>
-                <Input
-                  value={content.personal_info?.name || ""}
-                  onChange={(e) => updatePersonalInfo("name", e.target.value)}
-                  placeholder="Ism Familiya"
-                  className="mt-1"
-                />
-              </div>
-              <div>
-                <Label>Professional unvon</Label>
-                <Input
-                  value={content.personal_info?.professional_title || ""}
-                  onChange={(e) => updatePersonalInfo("professional_title", e.target.value)}
-                  placeholder="masalan: Software Engineer"
-                  className="mt-1"
-                />
-              </div>
-              <div>
-                <Label>Email</Label>
-                <Input
-                  value={content.personal_info?.email || ""}
-                  onChange={(e) => updatePersonalInfo("email", e.target.value)}
-                  placeholder="email@misol.com"
-                  className="mt-1"
-                />
-              </div>
-              <div>
-                <Label>Telefon</Label>
-                <Input
-                  value={content.personal_info?.phone || ""}
-                  onChange={(e) => updatePersonalInfo("phone", e.target.value)}
-                  placeholder="+998 90 123 4567"
-                  className="mt-1"
-                />
-              </div>
-              <div>
-                <Label>Joylashuv</Label>
-                <Input
-                  value={content.personal_info?.location || ""}
-                  onChange={(e) => updatePersonalInfo("location", e.target.value)}
-                  placeholder="Toshkent, O'zbekiston"
-                  className="mt-1"
-                />
-              </div>
-              <div>
-                <Label>LinkedIn</Label>
-                <Input
-                  value={content.personal_info?.linkedin_url || ""}
-                  onChange={(e) => updatePersonalInfo("linkedin_url", e.target.value)}
-                  placeholder="https://linkedin.com/in/..."
-                  className="mt-1"
-                />
-              </div>
-              <div className="sm:col-span-2">
-                <Label>Portfolio / Veb-sayt</Label>
-                <Input
-                  value={content.personal_info?.portfolio_url || ""}
-                  onChange={(e) => updatePersonalInfo("portfolio_url", e.target.value)}
-                  placeholder="https://saytingiz.com"
-                  className="mt-1"
-                />
-              </div>
-            </div>
-            <div>
-              <Label>Qisqacha ma'lumot</Label>
-              <textarea
-                value={content.summary || ""}
-                onChange={(e) => setContent((p) => ({ ...p, summary: e.target.value }))}
-                placeholder="O'zingiz haqingizda qisqacha..."
-                rows={4}
-                className="mt-1 w-full rounded-xl border border-surface-300 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
-              />
-            </div>
-          </div>
-        )}
+function Field({
+  label,
+  value,
+  onChange,
+  placeholder,
+  type = "text",
+  disabled,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  placeholder?: string;
+  type?: string;
+  disabled?: boolean;
+}) {
+  return (
+    <div>
+      <Label>{label}</Label>
+      <Input
+        type={type}
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        placeholder={placeholder}
+        disabled={disabled}
+        className="mt-1"
+      />
+    </div>
+  );
+}
 
-        {/* EXPERIENCE */}
-        {activeTab === "experience" && (
-          <div className="space-y-6">
-            <h3 className="font-bold text-surface-900">Ish tajribasi</h3>
-            {(content.experience || []).map((exp, i) => (
-              <div key={i} className="relative rounded-xl border border-surface-200 p-4">
-                <button
-                  onClick={() => removeExperience(i)}
-                  className="absolute right-3 top-3 text-surface-400 hover:text-red-500"
-                >
-                  <Trash2 className="h-4 w-4" />
-                </button>
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <div>
-                    <Label>Kompaniya</Label>
-                    <Input value={exp.company} onChange={(e) => updateExperience(i, "company", e.target.value)} placeholder="Kompaniya nomi" className="mt-1" />
-                  </div>
-                  <div>
-                    <Label>Lavozim</Label>
-                    <Input value={exp.position} onChange={(e) => updateExperience(i, "position", e.target.value)} placeholder="Lavozim nomi" className="mt-1" />
-                  </div>
-                  <div>
-                    <Label>Boshlanish sanasi</Label>
-                    <Input type="month" value={exp.start_date} onChange={(e) => updateExperience(i, "start_date", e.target.value)} className="mt-1" />
-                  </div>
-                  <div>
-                    <Label>Tugash sanasi</Label>
-                    <Input type="month" value={exp.end_date || ""} disabled={exp.is_current} onChange={(e) => updateExperience(i, "end_date", e.target.value)} className="mt-1" />
-                    <label className="mt-1 flex items-center gap-2 text-sm text-surface-600">
-                      <input type="checkbox" checked={!!exp.is_current} onChange={(e) => updateExperience(i, "is_current", e.target.checked)} />
-                      Hozirda ishlayapman
-                    </label>
-                  </div>
-                  <div className="sm:col-span-2">
-                    <Label>Tavsif</Label>
-                    <textarea
-                      value={exp.description}
-                      onChange={(e) => updateExperience(i, "description", e.target.value)}
-                      placeholder="Vazifalar va yutuqlar..."
-                      rows={3}
-                      className="mt-1 w-full rounded-xl border border-surface-300 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
-                    />
-                  </div>
-                </div>
-              </div>
-            ))}
-            <Button type="button" variant="outline" className="w-full" onClick={addExperience}>
-              <Plus className="mr-2 h-4 w-4" /> Tajriba qo'shish
-            </Button>
-          </div>
-        )}
-
-        {/* EDUCATION */}
-        {activeTab === "education" && (
-          <div className="space-y-6">
-            <h3 className="font-bold text-surface-900">Ta'lim</h3>
-            {(content.education || []).map((edu, i) => (
-              <div key={i} className="relative rounded-xl border border-surface-200 p-4">
-                <button onClick={() => removeEducation(i)} className="absolute right-3 top-3 text-surface-400 hover:text-red-500">
-                  <Trash2 className="h-4 w-4" />
-                </button>
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <div className="sm:col-span-2">
-                    <Label>O'quv yurti</Label>
-                    <Input value={edu.institution} onChange={(e) => updateEducation(i, "institution", e.target.value)} placeholder="O'quv yurt nomi" className="mt-1" />
-                  </div>
-                  <div>
-                    <Label>Daraja</Label>
-                    <Input value={edu.degree} onChange={(e) => updateEducation(i, "degree", e.target.value)} placeholder="Bakalavriat" className="mt-1" />
-                  </div>
-                  <div>
-                    <Label>Yo'nalish</Label>
-                    <Input value={edu.field || ""} onChange={(e) => updateEducation(i, "field", e.target.value)} placeholder="Kompyuter fanlari" className="mt-1" />
-                  </div>
-                  <div>
-                    <Label>Bitirish yili</Label>
-                    <Input value={edu.year} onChange={(e) => updateEducation(i, "year", e.target.value)} placeholder="2024" className="mt-1" />
-                  </div>
-                  <div>
-                    <Label>GPA (ixtiyoriy)</Label>
-                    <Input value={edu.gpa || ""} onChange={(e) => updateEducation(i, "gpa", e.target.value)} placeholder="3.8" className="mt-1" />
-                  </div>
-                </div>
-              </div>
-            ))}
-            <Button type="button" variant="outline" className="w-full" onClick={addEducation}>
-              <Plus className="mr-2 h-4 w-4" /> Ta'lim qo'shish
-            </Button>
-          </div>
-        )}
-
-        {/* SKILLS */}
-        {activeTab === "skills" && (
-          <div className="space-y-4">
-            <h3 className="font-bold text-surface-900">Ko'nikmalar</h3>
-            <div>
-              <Label>Texnik ko'nikmalar (vergul bilan ajrating)</Label>
-              <textarea
-                value={(content.skills?.technical || []).join(", ")}
-                onChange={(e) =>
-                  setContent((p) => ({
-                    ...p,
-                    skills: {
-                      ...p.skills,
-                      technical: e.target.value.split(",").map((s) => s.trim()).filter(Boolean),
-                    },
-                  }))
-                }
-                placeholder="JavaScript, React, Python, ..."
-                rows={3}
-                className="mt-1 w-full rounded-xl border border-surface-300 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
-              />
-              <div className="mt-2 flex flex-wrap gap-2">
-                {(content.skills?.technical || []).map((s) => (
-                  <span key={s} className="rounded-full bg-purple-100 px-3 py-1 text-xs font-medium text-purple-700">{s}</span>
-                ))}
-              </div>
-            </div>
-            <div>
-              <Label>Ijtimoiy ko'nikmalar (vergul bilan ajrating)</Label>
-              <textarea
-                value={(content.skills?.soft || []).join(", ")}
-                onChange={(e) =>
-                  setContent((p) => ({
-                    ...p,
-                    skills: {
-                      ...p.skills,
-                      soft: e.target.value.split(",").map((s) => s.trim()).filter(Boolean),
-                    },
-                  }))
-                }
-                placeholder="Muloqot, Jamoaviy ish, ..."
-                rows={3}
-                className="mt-1 w-full rounded-xl border border-surface-300 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
-              />
-              <div className="mt-2 flex flex-wrap gap-2">
-                {(content.skills?.soft || []).map((s) => (
-                  <span key={s} className="rounded-full bg-cyan-100 px-3 py-1 text-xs font-medium text-cyan-700">{s}</span>
-                ))}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* LANGUAGES */}
-        {activeTab === "languages" && (
-          <div className="space-y-4">
-            <h3 className="font-bold text-surface-900">Tillar</h3>
-            {(content.languages || []).map((lang, i) => (
-              <div key={i} className="flex gap-3">
-                <Input
-                  value={lang.name}
-                  onChange={(e) => {
-                    const updated = [...(content.languages || [])];
-                    updated[i] = { ...updated[i], name: e.target.value };
-                    setContent((p) => ({ ...p, languages: updated }));
-                  }}
-                  placeholder="Til nomi"
-                />
-                <select
-                  value={lang.proficiency}
-                  onChange={(e) => {
-                    const updated = [...(content.languages || [])];
-                    updated[i] = { ...updated[i], proficiency: e.target.value };
-                    setContent((p) => ({ ...p, languages: updated }));
-                  }}
-                  className="w-44 rounded-xl border border-surface-300 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
-                >
-                  <option value="">Daraja</option>
-                  <option value="native">Ona tili</option>
-                  <option value="fluent">Ravon</option>
-                  <option value="advanced">Yuqori daraja</option>
-                  <option value="intermediate">O'rta daraja</option>
-                  <option value="basic">Boshlang'ich</option>
-                </select>
-                <button
-                  onClick={() => {
-                    const updated = (content.languages || []).filter((_, li) => li !== i);
-                    setContent((p) => ({ ...p, languages: updated }));
-                  }}
-                  className="text-surface-400 hover:text-red-500"
-                >
-                  <Trash2 className="h-4 w-4" />
-                </button>
-              </div>
-            ))}
-            <Button
-              type="button"
-              variant="outline"
-              className="w-full"
-              onClick={() =>
-                setContent((p) => ({
-                  ...p,
-                  languages: [...(p.languages || []), { name: "", proficiency: "" }],
-                }))
-              }
-            >
-              <Plus className="mr-2 h-4 w-4" /> Til qo'shish
-            </Button>
-          </div>
-        )}
-
-        {/* CERTIFICATIONS */}
-        {activeTab === "certifications" && (
-          <div className="space-y-4">
-            <h3 className="font-bold text-surface-900">Sertifikatlar</h3>
-            {(content.certifications || []).map((cert, i) => (
-              <div key={i} className="relative rounded-xl border border-surface-200 p-4">
-                <button
-                  onClick={() => {
-                    const updated = (content.certifications || []).filter((_, ci) => ci !== i);
-                    setContent((p) => ({ ...p, certifications: updated }));
-                  }}
-                  className="absolute right-3 top-3 text-surface-400 hover:text-red-500"
-                >
-                  <Trash2 className="h-4 w-4" />
-                </button>
-                <div className="grid gap-3 sm:grid-cols-3">
-                  <div className="sm:col-span-2">
-                    <Label>Sertifikat nomi</Label>
-                    <Input
-                      value={cert.name}
-                      onChange={(e) => {
-                        const updated = [...(content.certifications || [])];
-                        updated[i] = { ...updated[i], name: e.target.value };
-                        setContent((p) => ({ ...p, certifications: updated }));
-                      }}
-                      placeholder="AWS Certified Developer"
-                      className="mt-1"
-                    />
-                  </div>
-                  <div>
-                    <Label>Yil</Label>
-                    <Input
-                      value={cert.year}
-                      onChange={(e) => {
-                        const updated = [...(content.certifications || [])];
-                        updated[i] = { ...updated[i], year: e.target.value };
-                        setContent((p) => ({ ...p, certifications: updated }));
-                      }}
-                      placeholder="2024"
-                      className="mt-1"
-                    />
-                  </div>
-                  <div className="sm:col-span-3">
-                    <Label>Berilgan tashkilot</Label>
-                    <Input
-                      value={cert.issuer}
-                      onChange={(e) => {
-                        const updated = [...(content.certifications || [])];
-                        updated[i] = { ...updated[i], issuer: e.target.value };
-                        setContent((p) => ({ ...p, certifications: updated }));
-                      }}
-                      placeholder="Amazon Web Services"
-                      className="mt-1"
-                    />
-                  </div>
-                </div>
-              </div>
-            ))}
-            <Button
-              type="button"
-              variant="outline"
-              className="w-full"
-              onClick={() =>
-                setContent((p) => ({
-                  ...p,
-                  certifications: [...(p.certifications || []), { name: "", issuer: "", year: "" }],
-                }))
-              }
-            >
-              <Plus className="mr-2 h-4 w-4" /> Sertifikat qo'shish
-            </Button>
-          </div>
-        )}
-      </motion.div>
-
-      {/* Bottom Save */}
-      <div className="flex justify-end">
-        <Button
-          onClick={handleSave}
-          disabled={isSaving}
-          size="lg"
-          className="bg-gradient-to-r from-purple-500 to-indigo-600"
-        >
-          {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-          O'zgarishlarni saqlash
-        </Button>
-      </div>
+function TextArea({
+  label,
+  value,
+  onChange,
+  placeholder,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  placeholder?: string;
+}) {
+  return (
+    <div>
+      <Label>{label}</Label>
+      <textarea
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        placeholder={placeholder}
+        rows={4}
+        className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+      />
     </div>
   );
 }

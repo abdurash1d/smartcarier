@@ -105,6 +105,59 @@ class UserRole(str, Enum):
     ADMIN = "admin"
 
 
+class AdminSubRole(str, Enum):
+    """
+    Fine-grained admin sub-roles.
+
+    These roles apply only when User.role == ADMIN.
+    """
+
+    SUPER_ADMIN = "super_admin"
+    OPERATIONS_ADMIN = "operations_admin"
+    FINANCE_ADMIN = "finance_admin"
+    SECURITY_ADMIN = "security_admin"
+    SUPPORT_AGENT = "support_agent"
+
+
+ADMIN_PERMISSION_MATRIX = {
+    AdminSubRole.SUPER_ADMIN: {
+        "*",
+        "admin.access.read",
+        "admin.access.write",
+        "admin.errors.read",
+        "admin.errors.resolve",
+        "admin.system.read",
+        "admin.users.read",
+        "admin.dashboard.read",
+    },
+    AdminSubRole.OPERATIONS_ADMIN: {
+        "admin.access.read",
+        "admin.errors.read",
+        "admin.errors.resolve",
+        "admin.system.read",
+        "admin.users.read",
+        "admin.dashboard.read",
+    },
+    AdminSubRole.FINANCE_ADMIN: {
+        "admin.access.read",
+        "admin.users.read",
+        "admin.dashboard.read",
+    },
+    AdminSubRole.SECURITY_ADMIN: {
+        "admin.access.read",
+        "admin.errors.read",
+        "admin.errors.resolve",
+        "admin.system.read",
+        "admin.dashboard.read",
+    },
+    AdminSubRole.SUPPORT_AGENT: {
+        "admin.errors.read",
+        "admin.users.read",
+        "admin.dashboard.read",
+    },
+}
+
+
 # =============================================================================
 # USER MODEL
 # =============================================================================
@@ -273,11 +326,28 @@ class User(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin):
     
     # Role: Determines what the user can do
     role = Column(
-        SQLEnum(UserRole, name='user_role_enum', create_type=True),
+        # Persist enum values ("student", "company", "admin") to match
+        # existing PostgreSQL enum type created by Alembic migrations.
+        SQLEnum(
+            UserRole,
+            name='user_role_enum',
+            create_type=True,
+            values_callable=lambda enum_cls: [member.value for member in enum_cls],
+        ),
         nullable=False,
         default=UserRole.STUDENT,
         index=True,            # Often filter by role
         comment="User role: student (job seeker), company (employer), admin"
+    )
+
+    admin_role = Column(
+        String(32),
+        nullable=True,
+        index=True,
+        comment=(
+            "Admin sub-role for role='admin': super_admin, operations_admin, "
+            "finance_admin, security_admin, support_agent"
+        ),
     )
     
     # Is Active: Can the user log in?
@@ -574,6 +644,23 @@ class User(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin):
             phone = '+' + phone
         
         return phone
+
+    @validates('admin_role')
+    def validate_admin_role(self, key: str, admin_role: Optional[str]) -> Optional[str]:
+        """Validate and normalize admin sub-role values."""
+        if admin_role in (None, ""):
+            return None
+
+        if isinstance(admin_role, AdminSubRole):
+            return admin_role.value
+
+        normalized = str(admin_role).strip().lower()
+        valid_values = {role.value for role in AdminSubRole}
+        if normalized not in valid_values:
+            raise ValueError(
+                f"Invalid admin_role. Must be one of: {', '.join(sorted(valid_values))}"
+            )
+        return normalized
     
     # =========================================================================
     # HELPER METHODS
@@ -597,6 +684,34 @@ class User(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin):
     def is_student(self) -> bool:
         """Check if user is a student/job seeker."""
         return self.role == UserRole.STUDENT
+
+    @property
+    def effective_admin_role(self) -> Optional[AdminSubRole]:
+        """
+        Resolve admin sub-role safely.
+
+        Backward compatibility:
+        - legacy admins without admin_role behave as super_admin.
+        """
+        if self.role != UserRole.ADMIN:
+            return None
+
+        if not self.admin_role:
+            return AdminSubRole.SUPER_ADMIN
+
+        try:
+            return AdminSubRole(self.admin_role)
+        except ValueError:
+            return AdminSubRole.SUPER_ADMIN
+
+    def has_admin_permission(self, permission: str) -> bool:
+        """Check permission for admin sub-role matrix."""
+        admin_role = self.effective_admin_role
+        if admin_role is None:
+            return False
+
+        allowed = ADMIN_PERMISSION_MATRIX.get(admin_role, set())
+        return "*" in allowed or permission in allowed
     
     @property
     def can_post_jobs(self) -> bool:
@@ -661,6 +776,7 @@ class User(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin):
             "email": self.email,
             "full_name": self.full_name,
             "role": self.role.value,
+            "admin_role": self.effective_admin_role.value if self.effective_admin_role else None,
             "is_verified": self.is_verified,
             "avatar_url": self.avatar_url,
             "bio": self.bio,

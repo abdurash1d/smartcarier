@@ -31,11 +31,23 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
-from sqlalchemy import func
-from pydantic import BaseModel, Field
+from sqlalchemy import func, or_, text
+from pydantic import BaseModel, Field, field_validator
 
-from app.core.dependencies import get_db, get_current_admin
-from app.models import User, Resume, Job, Application, UserRole
+from app.core.dependencies import (
+    get_db,
+    get_current_super_admin,
+    require_admin_permission,
+)
+from app.models import (
+    User,
+    Resume,
+    Job,
+    Application,
+    UserRole,
+    AdminSubRole,
+    ADMIN_PERMISSION_MATRIX,
+)
 from app.services.error_logging_service import (
     error_logger,
     ErrorCategory,
@@ -93,11 +105,18 @@ class BulkResolveRequest(BaseModel):
     """Bulk resolve request."""
     error_ids: List[str] = Field(
         ...,
-        min_items=1,
-        max_items=100,
         description="Hal qilinadigan error ID'lar"
     )
     resolution_notes: Optional[str] = None
+
+    @field_validator("error_ids")
+    @classmethod
+    def validate_error_ids(cls, v: List[str]) -> List[str]:
+        if len(v) < 1:
+            raise ValueError("At least 1 error_id is required")
+        if len(v) > 100:
+            raise ValueError("Maximum 100 error_ids allowed at once")
+        return v
 
 
 class SystemHealthResponse(BaseModel):
@@ -114,9 +133,177 @@ class UserStatsResponse(BaseModel):
     stats: Dict[str, Any]
 
 
+class AdminRoleMatrixResponse(BaseModel):
+    """Admin sub-role permission matrix response."""
+    success: bool = True
+    roles: Dict[str, List[str]]
+
+
+class AdminUserAccessItem(BaseModel):
+    """Admin user access row."""
+    user_id: str
+    email: str
+    full_name: str
+    is_active: bool
+    admin_role: str
+    effective_permissions: List[str]
+
+
+class AdminUsersAccessResponse(BaseModel):
+    """Admin users with assigned sub-roles."""
+    success: bool = True
+    total: int
+    users: List[AdminUserAccessItem]
+
+
+class UpdateAdminRoleRequest(BaseModel):
+    """Request body for assigning admin sub-role."""
+    admin_role: AdminSubRole = Field(..., description="Admin sub-role to assign")
+
+
+class UserListItem(BaseModel):
+    """User item for admin list."""
+    id: UUID
+    email: str
+    full_name: str
+    role: str
+    is_active: bool
+    is_verified: bool
+    created_at: datetime
+    last_login: Optional[datetime] = None
+
+
+class UserListResponse(BaseModel):
+    """User list response."""
+    success: bool = True
+    total: int
+    users: List[UserListItem]
+
+
+class UpdateUserStatusRequest(BaseModel):
+    """Request body for updating user status."""
+    is_active: bool = Field(..., description="Account status")
+
+
 # =============================================================================
 # ERROR DASHBOARD ENDPOINTS
 # =============================================================================
+
+@router.get(
+    "/access/roles-matrix",
+    response_model=AdminRoleMatrixResponse,
+    summary="Admin role matrix",
+    description="Available admin sub-roles and their permissions.",
+)
+async def get_admin_roles_matrix(
+    admin: User = Depends(require_admin_permission("admin.access.read")),
+):
+    """Return role -> permissions mapping."""
+    roles = {
+        role.value: sorted(list(permissions))
+        for role, permissions in ADMIN_PERMISSION_MATRIX.items()
+    }
+    return AdminRoleMatrixResponse(roles=roles)
+
+
+@router.get(
+    "/access/admin-users",
+    response_model=AdminUsersAccessResponse,
+    summary="List admin users and sub-roles",
+    description="Return all admin users with effective admin sub-role.",
+)
+async def list_admin_users_access(
+    admin: User = Depends(require_admin_permission("admin.access.read")),
+    db: Session = Depends(get_db),
+):
+    """List admins with effective sub-role and permissions."""
+    admin_users = db.query(User).filter(
+        User.role == UserRole.ADMIN,
+        User.is_deleted == False,
+    ).order_by(User.created_at.desc()).all()
+
+    users: List[AdminUserAccessItem] = []
+    for admin_user in admin_users:
+        effective_role = admin_user.effective_admin_role or AdminSubRole.SUPER_ADMIN
+        permissions = sorted(list(ADMIN_PERMISSION_MATRIX.get(effective_role, set())))
+        users.append(
+            AdminUserAccessItem(
+                user_id=str(admin_user.id),
+                email=admin_user.email,
+                full_name=admin_user.full_name,
+                is_active=admin_user.is_active_account,
+                admin_role=effective_role.value,
+                effective_permissions=permissions,
+            )
+        )
+
+    return AdminUsersAccessResponse(total=len(users), users=users)
+
+
+@router.patch(
+    "/access/admin-users/{user_id}/role",
+    summary="Update admin sub-role",
+    description="Assign admin sub-role to an admin user. Super admin only.",
+)
+async def update_admin_user_role(
+    user_id: UUID,
+    request: UpdateAdminRoleRequest,
+    super_admin: User = Depends(get_current_super_admin),
+    db: Session = Depends(get_db),
+):
+    """Update admin sub-role for a target admin user."""
+    target_user = db.query(User).filter(
+        User.id == user_id,
+        User.is_deleted == False,
+    ).first()
+
+    if not target_user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Admin user not found",
+        )
+
+    if target_user.role != UserRole.ADMIN:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Target user is not an admin account",
+        )
+
+    current_effective_role = target_user.effective_admin_role or AdminSubRole.SUPER_ADMIN
+    requested_role = request.admin_role
+
+    if current_effective_role == AdminSubRole.SUPER_ADMIN and requested_role != AdminSubRole.SUPER_ADMIN:
+        remaining_super_admins = db.query(func.count(User.id)).filter(
+            User.role == UserRole.ADMIN,
+            User.is_deleted == False,
+            or_(User.admin_role == AdminSubRole.SUPER_ADMIN.value, User.admin_role.is_(None)),
+        ).scalar()
+        if remaining_super_admins <= 1:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="At least one super_admin must remain",
+            )
+
+    target_user.admin_role = requested_role.value
+    db.commit()
+    db.refresh(target_user)
+
+    logger.info(
+        "Admin role updated by %s: target=%s role=%s",
+        super_admin.id,
+        target_user.id,
+        requested_role.value,
+    )
+
+    return {
+        "success": True,
+        "message": "Admin role updated successfully",
+        "data": {
+            "user_id": str(target_user.id),
+            "admin_role": target_user.admin_role,
+        },
+    }
+
 
 @router.get(
     "/errors",
@@ -125,7 +312,7 @@ class UserStatsResponse(BaseModel):
     description="Barcha errorlarni filterlash va pagination bilan olish",
 )
 async def list_errors(
-    admin: User = Depends(get_current_admin),
+    admin: User = Depends(require_admin_permission("admin.errors.read")),
     category: Optional[ErrorCategory] = Query(None, description="Error kategoriyasi"),
     severity: Optional[ErrorSeverity] = Query(None, description="Jiddiylik darajasi"),
     from_time: Optional[datetime] = Query(None, description="Boshlanish vaqti"),
@@ -161,7 +348,7 @@ async def list_errors(
     description="Error statistikasi va analytics",
 )
 async def get_error_statistics(
-    admin: User = Depends(get_current_admin),
+    admin: User = Depends(require_admin_permission("admin.errors.read")),
     hours: int = Query(24, ge=1, le=168, description="Soatlar soni (1-168)"),
 ):
     """Get error statistics."""
@@ -187,7 +374,7 @@ async def get_error_statistics(
 )
 async def get_error_detail(
     error_id: str,
-    admin: User = Depends(get_current_admin),
+    admin: User = Depends(require_admin_permission("admin.errors.read")),
 ):
     """Get single error details."""
     
@@ -213,7 +400,7 @@ async def get_error_detail(
 async def resolve_error(
     error_id: str,
     request: ResolveRequest,
-    admin: User = Depends(get_current_admin),
+    admin: User = Depends(require_admin_permission("admin.errors.resolve")),
 ):
     """Mark error as resolved."""
     
@@ -241,7 +428,7 @@ async def resolve_error(
 )
 async def bulk_resolve_errors(
     request: BulkResolveRequest,
-    admin: User = Depends(get_current_admin),
+    admin: User = Depends(require_admin_permission("admin.errors.resolve")),
 ):
     """Resolve multiple errors at once."""
     
@@ -270,7 +457,7 @@ async def bulk_resolve_errors(
     description="Barcha tizim komponentlari holati",
 )
 async def get_system_health(
-    admin: User = Depends(get_current_admin),
+    admin: User = Depends(require_admin_permission("admin.system.read")),
     db: Session = Depends(get_db),
 ):
     """Get system health status."""
@@ -280,7 +467,7 @@ async def get_system_health(
     
     # Check database
     try:
-        db.execute("SELECT 1")
+        db.execute(text("SELECT 1"))
         components["database"] = {
             "status": "healthy",
             "type": "sqlite" if "sqlite" in str(db.bind.url) else "postgresql",
@@ -352,7 +539,7 @@ async def get_system_health(
     description="Foydalanuvchilar statistikasi",
 )
 async def get_user_statistics(
-    admin: User = Depends(get_current_admin),
+    admin: User = Depends(require_admin_permission("admin.users.read")),
     db: Session = Depends(get_db),
 ):
     """Get user statistics."""
@@ -435,7 +622,7 @@ async def get_user_statistics(
     description="Admin uchun umumiy dashboard ma'lumotlari",
 )
 async def get_admin_dashboard(
-    admin: User = Depends(get_current_admin),
+    admin: User = Depends(require_admin_permission("admin.dashboard.read")),
     db: Session = Depends(get_db),
 ):
     """Get admin dashboard summary."""
@@ -488,6 +675,101 @@ async def get_admin_dashboard(
             "timestamp": datetime.now(timezone.utc).isoformat(),
         }
     }
+
+
+# =============================================================================
+# USER MANAGEMENT ENDPOINTS
+# =============================================================================
+
+@router.get(
+    "/users",
+    response_model=UserListResponse,
+    summary="👥 Foydalanuvchilar ro'yxati",
+    description="Tizimdagi barcha foydalanuvchilarni boshqarish uchun olish",
+)
+async def list_users_for_admin(
+    admin: User = Depends(require_admin_permission("admin.users.read")),
+    db: Session = Depends(get_db),
+    role: Optional[UserRole] = Query(None, description="Role bo'yicha filter"),
+    is_active: Optional[bool] = Query(None, description="Holati bo'yicha filter"),
+    search: Optional[str] = Query(None, description="Email yoki ism bo'yicha qidirish"),
+    limit: int = Query(50, ge=1, le=100),
+    offset: int = Query(0, ge=0),
+):
+    """Get all users with filtering and search."""
+    query = db.query(User).filter(User.is_deleted == False)
+
+    if role:
+        query = query.filter(User.role == role)
+    if is_active is not None:
+        query = query.filter(User.is_active_account == is_active)
+    if search:
+        search_filter = f"%{search}%"
+        query = query.filter(
+            or_(
+                User.email.ilike(search_filter),
+                User.full_name.ilike(search_filter)
+            )
+        )
+
+    total = query.count()
+    users = query.order_by(User.created_at.desc()).offset(offset).limit(limit).all()
+
+    user_items = [
+        UserListItem(
+            id=user.id,
+            email=user.email,
+            full_name=user.full_name,
+            role=user.role.value,
+            is_active=user.is_active_account,
+            is_verified=user.is_verified,
+            created_at=user.created_at,
+            last_login=user.last_login,
+        )
+        for user in users
+    ]
+
+    return UserListResponse(total=total, users=user_items)
+
+
+@router.patch(
+    "/users/{user_id}/status",
+    summary="🚫 Foydalanuvchi holatini o'zgartirish",
+    description="Foydalanuvchini bloklash yoki faollashtirish",
+)
+async def update_user_status(
+    user_id: UUID,
+    request: UpdateUserStatusRequest,
+    admin: User = Depends(require_admin_permission("admin.users.write")),
+    db: Session = Depends(get_db),
+):
+    """Enable or disable a user account."""
+    user = db.query(User).filter(
+        User.id == user_id,
+        User.is_deleted == False
+    ).first()
+
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Foydalanuvchi topilmadi"
+        )
+
+    user.is_active_account = request.is_active
+    db.commit()
+
+    action = "activated" if request.is_active else "blocked"
+    logger.info(f"User {user.email} (ID: {user.id}) {action} by admin {admin.id}")
+
+    return {
+        "success": True,
+        "message": f"Foydalanuvchi muvaffaqiyatli {'faollashtirildi' if request.is_active else 'bloklandi'}",
+        "data": {
+            "user_id": str(user.id),
+            "is_active": user.is_active_account
+        }
+    }
+
 
 
 

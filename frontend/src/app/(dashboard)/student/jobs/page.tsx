@@ -22,7 +22,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
-import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Search,
@@ -36,7 +36,6 @@ import {
   Bookmark,
   BookmarkCheck,
   ExternalLink,
-  Sparkles,
   SlidersHorizontal,
   X,
   ChevronDown,
@@ -49,7 +48,6 @@ import {
   Calendar,
   Share2,
   Send,
-  CheckCircle,
   Star,
   ArrowUpRight,
   Loader2,
@@ -638,6 +636,7 @@ const searchSuggestions = [
 // =============================================================================
 
 export default function JobsPage() {
+  const router = useRouter();
   const { jobs, isLoading, fetchJobs } = useJobs();
   const [localJobs, setLocalJobs] = useState<(Job & { matchScore?: number })[]>([]);
   const [selectedJob, setSelectedJob] = useState<(Job & { matchScore?: number }) | null>(null);
@@ -646,8 +645,8 @@ export default function JobsPage() {
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [sortBy, setSortBy] = useState("relevance");
   const [isLoadingMore, setIsLoadingMore] = useState(false);
-  const [showApplyDialog, setShowApplyDialog] = useState(false);
   const [showMobileFilters, setShowMobileFilters] = useState(false);
+  const [isDesktop, setIsDesktop] = useState(false);
 
   // Load jobs from backend
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -660,6 +659,19 @@ export default function JobsPage() {
         setSavedJobs(new Set(data.map((j: any) => j.id)));
       }
     }).catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    const updateViewport = () => {
+      setIsDesktop(window.innerWidth >= 1280);
+    };
+
+    updateViewport();
+    window.addEventListener("resize", updateViewport);
+
+    return () => {
+      window.removeEventListener("resize", updateViewport);
+    };
   }, []);
 
   // Keep localJobs in sync (and allow adding matchScore client-side later)
@@ -822,8 +834,7 @@ export default function JobsPage() {
 
   // Handle apply
   const handleApply = (job: Job) => {
-    setSelectedJob(job as any);
-    setShowApplyDialog(true);
+    router.push(`/student/jobs/${job.id}/apply`);
   };
 
   // Infinite scroll
@@ -854,10 +865,10 @@ export default function JobsPage() {
 
   // Select first job on desktop
   useEffect(() => {
-    if (sortedJobs.length > 0 && !selectedJob && window.innerWidth >= 1280) {
+    if (sortedJobs.length > 0 && !selectedJob && isDesktop) {
       setSelectedJob(sortedJobs[0]);
     }
-  }, [sortedJobs]);
+  }, [sortedJobs, isDesktop, selectedJob]);
 
   return (
     <div className="flex h-[calc(100vh-8rem)] gap-6">
@@ -1273,7 +1284,7 @@ export default function JobsPage() {
 
       {/* Mobile Job Details Dialog */}
       <Dialog
-        open={!!selectedJob && window.innerWidth < 1280}
+        open={!!selectedJob && !isDesktop}
         onOpenChange={(open) => !open && setSelectedJob(null)}
       >
         <DialogContent className="max-h-[90vh] max-w-lg overflow-hidden p-0">
@@ -1291,87 +1302,6 @@ export default function JobsPage() {
               }}
             />
           )}
-        </DialogContent>
-      </Dialog>
-
-      {/* Apply Dialog */}
-      <Dialog open={showApplyDialog} onOpenChange={setShowApplyDialog}>
-        <DialogContent className="sm:max-w-lg">
-          <DialogHeader>
-            <DialogTitle>Apply for {selectedJob?.title}</DialogTitle>
-            <DialogDescription>
-              at {selectedJob?.company?.name}
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-4">
-            <div>
-              <label className="mb-1.5 block text-sm font-medium text-surface-700">
-                Select Resume
-              </label>
-              <Select defaultValue="resume-1">
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="resume-1">
-                    <span className="flex items-center gap-2">
-                      <Badge variant="success" className="text-xs">95% match</Badge>
-                      Senior Software Engineer Resume
-                    </span>
-                  </SelectItem>
-                  <SelectItem value="resume-2">
-                    <span className="flex items-center gap-2">
-                      <Badge variant="warning" className="text-xs">78% match</Badge>
-                      Full Stack Developer Resume
-                    </span>
-                  </SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div>
-              <label className="mb-1.5 block text-sm font-medium text-surface-700">
-                Cover Letter (Optional)
-              </label>
-              <textarea
-                className="w-full rounded-lg border border-surface-300 p-3 text-sm focus:border-purple-500 focus:outline-none focus:ring-1 focus:ring-purple-500"
-                rows={4}
-                placeholder="Write a brief cover letter or use AI to generate one..."
-              />
-              <div className="mt-2 flex items-center gap-2">
-                <Button variant="outline" size="sm" className="gap-1">
-                  <Sparkles className="h-3 w-3" />
-                  Generate with AI
-                </Button>
-              </div>
-            </div>
-
-            <div className="rounded-lg bg-surface-50 p-3">
-              <div className="flex items-center gap-2">
-                <CheckCircle className="h-4 w-4 text-green-600" />
-                <span className="text-sm text-surface-600">
-                  Your resume matches <strong>95%</strong> of the job requirements
-                </span>
-              </div>
-            </div>
-
-            <div className="flex justify-end gap-3">
-              <Button variant="outline" onClick={() => setShowApplyDialog(false)}>
-                Cancel
-              </Button>
-              <Button
-                onClick={() => {
-                  setShowApplyDialog(false);
-                  // Show success toast
-                }}
-                className="bg-gradient-to-r from-purple-500 to-indigo-600"
-              >
-                <Send className="mr-2 h-4 w-4" />
-                Submit Application
-              </Button>
-            </div>
-          </div>
         </DialogContent>
       </Dialog>
 

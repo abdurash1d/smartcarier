@@ -13,8 +13,24 @@ VERSION: 1.0.0
 import pytest
 from fastapi import status
 from fastapi.testclient import TestClient
+from uuid import uuid4
 
-from app.models import User
+from app.models import User, UserRole
+
+
+def _error_message(payload: dict) -> str:
+    """Extract a user-facing error message from legacy and envelope formats."""
+    detail = payload.get("detail")
+    if isinstance(detail, str):
+        return detail
+    if isinstance(detail, dict):
+        return str(detail.get("message") or detail.get("error") or detail)
+
+    error = payload.get("error")
+    if isinstance(error, dict):
+        return str(error.get("message") or error.get("code") or "")
+
+    return ""
 
 
 # =============================================================================
@@ -96,7 +112,7 @@ def test_change_password_wrong_current(client: TestClient, student_headers: dict
     )
     
     assert response.status_code == status.HTTP_400_BAD_REQUEST
-    assert "incorrect" in response.json()["detail"].lower()
+    assert "incorrect" in _error_message(response.json()).lower()
 
 
 @pytest.mark.unit
@@ -278,6 +294,82 @@ def test_admin_can_view_errors(client: TestClient, admin_headers: dict):
     )
     
     assert response.status_code == status.HTTP_200_OK
+
+
+@pytest.mark.integration
+def test_admin_can_view_admin_role_matrix(client: TestClient, admin_headers: dict):
+    """Test admin access to role-permission matrix."""
+    response = client.get(
+        "/api/v1/admin/access/roles-matrix",
+        headers=admin_headers,
+    )
+
+    assert response.status_code == status.HTTP_200_OK
+    payload = response.json()
+    assert payload["success"] is True
+    assert "roles" in payload
+    assert "super_admin" in payload["roles"]
+
+
+@pytest.mark.integration
+def test_admin_can_list_admin_access_users(client: TestClient, admin_headers: dict):
+    """Test admin can list admin users and effective permissions."""
+    response = client.get(
+        "/api/v1/admin/access/admin-users",
+        headers=admin_headers,
+    )
+
+    assert response.status_code == status.HTTP_200_OK
+    payload = response.json()
+    assert payload["success"] is True
+    assert payload["total"] >= 1
+    assert isinstance(payload["users"], list)
+
+
+@pytest.mark.integration
+def test_super_admin_can_update_admin_role(
+    client: TestClient, test_db, test_admin: User, admin_headers: dict
+):
+    """Test super_admin can update another admin's sub-role."""
+    another_admin = User(
+        id=uuid4(),
+        email="second.admin@example.com",
+        full_name="Second Admin",
+        role=UserRole.ADMIN,
+        is_active_account=True,
+        is_verified=True,
+    )
+    another_admin.set_password("AdminPassword123!")
+    test_db.add(another_admin)
+    test_db.commit()
+    test_db.refresh(another_admin)
+
+    response = client.patch(
+        f"/api/v1/admin/access/admin-users/{another_admin.id}/role",
+        headers=admin_headers,
+        json={"admin_role": "support_agent"},
+    )
+
+    assert response.status_code == status.HTTP_200_OK
+    payload = response.json()
+    assert payload["success"] is True
+    assert payload["data"]["user_id"] == str(another_admin.id)
+    assert payload["data"]["admin_role"] == "support_agent"
+
+
+@pytest.mark.integration
+def test_super_admin_cannot_demote_last_super_admin(
+    client: TestClient, test_admin: User, admin_headers: dict
+):
+    """Test guard that prevents removing the last super_admin."""
+    response = client.patch(
+        f"/api/v1/admin/access/admin-users/{test_admin.id}/role",
+        headers=admin_headers,
+        json={"admin_role": "support_agent"},
+    )
+
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert "at least one super_admin" in _error_message(response.json()).lower()
 
 
 # =============================================================================

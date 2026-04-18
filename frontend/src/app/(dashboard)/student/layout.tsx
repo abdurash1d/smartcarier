@@ -77,12 +77,12 @@ const getNavigation = (t: (key: string) => string) => [
     badgeColor: "warning",
   },
   {
-    name: "Saqlangan ishlar",
+    name: t("dashboard.sidebar.savedJobs"),
     href: "/student/saved-jobs",
     icon: BookmarkCheck,
   },
   {
-    name: "Bildirishnomalar",
+    name: t("dashboard.sidebar.notifications"),
     href: "/student/notifications",
     icon: Bell,
   },
@@ -338,14 +338,14 @@ export default function StudentDashboardLayout({
                     >
                       <div className="flex items-center justify-between border-b border-surface-200 p-4 dark:border-surface-700">
                         <h3 className="font-semibold text-surface-900 dark:text-white">
-                          Bildirishnomalar
+                          {t("dashboard.sidebar.notifications")}
                         </h3>
                         {unreadCount > 0 && (
                           <button
                             onClick={markAllRead}
                             className="text-sm text-purple-600 hover:underline"
                           >
-                            Barchasini o'qildi deb belgilash
+                            {t("notificationsPage.markAllRead")}
                           </button>
                         )}
                       </div>
@@ -353,7 +353,7 @@ export default function StudentDashboardLayout({
                         {notifications.length === 0 ? (
                           <div className="flex flex-col items-center justify-center py-8 text-center">
                             <Bell className="h-8 w-8 text-surface-300" />
-                            <p className="mt-2 text-sm text-surface-500">Bildirishnoma yo'q</p>
+                            <p className="mt-2 text-sm text-surface-500">{t("notificationsPage.empty")}</p>
                           </div>
                         ) : (
                           notifications.map((n) => (
@@ -385,7 +385,7 @@ export default function StudentDashboardLayout({
                       <div className="border-t border-surface-200 p-2 dark:border-surface-700">
                         <Link href="/student/notifications" onClick={() => setNotificationsOpen(false)}>
                           <Button variant="ghost" size="sm" className="w-full">
-                            Barcha bildirishnomalar
+                            {t("notificationsPage.allNotifications")}
                           </Button>
                         </Link>
                       </div>
@@ -443,7 +443,7 @@ export default function StudentDashboardLayout({
                           className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm text-surface-600 hover:bg-surface-100 dark:text-surface-400 dark:hover:bg-surface-700"
                         >
                           <User className="h-4 w-4" />
-                          Profile Settings
+                          {t("dashboard.sidebar.profileSettings")}
                         </Link>
                         <Link
                           href="/student/settings"
@@ -451,7 +451,7 @@ export default function StudentDashboardLayout({
                           className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm text-surface-600 hover:bg-surface-100 dark:text-surface-400 dark:hover:bg-surface-700"
                         >
                           <Settings className="h-4 w-4" />
-                          Account Settings
+                          {t("dashboard.sidebar.accountSettings")}
                         </Link>
                       </div>
                       <div className="border-t border-surface-200 pt-2 dark:border-surface-700">
@@ -463,7 +463,7 @@ export default function StudentDashboardLayout({
                           className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-500/10"
                         >
                           <LogOut className="h-4 w-4" />
-                          Sign Out
+                          {t("nav.logout")}
                         </button>
                       </div>
                     </motion.div>

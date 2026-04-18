@@ -16,12 +16,22 @@ branch_labels = None
 depends_on = None
 
 
+def _uuid_type():
+    """Use native UUID on PostgreSQL, string UUID elsewhere (e.g. SQLite)."""
+    if op.get_bind().dialect.name == "postgresql":
+        from sqlalchemy.dialects import postgresql
+        return postgresql.UUID(as_uuid=True)
+    return sa.String(36)
+
+
 def upgrade():
+    uuid_type = _uuid_type()
+
     # Create notifications table
     op.create_table(
         'notifications',
-        sa.Column('id', sa.String(36), primary_key=True),
-        sa.Column('user_id', sa.String(36), sa.ForeignKey('users.id', ondelete='CASCADE'), nullable=False),
+        sa.Column('id', uuid_type, primary_key=True),
+        sa.Column('user_id', uuid_type, sa.ForeignKey('users.id', ondelete='CASCADE'), nullable=False),
         sa.Column('title', sa.String(200), nullable=False),
         sa.Column('message', sa.Text(), nullable=False),
         sa.Column('type', sa.String(50), nullable=False),
@@ -38,8 +48,8 @@ def upgrade():
     # Create saved_searches table
     op.create_table(
         'saved_searches',
-        sa.Column('id', sa.String(36), primary_key=True),
-        sa.Column('user_id', sa.String(36), sa.ForeignKey('users.id', ondelete='CASCADE'), nullable=False),
+        sa.Column('id', uuid_type, primary_key=True),
+        sa.Column('user_id', uuid_type, sa.ForeignKey('users.id', ondelete='CASCADE'), nullable=False),
         sa.Column('name', sa.String(200), nullable=False),
         sa.Column('search_type', sa.String(50), nullable=False),
         sa.Column('filters', sa.JSON(), nullable=False),

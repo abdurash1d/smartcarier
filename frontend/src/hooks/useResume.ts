@@ -35,6 +35,10 @@ interface GenerateResumeData {
     name: string;
     email: string;
     phone?: string;
+    location?: string;
+    professional_title?: string;
+    linkedin_url?: string;
+    portfolio_url?: string;
     skills: string[];
     experience: Array<{
       company: string;
@@ -51,6 +55,80 @@ interface GenerateResumeData {
   };
   template?: "modern" | "classic" | "minimal" | "creative";
   tone?: "professional" | "confident" | "friendly" | "technical";
+}
+
+function unwrapApiData<T>(payload: unknown): T {
+  if (payload && typeof payload === "object" && !Array.isArray(payload)) {
+    const record = payload as Record<string, unknown>;
+
+    if (record.data !== undefined) {
+      return unwrapApiData<T>(record.data);
+    }
+
+    if (record.result !== undefined) {
+      return unwrapApiData<T>(record.result);
+    }
+  }
+
+  return payload as T;
+}
+
+function isResumeLike(value: unknown): value is Resume {
+  return (
+    !!value &&
+    typeof value === "object" &&
+    !Array.isArray(value) &&
+    "id" in value &&
+    "title" in value &&
+    "content" in value
+  );
+}
+
+function extractResumeList(payload: unknown): Resume[] {
+  const data = unwrapApiData<{
+    resumes?: Resume[];
+    items?: Resume[];
+  } | Resume[] | null>(payload);
+
+  if (Array.isArray(data)) {
+    return data;
+  }
+
+  if (data && typeof data === "object") {
+    const record = data as { resumes?: Resume[]; items?: Resume[] };
+
+    if (Array.isArray(record.resumes)) {
+      return record.resumes;
+    }
+
+    if (Array.isArray(record.items)) {
+      return record.items;
+    }
+  }
+
+  return [];
+}
+
+function extractResume(payload: unknown): Resume {
+  const data = unwrapApiData<Record<string, unknown> | Resume>(payload);
+
+  if (isResumeLike(data)) {
+    return data;
+  }
+
+  if (data && typeof data === "object") {
+    const record = data as Record<string, unknown>;
+
+    if (isResumeLike(record.resume)) {
+      return record.resume;
+    }
+
+    if (isResumeLike(record.item)) {
+      return record.item;
+    }
+  }
+
+  throw new Error("Unexpected resume response format");
 }
 
 // =============================================================================
@@ -72,11 +150,11 @@ export function useResume() {
 
     try {
       const response = await resumeApi.list();
-      const data = response.data as { resumes?: Resume[] };
+      const resumes = extractResumeList(response.data);
 
       setState((prev) => ({
         ...prev,
-        resumes: data.resumes || [],
+        resumes,
         isLoading: false,
       }));
     } catch (error) {
@@ -96,7 +174,7 @@ export function useResume() {
 
     try {
       const response = await resumeApi.get(id);
-      const resume = response.data as Resume;
+      const resume = extractResume(response.data);
 
       setState((prev) => ({
         ...prev,
@@ -121,7 +199,7 @@ export function useResume() {
 
     try {
       const response = await resumeApi.create(data);
-      const newResume = response.data as Resume;
+      const newResume = extractResume(response.data);
 
       setState((prev) => ({
         ...prev,
@@ -149,18 +227,18 @@ export function useResume() {
     setState((prev) => ({ ...prev, isGenerating: true, error: null }));
 
     try {
-      const response = await resumeApi.generateAI(data as any);
-      const result = response.data as {
+      const response = await resumeApi.generateAI(data);
+      const result = unwrapApiData<{
         success: boolean;
         message?: string;
         resume?: Resume;
-      };
+      }>(response.data);
 
-      if (!result.success || !result.resume) {
+      if (result.success === false) {
         throw new Error(result.message || "Failed to generate resume with AI");
       }
 
-      const newResume = result.resume;
+      const newResume = extractResume(result);
 
       setState((prev) => ({
         ...prev,
@@ -189,7 +267,7 @@ export function useResume() {
 
     try {
       const response = await resumeApi.update(id, data);
-      const updated = response.data as Resume;
+      const updated = extractResume(response.data);
 
       setState((prev) => ({
         ...prev,
@@ -248,7 +326,7 @@ export function useResume() {
 
     try {
       const response = await resumeApi.publish(id);
-      const updated = response.data as Resume;
+      const updated = extractResume(response.data);
 
       setState((prev) => ({
         ...prev,
@@ -277,7 +355,7 @@ export function useResume() {
 
     try {
       const response = await resumeApi.archive(id);
-      const updated = response.data as Resume;
+      const updated = extractResume(response.data);
 
       setState((prev) => ({
         ...prev,

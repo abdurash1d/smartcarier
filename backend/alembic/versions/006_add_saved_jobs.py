@@ -16,19 +16,29 @@ branch_labels = None
 depends_on = None
 
 
+def _uuid_type():
+    """Use native UUID on PostgreSQL and String(36) elsewhere (e.g. SQLite)."""
+    if op.get_bind().dialect.name == "postgresql":
+        from sqlalchemy.dialects import postgresql
+
+        return postgresql.UUID(as_uuid=True)
+    return sa.String(36)
+
+
 def upgrade():
-    from alembic import op as _op
     from sqlalchemy import inspect
+
     bind = op.get_bind()
     inspector = inspect(bind)
     existing_tables = inspector.get_table_names()
+    uuid_type = _uuid_type()
 
     if 'saved_jobs' not in existing_tables:
         op.create_table(
             'saved_jobs',
-            sa.Column('id', sa.String(36), primary_key=True),
-            sa.Column('user_id', sa.String(36), sa.ForeignKey('users.id', ondelete='CASCADE'), nullable=False),
-            sa.Column('job_id', sa.String(36), sa.ForeignKey('jobs.id', ondelete='CASCADE'), nullable=False),
+            sa.Column('id', uuid_type, primary_key=True),
+            sa.Column('user_id', uuid_type, sa.ForeignKey('users.id', ondelete='CASCADE'), nullable=False),
+            sa.Column('job_id', uuid_type, sa.ForeignKey('jobs.id', ondelete='CASCADE'), nullable=False),
             sa.Column('created_at', sa.DateTime(), nullable=False),
             sa.Column('updated_at', sa.DateTime(), nullable=True),
             sa.UniqueConstraint('user_id', 'job_id', name='uq_saved_jobs_user_job'),

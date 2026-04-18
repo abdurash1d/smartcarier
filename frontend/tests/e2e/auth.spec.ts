@@ -179,7 +179,7 @@ test.describe('Authentication Flow', () => {
     // Logout
     // Open user menu (button contains user full name)
     await page.getByRole('button', { name: /john|user/i }).click();
-    await page.getByRole('button', { name: /sign out|logout/i }).click();
+    await page.getByRole('button', { name: /sign out|logout|chiqish|выйти/i }).click();
     
     // Should redirect to home or login
     await expect(page).toHaveURL(/\/(|login)/);

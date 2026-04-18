@@ -46,7 +46,12 @@ test.describe("Smoke Expansion", () => {
       timeout: 15000,
     });
     await expect(page.getByText(/Foydalanuvchi statistikasi/i)).toBeVisible({ timeout: 15000 });
-    await expect(page.getByRole("heading", { level: 2, name: /System health/i })).toBeVisible({
+    await expect(
+      page.getByRole("heading", {
+        level: 2,
+        name: /system health|tizim holati|состояние системы/i,
+      })
+    ).toBeVisible({
       timeout: 15000,
     });
   });

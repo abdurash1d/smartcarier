@@ -112,9 +112,9 @@ class Settings(BaseSettings):
     GEMINI_API_KEY: str = ""
     
     # Gemini model tanlash
-    # "gemini-1.5-flash" - Tez va bepul
-    # "gemini-1.5-pro" - Kuchliroq
-    GEMINI_MODEL: str = "gemini-1.5-flash"
+    # "gemini-2.5-flash" - Tavsiya etiladi (tez va zamonaviy)
+    # "gemini-2.5-pro" - Kuchliroq
+    GEMINI_MODEL: str = "gemini-2.5-flash"
     
     # AI provider tanlash: "gemini" yoki "openai"
     AI_PROVIDER: str = "gemini"
@@ -181,7 +181,7 @@ class Settings(BaseSettings):
     # True: Shows detailed errors, enables /docs endpoint
     # False: Hides errors, disables /docs (use in production)
     DEBUG: bool = Field(
-        default=True,
+        default=False,
         validation_alias=AliasChoices("SMARTCAREER_DEBUG", "DEBUG"),
     )
     
@@ -327,6 +327,35 @@ class Settings(BaseSettings):
         """
         if self.DEBUG and "RATE_LIMIT_ENABLED" not in os.environ:
             self.RATE_LIMIT_ENABLED = False
+        return self
+
+    @model_validator(mode="after")
+    def _validate_production_secrets(self) -> "Settings":
+        """
+        Fail fast in production if the JWT signing secret is unsafe.
+
+        When DEBUG is disabled we require a strong, non-default SECRET_KEY so
+        deployments do not accidentally boot with a predictable token signer.
+        """
+        weak_secrets = {
+            "",
+            "your-super-secret-key-change-in-production",
+            "CHANGE-THIS-TO-RANDOM-32-CHAR-STRING-USE-COMMAND-BELOW",
+            "generate-a-secure-random-key-here",
+            "secret",
+            "changeme",
+            "change-me",
+            "test-secret",
+            "test-secret-key-for-ci",
+        }
+
+        if not self.DEBUG:
+            secret = (self.SECRET_KEY or "").strip()
+            if len(secret) < 32 or secret in weak_secrets:
+                raise ValueError(
+                    "SECRET_KEY must be set to a strong unique value when DEBUG=False"
+                )
+
         return self
 
 

@@ -21,6 +21,7 @@ import {
   Clock,
 } from "lucide-react";
 import { useJobs } from "@/hooks/useJobs";
+import { useTranslation } from "@/hooks/useTranslation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -29,6 +30,7 @@ import { formatRelativeTime, formatSalaryRange } from "@/lib/utils";
 import type { Job } from "@/types/api";
 
 export default function CompanyJobsPage() {
+  const { t } = useTranslation();
   const {
     jobs,
     isLoading,
@@ -49,7 +51,7 @@ export default function CompanyJobsPage() {
     if (action === "publish") await publishJob(job.id);
     if (action === "close") await closeJob(job.id);
     if (action === "delete") {
-      if (confirm(`"${job.title}" vakansiyasini o'chirishni tasdiqlaysizmi?`)) {
+      if (confirm(t("companyJobsPage.deleteConfirm", { title: job.title }))) {
         await deleteJob(job.id);
       }
     }
@@ -67,16 +69,16 @@ export default function CompanyJobsPage() {
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="font-display text-2xl font-bold text-surface-900 dark:text-white">
-            Job Postings
+            {t("companyJobsPage.title")}
           </h1>
           <p className="mt-1 text-surface-500">
-            Create and manage your job listings
+            {t("companyJobsPage.subtitle")}
           </p>
         </div>
         <Link href="/company/jobs/new">
           <Button variant="gradient">
             <PlusCircle className="mr-2 h-4 w-4" />
-            Post New Job
+            {t("companyJobsPage.postNewJob")}
           </Button>
         </Link>
       </div>
@@ -93,7 +95,7 @@ export default function CompanyJobsPage() {
                 <p className="text-2xl font-bold text-surface-900 dark:text-white">
                   {activeJobs.length}
                 </p>
-                <p className="text-sm text-surface-500">Active Jobs</p>
+                <p className="text-sm text-surface-500">{t("companyJobsPage.activeJobs")}</p>
               </div>
             </div>
           </CardContent>
@@ -108,7 +110,7 @@ export default function CompanyJobsPage() {
                 <p className="text-2xl font-bold text-surface-900 dark:text-white">
                   {totalApplications}
                 </p>
-                <p className="text-sm text-surface-500">Total Applications</p>
+                <p className="text-sm text-surface-500">{t("companyJobsPage.totalApplications")}</p>
               </div>
             </div>
           </CardContent>
@@ -123,7 +125,7 @@ export default function CompanyJobsPage() {
                 <p className="text-2xl font-bold text-surface-900 dark:text-white">
                   {totalViews}
                 </p>
-                <p className="text-sm text-surface-500">Total Views</p>
+                <p className="text-sm text-surface-500">{t("companyJobsPage.totalViews")}</p>
               </div>
             </div>
           </CardContent>
@@ -138,7 +140,7 @@ export default function CompanyJobsPage() {
                 <p className="text-2xl font-bold text-surface-900 dark:text-white">
                   {draftJobs.length}
                 </p>
-                <p className="text-sm text-surface-500">Drafts</p>
+                <p className="text-sm text-surface-500">{t("companyJobsPage.drafts")}</p>
               </div>
             </div>
           </CardContent>
@@ -159,15 +161,15 @@ export default function CompanyJobsPage() {
               <Briefcase className="h-8 w-8 text-surface-400" />
             </div>
             <h3 className="font-display text-lg font-semibold text-surface-900 dark:text-white">
-              No job postings yet
+              {t("companyJobsPage.noJobsTitle")}
             </h3>
             <p className="mt-2 max-w-sm text-surface-500">
-              Create your first job posting to start receiving applications from qualified candidates.
+              {t("companyJobsPage.noJobsDescription")}
             </p>
             <Link href="/company/jobs/new">
               <Button className="mt-6" variant="gradient">
                 <PlusCircle className="mr-2 h-4 w-4" />
-                Post Your First Job
+                {t("companyJobsPage.postFirstJob")}
               </Button>
             </Link>
           </CardContent>
@@ -200,7 +202,7 @@ export default function CompanyJobsPage() {
                     {/* Meta */}
                     <div className="flex flex-wrap items-center gap-4 text-sm text-surface-500">
                       <span>{job.location}</span>
-                      <span>{job.job_type.replace("_", " ")}</span>
+                      <span>{job.job_type?.replace("_", " ")}</span>
                       <span>{job.experience_level}</span>
                       {job.salary_min !== undefined && job.salary_max !== undefined && (
                         <span>{formatSalaryRange(job.salary_min, job.salary_max)}</span>
@@ -214,18 +216,18 @@ export default function CompanyJobsPage() {
                         <span className="font-medium text-surface-900 dark:text-white">
                           {job.applications_count}
                         </span>
-                        <span className="text-surface-500">applicants</span>
+                        <span className="text-surface-500">{t("companyJobsPage.applicants")}</span>
                       </div>
                       <div className="flex items-center gap-2 text-sm">
                         <Eye className="h-4 w-4 text-surface-400" />
                         <span className="font-medium text-surface-900 dark:text-white">
                           {job.views_count}
                         </span>
-                        <span className="text-surface-500">views</span>
+                        <span className="text-surface-500">{t("companyJobsPage.views")}</span>
                       </div>
                       <div className="flex items-center gap-2 text-sm text-surface-500">
                         <Clock className="h-4 w-4" />
-                        Posted {formatRelativeTime(job.created_at)}
+                        {t("companyJobsPage.posted")} {formatRelativeTime(job.created_at)}
                       </div>
                     </div>
                   </div>
@@ -235,7 +237,7 @@ export default function CompanyJobsPage() {
                     <Link href={`/company/jobs/${job.id}/applicants`}>
                       <Button variant="outline" size="sm">
                         <Users className="mr-2 h-4 w-4" />
-                        View Applicants
+                        {t("companyJobsPage.viewApplicants")}
                       </Button>
                     </Link>
                     <Link href={`/company/jobs/${job.id}/edit`}>
@@ -267,7 +269,7 @@ export default function CompanyJobsPage() {
                                 className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-surface-600 hover:bg-surface-100 dark:text-surface-400 dark:hover:bg-surface-700"
                               >
                                 <Globe className="h-4 w-4" />
-                                Publish
+                                {t("companyJobsPage.publish")}
                               </button>
                             )}
                             {job.status === "active" && (
@@ -276,7 +278,7 @@ export default function CompanyJobsPage() {
                                 className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-surface-600 hover:bg-surface-100 dark:text-surface-400 dark:hover:bg-surface-700"
                               >
                                 <Archive className="h-4 w-4" />
-                                Close Job
+                                {t("companyJobsPage.closeJob")}
                               </button>
                             )}
                             <button
@@ -284,7 +286,7 @@ export default function CompanyJobsPage() {
                               className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-500/10"
                             >
                               <Trash2 className="h-4 w-4" />
-                              Delete
+                              {t("common.delete")}
                             </button>
                           </div>
                         </>
@@ -300,7 +302,6 @@ export default function CompanyJobsPage() {
     </div>
   );
 }
-
 
 
 

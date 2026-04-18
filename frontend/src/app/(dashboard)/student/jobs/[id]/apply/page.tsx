@@ -66,9 +66,11 @@ import { Avatar } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn, formatSalaryRange } from "@/lib/utils";
 import type { Job, Resume } from "@/types/api";
+import { aiApi, getErrorMessage } from "@/lib/api";
 import { useJobs } from "@/hooks/useJobs";
 import { useResume } from "@/hooks/useResume";
 import { useApplications } from "@/hooks/useApplications";
+import { toast } from "sonner";
 
 const additionalQuestions = [
   {
@@ -102,6 +104,32 @@ const steps: { id: number; title: string; icon: React.ComponentType<any> }[] = [
   { id: 3, title: "Questions", icon: HelpCircle },
   { id: 4, title: "Review", icon: CheckSquare },
 ];
+
+function buildResumeText(resume: Resume): string {
+  try {
+    const text = JSON.stringify(resume.content ?? {}, null, 2);
+    return text.length >= 100 ? text : `${text}\n\nAdditional profile context for AI optimization.`;
+  } catch {
+    return "Resume content is available but could not be serialized.";
+  }
+}
+
+function buildJobDescription(job: Job): string {
+  const extendedJob = job as Job & { responsibilities?: string[] };
+  const parts = [
+    `Title: ${job.title}`,
+    `Company: ${job.company?.name || ""}`,
+    `Location: ${job.location || ""}`,
+    `Description: ${job.description || ""}`,
+    `Requirements: ${(job.requirements?.skills || []).join(", ")}`,
+    `Responsibilities: ${(extendedJob.responsibilities || []).join(", ")}`,
+  ]
+    .map((part) => part.trim())
+    .filter(Boolean);
+
+  const text = parts.join("\n");
+  return text.length >= 50 ? text : `${text}\nThis role expects strong communication, ownership, and team collaboration.`;
+}
 
 // =============================================================================
 // STEP INDICATOR COMPONENT
@@ -328,7 +356,7 @@ function CoverLetterEditor({
 }: {
   value: string;
   onChange: (value: string) => void;
-  onGenerateAI: () => void;
+  onGenerateAI: (tone: string) => void;
   isGenerating: boolean;
   jobTitle: string;
   companyName: string;
@@ -384,7 +412,7 @@ function CoverLetterEditor({
                 ))}
               </select>
               <Button
-                onClick={onGenerateAI}
+                onClick={() => onGenerateAI(tone)}
                 disabled={isGenerating}
                 className="bg-gradient-to-r from-purple-500 to-indigo-600"
               >
@@ -926,45 +954,78 @@ export default function ApplyPage() {
   };
 
   // Generate AI cover letter
-  const handleGenerateCoverLetter = async () => {
-    if (!job || !selectedResume) return;
+  const handleGenerateCoverLetter = async (tone: string) => {
+    if (!job || !selectedResume) {
+      toast.error("Select a resume before generating a cover letter.");
+      return;
+    }
 
     setIsGeneratingCover(true);
-    // Simulate AI generation
-    await new Promise((resolve) => setTimeout(resolve, 2000));
 
-    const generatedLetter = `Dear Hiring Manager,
+    try {
+      const response = await aiApi.generateCoverLetter({
+        resume_text: buildResumeText(selectedResume),
+        job_description: buildJobDescription(job),
+        company_name: job.company?.name || "",
+        tone,
+      });
 
-I am writing to express my strong interest in the ${job.title} position at ${job.company?.name}. With my background in ${selectedResume.content.skills?.technical?.slice(0, 3).join(", ")}, I am confident that I would be a valuable addition to your team.
+      const data = response.data as {
+        success?: boolean;
+        message?: string;
+        cover_letter?: string;
+        data?: {
+          cover_letter?: string;
+          content?: string;
+          text?: string;
+          letter?: string;
+        };
+      };
 
-Throughout my career, I have developed expertise in building scalable applications and leading development teams. My experience aligns well with the requirements outlined in your job posting, particularly in ${job.requirements.skills?.slice(0, 2).join(" and ")}.
+      if (data.success === false) {
+        throw new Error(data.message || "AI cover letter generation failed.");
+      }
 
-I am particularly excited about this opportunity because of ${job.company?.name}'s reputation for innovation and commitment to excellence. I am eager to contribute my skills and grow with your team.
+      const generatedLetter =
+        (typeof response.data === "string" ? response.data : "") ||
+        data.cover_letter ||
+        data.data?.cover_letter ||
+        data.data?.content ||
+        data.data?.text ||
+        data.data?.letter;
 
-Thank you for considering my application. I look forward to the opportunity to discuss how my experience and enthusiasm can contribute to your team's success.
+      if (!generatedLetter) {
+        throw new Error(data.message || "AI cover letter generation returned no content.");
+      }
 
-Best regards,
-${selectedResume.content.personal_info?.name || "John Doe"}`;
-
-    setCoverLetter(generatedLetter);
-    setIsGeneratingCover(false);
+      setCoverLetter(generatedLetter);
+      toast.success("Cover letter generated");
+    } catch (error) {
+      toast.error(getErrorMessage(error));
+    } finally {
+      setIsGeneratingCover(false);
+    }
   };
 
   // Submit application
   const handleSubmit = async () => {
+    if (!job || !selectedResumeId) {
+      toast.error("Please select a resume before submitting.");
+      return;
+    }
+
     setIsSubmitting(true);
     try {
-      if (!job || !selectedResumeId) {
-        throw new Error("Please select a resume before submitting.");
-      }
       await applyToJob({
         job_id: job.id,
         resume_id: selectedResumeId,
         cover_letter: coverLetter || undefined,
       });
-      setIsSubmitting(false);
       setIsSubmitted(true);
     } catch (error) {
+      // The hook already surfaces API errors; keep this catch for control flow.
+      console.error("Application submission failed:", error);
+    } finally {
       setIsSubmitting(false);
     }
   };

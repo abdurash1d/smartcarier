@@ -41,6 +41,7 @@ import {
   MessageSquare,
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
+import { useTranslation } from "@/hooks/useTranslation";
 import { useJobs } from "@/hooks/useJobs";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -92,12 +93,13 @@ const StatsCard = ({
 );
 
 const StatusBadge = ({ status }: { status: string }) => {
+  const { t } = useTranslation();
   const configs: Record<string, { label: string; variant: string; icon: any }> = {
-    new: { label: "New", variant: "bg-blue-100 text-blue-700", icon: Clock },
-    reviewing: { label: "Reviewing", variant: "bg-yellow-100 text-yellow-700", icon: Eye },
-    interview: { label: "Interview", variant: "bg-purple-100 text-purple-700", icon: Calendar },
-    offered: { label: "Offered", variant: "bg-green-100 text-green-700", icon: CheckCircle },
-    rejected: { label: "Rejected", variant: "bg-red-100 text-red-700", icon: XCircle },
+    new: { label: t("companyDashboard.new"), variant: "bg-blue-100 text-blue-700", icon: Clock },
+    reviewing: { label: t("companyDashboard.reviewing"), variant: "bg-yellow-100 text-yellow-700", icon: Eye },
+    interview: { label: t("companyDashboard.interview"), variant: "bg-purple-100 text-purple-700", icon: Calendar },
+    offered: { label: t("companyDashboard.offered"), variant: "bg-green-100 text-green-700", icon: CheckCircle },
+    rejected: { label: t("companyDashboard.rejected"), variant: "bg-red-100 text-red-700", icon: XCircle },
   };
 
   const config = configs[status] || configs.new;
@@ -116,6 +118,7 @@ const StatusBadge = ({ status }: { status: string }) => {
 
 export default function CompanyDashboardPage() {
   const { user } = useAuth();
+  const { t } = useTranslation();
   const { jobs, isLoading: jobsLoading, fetchMyJobs } = useJobs();
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -142,17 +145,17 @@ export default function CompanyDashboardPage() {
       <motion.div {...fadeInUp} className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="font-display text-2xl font-bold text-surface-900 dark:text-white">
-            Xush kelibsiz, {user?.company_name || "Kompaniya"} 👋
+            {t("companyDashboard.welcome")}, {user?.company_name || t("common.company")}
           </h1>
           <p className="mt-1 text-surface-500">
-            HR Boshqaruv paneli - barcha nomzodlar va vakansiyalarni boshqaring
+            {t("companyDashboard.subtitle")}
           </p>
         </div>
         <div className="flex gap-3">
           <Link href="/company/jobs/new">
             <Button variant="gradient">
               <PlusCircle className="mr-2 h-4 w-4" />
-              Yangi vakansiya
+              {t("companyDashboard.newJob")}
             </Button>
           </Link>
         </div>
@@ -166,25 +169,25 @@ export default function CompanyDashboardPage() {
         className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4"
       >
         <StatsCard
-          title="Faol vakansiyalar"
+          title={t("companyDashboard.activeJobs")}
           value={isLoading ? "—" : activeJobs.length}
           icon={Briefcase}
           color="bg-blue-100 dark:bg-blue-500/20 text-blue-600"
         />
         <StatsCard
-          title="Jami arizalar"
+          title={t("companyDashboard.totalApplications")}
           value={isLoading ? "—" : totalApplications}
           icon={FileText}
           color="bg-purple-100 dark:bg-purple-500/20 text-purple-600"
         />
         <StatsCard
-          title="Jami vakansiyalar"
+          title={t("companyDashboard.totalJobs")}
           value={isLoading ? "—" : jobs.length}
           icon={Calendar}
           color="bg-cyan-100 dark:bg-cyan-500/20 text-cyan-600"
         />
         <StatsCard
-          title="Jami ko'rishlar"
+          title={t("companyDashboard.totalViews")}
           value={isLoading ? "—" : totalViews}
           icon={Eye}
           color="bg-green-100 dark:bg-green-500/20 text-green-600"
@@ -203,11 +206,11 @@ export default function CompanyDashboardPage() {
             <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle className="flex items-center gap-2">
                 <Users className="h-5 w-5 text-purple-500" />
-                So'nggi arizalar
+                {t("companyDashboard.recentApplications")}
               </CardTitle>
               <Link href="/company/applicants">
                 <Button variant="ghost" size="sm">
-                  Barchasini ko'rish
+                  {t("companyDashboard.viewAll")}
                   <ArrowRight className="ml-2 h-4 w-4" />
                 </Button>
               </Link>
@@ -220,9 +223,9 @@ export default function CompanyDashboardPage() {
               ) : jobs.length === 0 ? (
                 <div className="py-8 text-center">
                   <Users className="mx-auto h-10 w-10 text-surface-400" />
-                  <p className="mt-2 text-sm text-surface-500">Hozircha arizalar yo'q</p>
+                  <p className="mt-2 text-sm text-surface-500">{t("companyDashboard.noApplications")}</p>
                   <Link href="/company/jobs/new">
-                    <Button size="sm" className="mt-4" variant="outline">Yangi vakansiya yaratish</Button>
+                    <Button size="sm" className="mt-4" variant="outline">{t("companyDashboard.createFirstJob")}</Button>
                   </Link>
                 </div>
               ) : (
@@ -250,9 +253,9 @@ export default function CompanyDashboardPage() {
                         <div className="text-right">
                           <div className="flex items-center gap-1 text-sm font-medium text-blue-600">
                             <Users className="h-4 w-4" />
-                            {job.applications_count ?? 0} ariza
+                            {job.applications_count ?? 0} {t("companyDashboard.applications")}
                           </div>
-                          <p className="text-xs text-surface-400">{job.views_count ?? 0} ko'rishlar</p>
+                          <p className="text-xs text-surface-400">{job.views_count ?? 0} {t("companyDashboard.views")}</p>
                         </div>
                         <StatusBadge status={job.status} />
                         <Link href={`/company/jobs`}>
@@ -279,7 +282,7 @@ export default function CompanyDashboardPage() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Briefcase className="h-5 w-5 text-blue-500" />
-                Faol vakansiyalar
+                {t("companyDashboard.activeJobsTitle")}
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -289,7 +292,7 @@ export default function CompanyDashboardPage() {
                 </div>
               ) : activeJobs.length === 0 ? (
                 <div className="py-4 text-center">
-                  <p className="text-sm text-surface-500">Faol vakansiya yo'q</p>
+                  <p className="text-sm text-surface-500">{t("companyDashboard.noActiveJobs")}</p>
                 </div>
               ) : (
                 activeJobs.slice(0, 4).map((job: Job) => (
@@ -311,7 +314,7 @@ export default function CompanyDashboardPage() {
                       {(job.applications_count ?? 0) > 0 && (
                         <div className="mt-2">
                           <div className="flex items-center justify-between text-xs text-surface-400 mb-1">
-                            <span>Arizalar</span>
+                            <span>{t("companyDashboard.applications")}</span>
                             <span>{job.applications_count ?? 0}/50</span>
                           </div>
                           <Progress value={((job.applications_count ?? 0) / 50) * 100} className="h-1" />
@@ -323,7 +326,7 @@ export default function CompanyDashboardPage() {
               )}
               <Link href="/company/jobs">
                 <Button variant="outline" className="w-full">
-                  Barchasi ko'rish
+                  {t("companyDashboard.viewAllJobs")}
                 </Button>
               </Link>
             </CardContent>
@@ -345,17 +348,17 @@ export default function CompanyDashboardPage() {
               </div>
               <div>
                 <h3 className="font-display text-lg font-semibold text-surface-900 dark:text-white">
-                  Eng yaxshi nomzodlarni toping
+                  {t("companyDashboard.bestCandidatesTitle")}
                 </h3>
                 <p className="text-sm text-surface-500">
-                  Yangi vakansiya yarating va AI yordamida eng mos nomzodlarni toping
+                  {t("companyDashboard.bestCandidatesDesc")}
                 </p>
               </div>
             </div>
             <Link href="/company/jobs/new">
               <Button variant="gradient">
                 <PlusCircle className="mr-2 h-4 w-4" />
-                Vakansiya yaratish
+                {t("companyDashboard.createJob")}
               </Button>
             </Link>
           </CardContent>
@@ -376,8 +379,8 @@ export default function CompanyDashboardPage() {
                 <PlusCircle className="h-6 w-6" />
               </div>
               <div>
-                <p className="font-semibold text-surface-900 dark:text-white">Vakansiya yaratish</p>
-                <p className="text-sm text-surface-500">Yangi ish e'loni qo'shish</p>
+                <p className="font-semibold text-surface-900 dark:text-white">{t("companyDashboard.createJob")}</p>
+                <p className="text-sm text-surface-500">{t("companyDashboard.createJobDesc")}</p>
               </div>
             </CardContent>
           </Card>
@@ -390,8 +393,8 @@ export default function CompanyDashboardPage() {
                 <Users className="h-6 w-6" />
               </div>
               <div>
-                <p className="font-semibold text-surface-900 dark:text-white">Nomzodlar</p>
-                <p className="text-sm text-surface-500">Arizalarni ko'rish</p>
+                <p className="font-semibold text-surface-900 dark:text-white">{t("companyDashboard.candidates")}</p>
+                <p className="text-sm text-surface-500">{t("companyDashboard.candidatesDesc")}</p>
               </div>
             </CardContent>
           </Card>
@@ -404,8 +407,8 @@ export default function CompanyDashboardPage() {
                 <BarChart3 className="h-6 w-6" />
               </div>
               <div>
-                <p className="font-semibold text-surface-900 dark:text-white">Tahlil</p>
-                <p className="text-sm text-surface-500">HR statistikasi</p>
+                <p className="font-semibold text-surface-900 dark:text-white">{t("companyDashboard.analytics")}</p>
+                <p className="text-sm text-surface-500">{t("companyDashboard.analyticsDesc")}</p>
               </div>
             </CardContent>
           </Card>
@@ -418,8 +421,8 @@ export default function CompanyDashboardPage() {
                 <Building2 className="h-6 w-6" />
               </div>
               <div>
-                <p className="font-semibold text-surface-900 dark:text-white">Kompaniya profili</p>
-                <p className="text-sm text-surface-500">Ma'lumotlarni tahrirlash</p>
+                <p className="font-semibold text-surface-900 dark:text-white">{t("companyDashboard.companyProfile")}</p>
+                <p className="text-sm text-surface-500">{t("companyDashboard.companyProfileDesc")}</p>
               </div>
             </CardContent>
           </Card>

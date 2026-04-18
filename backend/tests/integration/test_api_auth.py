@@ -63,8 +63,15 @@ class TestRegister:
         )
         
         assert response.status_code == status.HTTP_409_CONFLICT
-        assert "email" in response.json().get("detail", "").lower() or \
-               "already" in response.json().get("detail", "").lower()
+        payload = response.json()
+        detail_message = str(payload.get("detail", "")).lower()
+        envelope_message = str(
+            payload.get("error", {}).get("message", "")
+            if isinstance(payload.get("error"), dict)
+            else ""
+        ).lower()
+        message = detail_message or envelope_message
+        assert "email" in message or "already" in message
 
     @pytest.mark.asyncio
     async def test_register_invalid_email(self, async_client: AsyncClient):

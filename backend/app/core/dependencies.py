@@ -55,7 +55,7 @@ VERSION: 1.0.0
 # =============================================================================
 
 import logging
-from typing import Generator, Optional
+from typing import Callable, Generator, Optional
 from uuid import UUID
 
 from fastapi import Depends, HTTPException, status
@@ -64,7 +64,7 @@ from sqlalchemy.orm import Session
 
 # Local imports
 from app.database import SessionLocal
-from app.models import User, UserRole
+from app.models import User, UserRole, AdminSubRole
 from app.core.security import (
     verify_token,
     TokenType,
@@ -334,6 +334,50 @@ def get_current_admin(
         )
     
     return user
+
+
+def get_current_super_admin(
+    admin: User = Depends(get_current_admin),
+) -> User:
+    """
+    Ensure the current admin has super_admin privileges.
+    """
+    if admin.effective_admin_role != AdminSubRole.SUPER_ADMIN:
+        logger.warning(f"Non-super-admin attempted restricted action: {admin.id}")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Super admin access required",
+        )
+
+    return admin
+
+
+def require_admin_permission(permission: str) -> Callable[..., User]:
+    """
+    Build a dependency that enforces admin sub-role permission checks.
+
+    Backward compatibility:
+    - legacy admins without admin_role are treated as super_admin.
+    """
+
+    def _require_permission(
+        admin: User = Depends(get_current_admin),
+    ) -> User:
+        if not admin.has_admin_permission(permission):
+            logger.warning(
+                "Admin permission denied: user=%s permission=%s role=%s admin_role=%s",
+                admin.id,
+                permission,
+                admin.role.value,
+                admin.effective_admin_role.value if admin.effective_admin_role else None,
+            )
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Insufficient admin permissions",
+            )
+        return admin
+
+    return _require_permission
 
 
 def get_current_company(

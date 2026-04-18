@@ -176,7 +176,7 @@ class TestAutoApplyPremiumGateAndQuota:
         client,
         test_db,
     ):
-        """Free users should receive a 402 with a useful detail payload."""
+        """Free users should receive a 402 with a useful error envelope."""
         student, student_headers = _create_student(test_db)
         company = _create_company(test_db)
         resume = _create_published_resume(test_db, student)
@@ -191,9 +191,12 @@ class TestAutoApplyPremiumGateAndQuota:
 
         assert response.status_code == status.HTTP_402_PAYMENT_REQUIRED
         data = response.json()
-        assert isinstance(data["detail"], dict)
-        assert data["detail"]["error"] == "Premium subscription required"
-        assert "active Premium or Enterprise subscription" in data["detail"]["message"]
+        assert data.get("success") is False
+        assert isinstance(data.get("error"), dict)
+        assert "premium subscription required" in str(data["error"].get("code", "")).lower()
+        assert "active premium or enterprise subscription" in str(
+            data["error"].get("message", "")
+        ).lower()
 
     def test_auto_apply_premium_quota_blocks_additional_live_applications(
         self,

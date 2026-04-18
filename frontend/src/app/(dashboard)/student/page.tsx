@@ -88,29 +88,27 @@ type DashboardApplication = {
   };
 };
 
-const interviewDateFormatter = new Intl.DateTimeFormat("uz-UZ", {
-  dateStyle: "medium",
-  timeStyle: "short",
-});
-
-function formatInterviewDateTime(dateValue: string) {
+function formatInterviewDateTime(dateValue: string, locale: "uz" | "ru") {
   const date = new Date(dateValue);
   if (Number.isNaN(date.getTime())) {
     return dateValue;
   }
 
-  return interviewDateFormatter.format(date);
+  return new Intl.DateTimeFormat(locale === "ru" ? "ru-RU" : "uz-UZ", {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(date);
 }
 
-function formatInterviewTypeLabel(interviewType?: string) {
+function formatInterviewTypeLabel(interviewType: string | undefined, t: (key: string) => string) {
   if (!interviewType) {
-    return "Format belgilanmagan";
+    return t("dashboard.interview.formatNotSet");
   }
 
   const normalized = interviewType.trim().toLowerCase();
-  if (normalized === "video") return "Video intervyu";
-  if (normalized === "phone") return "Telefon intervyu";
-  if (normalized === "in-person" || normalized === "in person") return "Shaxsan intervyu";
+  if (normalized === "video") return t("dashboard.interview.videoInterview");
+  if (normalized === "phone") return t("dashboard.interview.phoneInterview");
+  if (normalized === "in-person" || normalized === "in person") return t("dashboard.interview.inPersonInterview");
 
   return interviewType;
 }
@@ -135,7 +133,7 @@ function getUpcomingInterview(applications: UpcomingInterviewCandidate[]) {
 export default function StudentDashboardPage() {
   const router = useRouter();
   const { user } = useAuth();
-  const { t } = useTranslation();
+  const { t, locale } = useTranslation();
 
   const { resumes, isLoading: resumesLoading, fetchResumes } = useResume();
   const { stats: appStats, applications, isLoading: appsLoading, fetchMyApplications } = useApplications();
@@ -175,7 +173,7 @@ export default function StudentDashboardPage() {
       color: "from-purple-500 to-indigo-600",
       bgColor: "bg-purple-100 dark:bg-purple-500/20",
       iconColor: "text-purple-600",
-      change: resumes.length > 0 ? `${resumes.length} ta resume` : t("dashboard.stats.thisWeek"),
+      change: resumes.length > 0 ? t("dashboard.stats.resumeCount", { count: resumes.length }) : t("dashboard.stats.thisWeek"),
       changeType: "positive",
     },
     {
@@ -185,7 +183,7 @@ export default function StudentDashboardPage() {
       color: "from-cyan-500 to-blue-600",
       bgColor: "bg-cyan-100 dark:bg-cyan-500/20",
       iconColor: "text-cyan-600",
-      change: appStats.pending > 0 ? `${appStats.pending} ta kutilmoqda` : "Ariza yo'q",
+      change: appStats.pending > 0 ? t("dashboard.stats.pendingCount", { count: appStats.pending }) : t("dashboard.stats.noApplications"),
       changeType: "positive",
     },
     {
@@ -195,7 +193,7 @@ export default function StudentDashboardPage() {
       color: "from-green-500 to-emerald-600",
       bgColor: "bg-green-100 dark:bg-green-500/20",
       iconColor: "text-green-600",
-      change: appStats.interview > 0 ? `${appStats.interview} ta interview` : "Intervyu yo'q",
+      change: appStats.interview > 0 ? t("dashboard.stats.interviewCount", { count: appStats.interview }) : t("dashboard.stats.noInterviews"),
       changeType: "neutral",
     },
     {
@@ -205,7 +203,7 @@ export default function StudentDashboardPage() {
       color: "from-amber-500 to-orange-600",
       bgColor: "bg-amber-100 dark:bg-amber-500/20",
       iconColor: "text-amber-600",
-      change: appStats.accepted > 0 ? `${appStats.accepted} ta qabul qilindi` : "Ko'rib chiqilmoqda",
+      change: appStats.accepted > 0 ? t("dashboard.stats.acceptedCount", { count: appStats.accepted }) : t("dashboard.stats.underReview"),
       changeType: "positive",
     },
   ];
@@ -216,7 +214,7 @@ export default function StudentDashboardPage() {
   const recentActivity = applicationsForDisplay.slice(0, 5).map((app) => ({
     id: app.id,
     type: "application",
-    title: `${app.job?.title || "Ish joyi"} — ${app.job?.company?.name || app.job?.company_name || "Kompaniya"}`,
+    title: `${app.job?.title || t("dashboard.jobs.jobFallback")} - ${app.job?.company?.name || app.job?.company_name || t("common.company")}`,
     time: app.applied_at ? formatRelativeTime(app.applied_at) : "",
     icon: app.status === "interview" ? Calendar : app.status === "accepted" ? CheckCircle : Send,
     color: app.status === "interview"
@@ -230,7 +228,7 @@ export default function StudentDashboardPage() {
   const upcomingInterviewCompanyName =
     upcomingInterview?.job?.company?.name ||
     upcomingInterview?.job?.company_name ||
-    "Kompaniya";
+    t("common.company");
 
   const quickActions = [
     {
@@ -269,7 +267,7 @@ export default function StudentDashboardPage() {
       <motion.div variants={itemVariants} className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="font-display text-2xl font-bold text-surface-900 dark:text-white sm:text-3xl">
-            {greeting()}, {user?.full_name?.split(" ")[0] || "there"}! 👋
+            {greeting()}, {user?.full_name?.split(" ")[0] || t("common.student")}!
           </h1>
           <p className="mt-1 text-surface-500">
             {t("dashboard.subtitle")}
@@ -417,7 +415,7 @@ export default function StudentDashboardPage() {
                 </div>
               ) : recentActivity.length === 0 ? (
                 <p className="py-6 text-center text-sm text-surface-500">
-                  Hozircha faoliyat mavjud emas
+                  {t("dashboard.recentActivity.empty")}
                 </p>
               ) : (
                 <div className="space-y-4">
@@ -468,7 +466,7 @@ export default function StudentDashboardPage() {
                 </div>
               ) : jobs.length === 0 ? (
                 <p className="py-6 text-center text-sm text-surface-500">
-                  Hozircha ish imkoniyatlari mavjud emas
+                  {t("dashboard.recommended.empty")}
                 </p>
               ) : (
                 <div className="space-y-4">
@@ -486,7 +484,7 @@ export default function StudentDashboardPage() {
                               {job.title}
                             </h4>
                             <p className="text-sm text-surface-500">
-                              {job.company?.name || "Kompaniya"} • {job.location}
+                              {job.company?.name || t("common.company")} • {job.location}
                             </p>
                             {(job.salary_min || job.salary_max) && (
                               <p className="mt-1 text-sm font-medium text-green-600">
@@ -547,15 +545,15 @@ export default function StudentDashboardPage() {
                       {t("dashboard.interview.title")}
                     </h3>
                     <p className="text-surface-600 dark:text-surface-300">
-                      <strong>{upcomingInterview.job?.title || "Intervyu"}</strong>{" "}
+                      <strong>{upcomingInterview.job?.title || t("dashboard.interview.title")}</strong>{" "}
                       {t("dashboard.recentActivity.at")} {upcomingInterviewCompanyName}
                     </p>
                     <p className="text-sm text-surface-500">
-                      {formatInterviewDateTime(upcomingInterview.interview_at as string)}
+                      {formatInterviewDateTime(upcomingInterview.interview_at as string, locale)}
                     </p>
                     <div className="mt-3 flex flex-wrap items-center gap-3">
                       <Badge variant="secondary" className="bg-white/80 text-surface-700">
-                        {formatInterviewTypeLabel(upcomingInterview.interview_type)}
+                        {formatInterviewTypeLabel(upcomingInterview.interview_type, t)}
                       </Badge>
                       {upcomingInterview.meeting_link ? (
                         <Button asChild variant="outline" size="sm" className="h-8 rounded-full border-green-200 bg-white/80 px-3 text-green-700 hover:bg-green-50">
@@ -564,12 +562,12 @@ export default function StudentDashboardPage() {
                             target="_blank"
                             rel="noopener noreferrer"
                           >
-                            Meeting link
+                            {t("dashboard.interview.meetingLink")}
                           </a>
                         </Button>
                       ) : (
                         <span className="text-sm text-surface-500">
-                          Meeting link mavjud emas
+                          {t("dashboard.interview.noMeetingLink")}
                         </span>
                       )}
                     </div>
@@ -594,7 +592,7 @@ export default function StudentDashboardPage() {
                     {t("dashboard.interview.title")}
                   </h3>
                   <p className="mt-1 text-sm text-surface-500">
-                    Hozircha rejalashtirilgan intervyu mavjud emas.
+                    {t("dashboard.interview.empty")}
                   </p>
                 </div>
               </div>
