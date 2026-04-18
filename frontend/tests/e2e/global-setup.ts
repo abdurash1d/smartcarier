@@ -58,6 +58,25 @@ sys.path.insert(0, ".")
 from app.config import settings
 from app.models.user import User, UserRole
 
+def resolve_admin_role_value():
+    # Use enum value when available, but normalize to lowercase text to
+    # avoid adapter-specific enum-name serialization (e.g., "ADMIN").
+    admin_member = getattr(UserRole, "ADMIN", None)
+    raw_value = getattr(admin_member, "value", admin_member)
+
+    if raw_value is None:
+        for member in UserRole:
+            member_name = str(getattr(member, "name", "")).strip().lower()
+            member_value = str(getattr(member, "value", member)).strip()
+            if member_name == "admin":
+                raw_value = member_value or "admin"
+                break
+
+    normalized = str(raw_value or "admin").strip().lower()
+    return normalized or "admin"
+
+ADMIN_ROLE_VALUE = resolve_admin_role_value()
+
 engine = create_engine(os.environ.get("DATABASE_URL") or str(settings.DATABASE_URL), echo=False)
 SessionLocal = sessionmaker(bind=engine)
 
@@ -74,7 +93,7 @@ try:
             email="admin@smartcareer.uz",
             full_name="System Admin",
             phone="+998901111111",
-            role=UserRole.ADMIN,
+            role=ADMIN_ROLE_VALUE,
             is_active_account=True,
             is_verified=True,
         )
@@ -82,7 +101,7 @@ try:
     else:
         admin.full_name = "System Admin"
         admin.phone = "+998901111111"
-        admin.role = UserRole.ADMIN
+        admin.role = ADMIN_ROLE_VALUE
         admin.is_active_account = True
         admin.is_verified = True
 
