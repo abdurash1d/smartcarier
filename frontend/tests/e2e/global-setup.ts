@@ -50,62 +50,126 @@ import os
 import sys
 from uuid import uuid4
 
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.orm import sessionmaker
 
 sys.path.insert(0, ".")
 
 from app.config import settings
-from app.models.user import User, UserRole
+from app.models.user import User
 
-def resolve_admin_role_value():
-    # Use enum value when available, but normalize to lowercase text to
-    # avoid adapter-specific enum-name serialization (e.g., "ADMIN").
-    admin_member = getattr(UserRole, "ADMIN", None)
-    raw_value = getattr(admin_member, "value", admin_member)
-
-    if raw_value is None:
-        for member in UserRole:
-            member_name = str(getattr(member, "name", "")).strip().lower()
-            member_value = str(getattr(member, "value", member)).strip()
-            if member_name == "admin":
-                raw_value = member_value or "admin"
-                break
-
-    normalized = str(raw_value or "admin").strip().lower()
-    return normalized or "admin"
-
-ADMIN_ROLE_VALUE = resolve_admin_role_value()
+ADMIN_EMAIL = "admin@smartcareer.uz"
+ADMIN_ROLE_VALUE = "admin"
+ADMIN_SUB_ROLE_VALUE = "super_admin"
 
 engine = create_engine(os.environ.get("DATABASE_URL") or str(settings.DATABASE_URL), echo=False)
 SessionLocal = sessionmaker(bind=engine)
+is_postgres = engine.dialect.name == "postgresql"
 
 # Only ensure the users table exists. Creating the entire metadata can fail in fresh
 # Postgres (e.g. FK type mismatches) and would silently fall back to sqlite.
 User.__table__.create(bind=engine, checkfirst=True)
 
+inspector = inspect(engine)
+user_columns = {column["name"] for column in inspector.get_columns("users")}
+has_admin_role_column = "admin_role" in user_columns
+
 db = SessionLocal()
 try:
-    admin = db.query(User).filter(User.email == "admin@smartcareer.uz").first()
-    if admin is None:
-        admin = User(
-            id=uuid4(),
-            email="admin@smartcareer.uz",
-            full_name="System Admin",
-            phone="+998901111111",
-            role=ADMIN_ROLE_VALUE,
-            is_active_account=True,
-            is_verified=True,
-        )
-        db.add(admin)
-    else:
-        admin.full_name = "System Admin"
-        admin.phone = "+998901111111"
-        admin.role = ADMIN_ROLE_VALUE
-        admin.is_active_account = True
-        admin.is_verified = True
+    password_source = User(
+        email=ADMIN_EMAIL,
+        full_name="System Admin",
+    )
+    password_source.set_password("Admin123!")
+    password_hash = password_source.password_hash
 
-    admin.set_password("Admin123!")
+    existing_admin_row = db.execute(
+        text("SELECT id FROM users WHERE email = :email LIMIT 1"),
+        {"email": ADMIN_EMAIL},
+    ).first()
+
+    role_sql = "CAST(:role AS user_role_enum)" if is_postgres else ":role"
+
+    if existing_admin_row is not None:
+        update_fields = [
+            "full_name = :full_name",
+            "phone = :phone",
+            "password_hash = :password_hash",
+            f"role = {role_sql}",
+            "is_active = :is_active",
+            "is_verified = :is_verified",
+            "is_deleted = :is_deleted",
+            "deleted_at = NULL",
+            "updated_at = CURRENT_TIMESTAMP",
+        ]
+        if has_admin_role_column:
+            update_fields.append("admin_role = :admin_role")
+
+        db.execute(
+            text(
+                "UPDATE users "
+                "SET " + ", ".join(update_fields) + " "
+                "WHERE id = :id"
+            ),
+            {
+                "id": str(existing_admin_row[0]),
+                "full_name": "System Admin",
+                "phone": "+998901111111",
+                "password_hash": password_hash,
+                "role": ADMIN_ROLE_VALUE,
+                "admin_role": ADMIN_SUB_ROLE_VALUE,
+                "is_active": True,
+                "is_verified": True,
+                "is_deleted": False,
+            },
+        )
+    else:
+        insert_columns = [
+            "id",
+            "email",
+            "full_name",
+            "phone",
+            "password_hash",
+            "role",
+            "is_active",
+            "is_verified",
+            "is_deleted",
+        ]
+        insert_values = [
+            "CAST(:id AS uuid)" if is_postgres else ":id",
+            ":email",
+            ":full_name",
+            ":phone",
+            ":password_hash",
+            role_sql,
+            ":is_active",
+            ":is_verified",
+            ":is_deleted",
+        ]
+
+        if has_admin_role_column:
+            insert_columns.append("admin_role")
+            insert_values.append(":admin_role")
+
+        db.execute(
+            text(
+                "INSERT INTO users (" + ", ".join(insert_columns) + ") "
+                "VALUES (" + ", ".join(insert_values) + ")"
+            ),
+            {
+                "id": str(uuid4()),
+                "email": ADMIN_EMAIL,
+                "full_name": "System Admin",
+                "phone": "+998901111111",
+                "password_hash": password_hash,
+                "role": ADMIN_ROLE_VALUE,
+                "admin_role": ADMIN_SUB_ROLE_VALUE,
+                "is_active": True,
+                "is_verified": True,
+                "is_deleted": False,
+            },
+        )
+
     db.commit()
 finally:
     db.close()
