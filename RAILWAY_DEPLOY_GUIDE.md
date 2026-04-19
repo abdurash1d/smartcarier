@@ -91,7 +91,7 @@ ACCESS_TOKEN_EXPIRE_MINUTES=30
 DATABASE_URL=${{Postgres.DATABASE_URL}}
 
 # AI Services
-GEMINI_API_KEY=AIzaSyB0fOl77frnhsPzgpbsQ3Lly8oK22piSe8
+GEMINI_API_KEY=<your-gemini-api-key>
 OPENAI_API_KEY=<your-openai-key-if-you-have>
 OPENAI_MODEL=gpt-4-turbo-preview
 
