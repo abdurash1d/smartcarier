@@ -49,7 +49,7 @@ services:
       - key: GEMINI_API_KEY
         sync: false  # Manual qo'shish kerak
       - key: GEMINI_MODEL
-        value: gemini-1.5-flash
+        value: gemini-2.5-flash
       
       # OAuth2 (Google)
       - key: GOOGLE_CLIENT_ID
@@ -59,7 +59,7 @@ services:
       - key: GOOGLE_REDIRECT_URI
         sync: false  # Deploy'dan keyin to'ldirish kerak
       - key: OAUTH_ENABLED
-        value: true
+        value: false
       
       # Frontend URL
       - key: FRONTEND_URL
@@ -91,7 +91,11 @@ services:
       - key: STRIPE_WEBHOOK_SECRET
         sync: false  # Manual qo'shish kerak
       - key: PAYMENTS_REQUIRE_WEBHOOK_SECRET
-        value: true
+        value: false
+
+      # Email (Render free outbound SMTP cheklovlari uchun)
+      - key: EMAIL_TRANSPORT
+        value: disabled
       
       # Redis (Optional - agar Redis service qo'shgan bo'lsangiz)
       - key: REDIS_ENABLED
@@ -125,16 +129,6 @@ services:
         sync: false  # Google OAuth Client ID
 
   # =============================================================================
-  # DATABASE (PostgreSQL)
-  # =============================================================================
-  - type: pspg
-    name: smartcareer-db
-    region: frankfurt  # Backend bilan bir xil region
-    plan: free  # free (90 kun), starter ($7/oy)
-    databaseName: smartcareer
-    databaseUser: smartcareer_user
-
-  # =============================================================================
   # REDIS (Optional - Rate limiting, Token blacklist)
   # =============================================================================
   # - type: redis
@@ -142,4 +136,14 @@ services:
   #   region: frankfurt
   #   plan: free  # free (25MB), starter ($10/oy)
   #   maxmemoryPolicy: allkeys-lru
+
+databases:
+  # =============================================================================
+  # DATABASE (PostgreSQL)
+  # =============================================================================
+  - name: smartcareer-db
+    region: frankfurt  # Backend bilan bir xil region
+    plan: free  # free
+    databaseName: smartcareer
+    user: smartcareer_user
 
