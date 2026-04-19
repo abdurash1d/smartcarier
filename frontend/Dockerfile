@@ -23,7 +23,7 @@ RUN mkdir -p /app/public
 
 # Build the application
 ENV NEXT_TELEMETRY_DISABLED=1
-RUN npm run build
+RUN npm run build && ls -la /app/.next/
 
 # --- Stage 3: Runtime ---
 FROM node:18-alpine AS runner
