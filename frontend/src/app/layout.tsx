@@ -9,7 +9,11 @@ import { Toaster } from "sonner";
 import { Providers } from "./providers";
 import "./globals.css";
 
+const frontendBaseUrl =
+  process.env.NEXT_PUBLIC_FRONTEND_URL?.trim() || "http://localhost:3000";
+
 export const metadata: Metadata = {
+  metadataBase: new URL(frontendBaseUrl),
   title: {
     default: "SmartCareer AI - AI-Powered Career Platform",
     template: "%s | SmartCareer AI",
@@ -94,7 +98,6 @@ export default function RootLayout({
     </html>
   );
 }
-
 
 
 
