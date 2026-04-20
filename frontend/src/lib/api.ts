@@ -12,6 +12,7 @@
 
 import axios, { AxiosError, AxiosInstance, InternalAxiosRequestConfig } from "axios";
 import { useAuthStore } from "@/store/authStore";
+import { getApiBaseUrl } from "@/lib/runtime-config";
 import type {
   AdminAccessUsersResponse,
   AdminRoleMatrixResponse,
@@ -38,7 +39,7 @@ import type {
 // CONFIGURATION
 // =============================================================================
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1";
+const API_BASE_URL = getApiBaseUrl();
 const REQUEST_TIMEOUT = 30000; // 30 seconds
 
 // =============================================================================

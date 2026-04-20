@@ -42,6 +42,7 @@ import {
 import { useAuth } from "@/hooks/useAuth";
 import { useTranslation } from "@/hooks/useTranslation";
 import { useAuthStore } from "@/store/authStore";
+import { getBackendOrigin } from "@/lib/runtime-config";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
@@ -238,8 +239,7 @@ export default function RegisterPage() {
   const { t } = useTranslation();
 
   const handleGoogleOAuth = () => {
-    const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1";
-    const backendOrigin = apiBase.replace(/\/api\/v1\/?$/, "");
+    const backendOrigin = getBackendOrigin();
     window.location.href = `${backendOrigin}/api/v1/auth/oauth/google?redirect=true`;
   };
   const steps = RegisterSteps();
@@ -934,8 +934,7 @@ export default function RegisterPage() {
           <button
             type="button"
             onClick={() => {
-              const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1";
-              const origin = apiBase.replace(/\/api\/v1\/?$/, "");
+              const origin = getBackendOrigin();
               window.location.href = `${origin}/api/v1/auth/oauth/google?redirect=true`;
             }}
             className="flex h-12 items-center justify-center gap-2 rounded-xl border-2 border-surface-200 bg-white font-medium text-surface-700 transition-all hover:border-surface-300 hover:bg-surface-50"
@@ -951,8 +950,7 @@ export default function RegisterPage() {
           <button
             type="button"
             onClick={() => {
-              const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1";
-              const origin = apiBase.replace(/\/api\/v1\/?$/, "");
+              const origin = getBackendOrigin();
               window.location.href = `${origin}/api/v1/auth/oauth/linkedin?redirect=true`;
             }}
             className="flex h-12 items-center justify-center gap-2 rounded-xl border-2 border-surface-200 bg-white font-medium text-surface-700 transition-all hover:border-surface-300 hover:bg-surface-50"
