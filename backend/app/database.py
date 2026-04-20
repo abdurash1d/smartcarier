@@ -175,6 +175,55 @@ def check_database_connection() -> bool:
         return False
 
 
+def normalize_legacy_user_role_values() -> None:
+    """
+    Normalize legacy role/admin_role values that can break enum parsing.
+
+    Older local databases may contain uppercase role values
+    (STUDENT/COMPANY/ADMIN) that no longer match current enum values
+    (student/company/admin). This causes SQLAlchemy LookupError when loading
+    users during OAuth/login flows.
+    """
+    try:
+        with engine.begin() as connection:
+            # Ensure admin rows remain valid with constraint:
+            # role='admin' => admin_role must be non-null.
+            connection.execute(
+                text(
+                    """
+                    UPDATE users
+                    SET admin_role = 'super_admin'
+                    WHERE UPPER(CAST(role AS TEXT)) = 'ADMIN'
+                      AND (admin_role IS NULL OR TRIM(admin_role) = '')
+                    """
+                )
+            )
+
+            connection.execute(
+                text(
+                    """
+                    UPDATE users
+                    SET admin_role = LOWER(admin_role)
+                    WHERE admin_role IS NOT NULL
+                    """
+                )
+            )
+
+            connection.execute(
+                text(
+                    """
+                    UPDATE users
+                    SET role = LOWER(CAST(role AS TEXT))
+                    WHERE UPPER(CAST(role AS TEXT)) IN ('STUDENT', 'COMPANY', 'ADMIN')
+                    """
+                )
+            )
+        logger.info("Legacy user role values normalized successfully")
+    except Exception as e:
+        # Non-fatal: app can still run, but we log explicitly for diagnostics.
+        logger.warning(f"Failed to normalize legacy user roles: {e}")
+
+
 def get_db_info() -> dict:
     """
     Get database information for debugging.

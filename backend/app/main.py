@@ -48,7 +48,7 @@ from sqlalchemy.orm import Session
 # Local imports
 from app.config import settings, print_config_summary
 from app.api.v1 import api_router
-from app.database import check_database_connection, get_db
+from app.database import check_database_connection, get_db, normalize_legacy_user_role_values
 
 # =============================================================================
 # LOGGING CONFIGURATION
@@ -189,6 +189,7 @@ async def lifespan(app: FastAPI):
     # Check database connection
     if check_database_connection():
         logger.info("✅ Database connection successful")
+        normalize_legacy_user_role_values()
     else:
         logger.error("❌ Database connection failed!")
 
