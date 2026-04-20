@@ -186,6 +186,8 @@ def normalize_legacy_user_role_values() -> None:
     """
     try:
         with engine.begin() as connection:
+            is_postgres = connection.dialect.name == "postgresql"
+
             # Ensure admin rows remain valid with constraint:
             # role='admin' => admin_role must be non-null.
             connection.execute(
@@ -209,15 +211,33 @@ def normalize_legacy_user_role_values() -> None:
                 )
             )
 
-            connection.execute(
-                text(
-                    """
-                    UPDATE users
-                    SET role = LOWER(CAST(role AS TEXT))
-                    WHERE UPPER(CAST(role AS TEXT)) IN ('STUDENT', 'COMPANY', 'ADMIN')
-                    """
+            if is_postgres:
+                # PostgreSQL enum columns cannot be assigned raw text without
+                # casting back to the enum type.
+                connection.execute(
+                    text(
+                        """
+                        UPDATE users
+                        SET role = CASE CAST(role AS TEXT)
+                            WHEN 'STUDENT' THEN 'student'::user_role_enum
+                            WHEN 'COMPANY' THEN 'company'::user_role_enum
+                            WHEN 'ADMIN' THEN 'admin'::user_role_enum
+                            ELSE role
+                        END
+                        WHERE CAST(role AS TEXT) IN ('STUDENT', 'COMPANY', 'ADMIN')
+                        """
+                    )
                 )
-            )
+            else:
+                connection.execute(
+                    text(
+                        """
+                        UPDATE users
+                        SET role = LOWER(CAST(role AS TEXT))
+                        WHERE UPPER(CAST(role AS TEXT)) IN ('STUDENT', 'COMPANY', 'ADMIN')
+                        """
+                    )
+                )
         logger.info("Legacy user role values normalized successfully")
     except Exception as e:
         # Non-fatal: app can still run, but we log explicitly for diagnostics.
