@@ -14,6 +14,12 @@ RUN npm ci --frozen-lockfile
 FROM node:18-alpine AS builder
 WORKDIR /app
 
+# Build-time public envs for Next.js.
+# Railway Docker builds may not inject service vars automatically into `next build`,
+# so we provide sane defaults and allow override via build args.
+ARG NEXT_PUBLIC_API_URL="https://smartcareer-backend-production-fe34.up.railway.app/api/v1"
+ARG NEXT_PUBLIC_FRONTEND_URL="https://smartcareer-frontend-production-f5c1.up.railway.app"
+
 # Copy dependencies
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
@@ -23,6 +29,8 @@ RUN mkdir -p /app/public
 
 # Build the application
 ENV NEXT_TELEMETRY_DISABLED=1
+ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
+ENV NEXT_PUBLIC_FRONTEND_URL=${NEXT_PUBLIC_FRONTEND_URL}
 RUN npm run build && ls -la /app/.next/
 
 # --- Stage 3: Runtime ---
