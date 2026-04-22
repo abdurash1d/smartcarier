@@ -11,12 +11,12 @@ services:
     runtime: python
     region: frankfurt  # Yevropa: frankfurt, singapore, oregon
     plan: free  # free, starter ($7/oy), standard ($25/oy)
+    rootDir: backend
+    healthCheckPath: /health
     buildCommand: |
-      cd backend &&
-      pip install -r requirements.txt &&
-      alembic upgrade head
+      pip install -r requirements.txt
     startCommand: |
-      cd backend &&
+      alembic upgrade head &&
       uvicorn app.main:app --host 0.0.0.0 --port $PORT
     envVars:
       # Application
@@ -24,6 +24,8 @@ services:
         value: SmartCareer AI
       - key: APP_VERSION
         value: 1.0.0
+      - key: PYTHON_VERSION
+        value: 3.11.9
       - key: DEBUG
         value: false
       - key: SECRET_KEY
@@ -52,12 +54,6 @@ services:
         value: gemini-2.5-flash
       
       # OAuth2 (Google)
-      - key: GOOGLE_CLIENT_ID
-        sync: false  # Manual qo'shish kerak
-      - key: GOOGLE_CLIENT_SECRET
-        sync: false  # Manual qo'shish kerak
-      - key: GOOGLE_REDIRECT_URI
-        sync: false  # Deploy'dan keyin to'ldirish kerak
       - key: OAUTH_ENABLED
         value: false
       
@@ -74,10 +70,6 @@ services:
         value: smtp.gmail.com
       - key: SMTP_PORT
         value: 587
-      - key: SMTP_USER
-        sync: false  # Manual qo'shish kerak
-      - key: SMTP_PASSWORD
-        sync: false  # Manual qo'shish kerak
       - key: SMTP_FROM_EMAIL
         value: noreply@smartcareer.uz
       - key: SMTP_FROM_NAME
@@ -86,10 +78,6 @@ services:
         value: true
       
       # Payments (Stripe)
-      - key: STRIPE_SECRET_KEY
-        sync: false  # Manual qo'shish kerak
-      - key: STRIPE_WEBHOOK_SECRET
-        sync: false  # Manual qo'shish kerak
       - key: PAYMENTS_REQUIRE_WEBHOOK_SECRET
         value: false
 
@@ -100,8 +88,6 @@ services:
       # Redis (Optional - agar Redis service qo'shgan bo'lsangiz)
       - key: REDIS_ENABLED
         value: false
-      - key: REDIS_URL
-        sync: false  # Redis service'dan olinadi
 
   # =============================================================================
   # FRONTEND SERVICE (Next.js)
@@ -111,22 +97,21 @@ services:
     runtime: node
     region: frankfurt  # Backend bilan bir xil region
     plan: free  # free, starter ($7/oy)
+    rootDir: frontend
     buildCommand: |
-      cd frontend &&
-      npm install &&
+      npm ci &&
       npm run build
     startCommand: |
-      cd frontend &&
-      npm start
+      npm run start -- -H 0.0.0.0 -p $PORT
     envVars:
       - key: NODE_ENV
         value: production
+      - key: NODE_VERSION
+        value: 20
       - key: NEXT_PUBLIC_API_URL
         sync: false  # Backend URL bilan to'ldirish kerak
       - key: NEXT_PUBLIC_FRONTEND_URL
         sync: false  # Frontend URL bilan to'ldirish kerak
-      - key: NEXT_PUBLIC_GOOGLE_CLIENT_ID
-        sync: false  # Google OAuth Client ID
 
   # =============================================================================
   # REDIS (Optional - Rate limiting, Token blacklist)

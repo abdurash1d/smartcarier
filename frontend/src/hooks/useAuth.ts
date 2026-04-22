@@ -13,8 +13,9 @@ import { useCallback, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import type { User } from "@/types/api";
 import { useAuthStore } from "@/store/authStore";
+import { getApiBaseUrl } from "@/lib/runtime-config";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1";
+const API_BASE_URL = getApiBaseUrl();
 
 async function parseApiError(res: Response): Promise<string> {
   try {

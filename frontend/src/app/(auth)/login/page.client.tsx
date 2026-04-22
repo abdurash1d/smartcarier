@@ -28,6 +28,7 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useTranslation } from "@/hooks/useTranslation";
+import { getBackendOrigin } from "@/lib/runtime-config";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
@@ -96,14 +97,12 @@ export default function LoginPageClient() {
   };
 
   const handleGoogleOAuth = () => {
-    const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1";
-    const backendOrigin = apiBase.replace(/\/api\/v1\/?$/, "");
+    const backendOrigin = getBackendOrigin();
     window.location.href = `${backendOrigin}/api/v1/auth/oauth/google?redirect=true`;
   };
 
   const handleLinkedInOAuth = () => {
-    const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1";
-    const backendOrigin = apiBase.replace(/\/api\/v1\/?$/, "");
+    const backendOrigin = getBackendOrigin();
     window.location.href = `${backendOrigin}/api/v1/auth/oauth/linkedin?redirect=true`;
   };
 

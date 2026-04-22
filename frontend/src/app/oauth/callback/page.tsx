@@ -4,8 +4,9 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuthStore } from "@/store/authStore";
 import type { User } from "@/types/api";
+import { getApiBaseUrl } from "@/lib/runtime-config";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1";
+const API_BASE_URL = getApiBaseUrl();
 
 function parseParams(input: string, prefix: "#" | "?" = "#"): Record<string, string> {
   const clean = input.startsWith(prefix) ? input.slice(1) : input;

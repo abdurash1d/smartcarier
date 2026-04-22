@@ -14,12 +14,13 @@ import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 import { immer } from "zustand/middleware/immer";
 import type { User } from "@/types/api";
+import { getApiBaseUrl } from "@/lib/runtime-config";
 
 // =============================================================================
 // API CONFIG
 // =============================================================================
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1";
+const API_BASE_URL = getApiBaseUrl();
 
 async function parseApiError(res: Response): Promise<string> {
   try {
