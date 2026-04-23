@@ -84,12 +84,9 @@ class GeminiService:
         model_mapping = {
             "gemini-2.5-flash": "gemini-2.5-flash",
             "gemini-2.5-pro": "gemini-2.5-pro",
+            "gemini-2.5-flash-lite": "gemini-2.5-flash-lite",
             "gemini-2.0-flash": "gemini-2.0-flash",
-            "gemini-2.0-flash-exp": "gemini-2.0-flash-exp",
-            "gemini-2.0-pro": "gemini-2.0-pro-exp",
-            "gemini-2.0-pro-exp": "gemini-2.0-pro-exp",
-            "gemini-1.5-flash": "gemini-1.5-flash",
-            "gemini-1.5-pro": "gemini-1.5-pro",
+            "gemini-2.0-flash-lite": "gemini-2.0-flash-lite",
             "gemini-flash": "gemini-2.5-flash",
             "gemini-pro": "gemini-2.5-pro",
         }
@@ -100,12 +97,10 @@ class GeminiService:
         ordered = [
             preferred_model,
             "gemini-2.5-flash",
+            "gemini-2.5-flash-lite",
             "gemini-2.5-pro",
             "gemini-2.0-flash",
-            "gemini-2.0-flash-exp",
-            "gemini-2.0-pro-exp",
-            "gemini-1.5-flash",
-            "gemini-1.5-pro",
+            "gemini-2.0-flash-lite",
         ]
         deduped: List[str] = []
         for model in ordered:
@@ -123,6 +118,7 @@ class GeminiService:
             or "is not found" in message
             or "not supported for generatecontent" in message
             or "unknown model" in message
+            or "not found for api version" in message
         )
 
     @staticmethod
@@ -175,6 +171,7 @@ class GeminiService:
             raise Exception("Gemini API not configured")
 
         last_error: Optional[Exception] = None
+        saw_transient_error = False
 
         for model in self._model_candidates:
             for attempt in range(1, self._max_retries + 1):
@@ -201,6 +198,7 @@ class GeminiService:
 
                     if not self._is_transient_generation_error(e):
                         raise
+                    saw_transient_error = True
 
                     if attempt >= self._max_retries:
                         logger.warning(
@@ -218,6 +216,12 @@ class GeminiService:
                         delay,
                     )
                     await asyncio.sleep(delay)
+
+        if saw_transient_error:
+            raise Exception(
+                "Gemini service is temporarily unavailable due to high demand. "
+                "Please try again in 1-2 minutes."
+            )
 
         raise Exception(
             f"No compatible Gemini model found. Tried: {', '.join(self._model_candidates)}. "
