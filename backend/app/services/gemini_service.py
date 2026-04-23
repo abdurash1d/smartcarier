@@ -23,6 +23,8 @@ VERSION: 2.0.0 (migrated from google-generativeai to google-genai)
 
 import json
 import logging
+import asyncio
+import random
 from typing import Dict, Any, List, Optional
 
 try:
@@ -61,6 +63,17 @@ class GeminiService:
         model_setting = getattr(settings, 'GEMINI_MODEL', 'gemini-2.5-flash')
         self._model_name = self._normalize_model_name(model_setting)
         self._model_candidates = self._build_model_candidates(self._model_name)
+        self._max_retries = max(1, int(getattr(settings, "GEMINI_MAX_RETRIES", 3) or 3))
+        self._retry_base_delay_seconds = float(
+            getattr(settings, "GEMINI_RETRY_BASE_DELAY_SECONDS", 1) or 1
+        )
+        self._retry_max_delay_seconds = float(
+            getattr(settings, "GEMINI_RETRY_MAX_DELAY_SECONDS", 8) or 8
+        )
+        if self._retry_base_delay_seconds <= 0:
+            self._retry_base_delay_seconds = 1.0
+        if self._retry_max_delay_seconds < self._retry_base_delay_seconds:
+            self._retry_max_delay_seconds = self._retry_base_delay_seconds
         self.client = None
 
         self._initialize()
@@ -112,6 +125,45 @@ class GeminiService:
             or "unknown model" in message
         )
 
+    @staticmethod
+    def _is_transient_generation_error(error: Exception) -> bool:
+        """Detect retryable provider/runtime errors (503/unavailable/rate limit style)."""
+        message = str(error).lower()
+        status_code = str(getattr(error, "status_code", "")).lower()
+        code = str(getattr(error, "code", "")).lower()
+
+        transient_markers = (
+            "503",
+            "service unavailable",
+            "service_unavailable",
+            "unavailable",
+            "temporarily unavailable",
+            "resource exhausted",
+            "resource_exhausted",
+            "rate limit",
+            "rate_limit",
+            "too many requests",
+            "deadline exceeded",
+            "timeout",
+            "timed out",
+            "connection reset",
+            "connection aborted",
+            "connection refused",
+        )
+
+        joined = f"{message} {status_code} {code}"
+        return any(marker in joined for marker in transient_markers)
+
+    def _retry_delay_seconds(self, attempt_number: int) -> float:
+        """
+        Calculate capped exponential backoff with jitter.
+        attempt_number is 1-indexed.
+        """
+        exponential = self._retry_base_delay_seconds * (2 ** max(0, attempt_number - 1))
+        capped = min(exponential, self._retry_max_delay_seconds)
+        jitter = random.uniform(0, capped * 0.25) if capped > 0 else 0.0
+        return capped + jitter
+
     async def _generate_with_fallback(self, prompt: str):
         """
         Call Gemini with automatic model fallback.
@@ -125,27 +177,47 @@ class GeminiService:
         last_error: Optional[Exception] = None
 
         for model in self._model_candidates:
-            try:
-                response = await self.client.aio.models.generate_content(
-                    model=model,
-                    contents=prompt,
-                )
-
-                if model != self._model_name:
-                    logger.warning(
-                        "Gemini model switched from %s to %s due to compatibility.",
-                        self._model_name,
-                        model,
+            for attempt in range(1, self._max_retries + 1):
+                try:
+                    response = await self.client.aio.models.generate_content(
+                        model=model,
+                        contents=prompt,
                     )
-                    self._model_name = model
 
-                return response, model
-            except Exception as e:
-                last_error = e
-                if self._is_model_unavailable_error(e):
-                    logger.warning("Gemini model %s unavailable, trying fallback model.", model)
-                    continue
-                raise
+                    if model != self._model_name:
+                        logger.warning(
+                            "Gemini model switched from %s to %s due to compatibility.",
+                            self._model_name,
+                            model,
+                        )
+                        self._model_name = model
+
+                    return response, model
+                except Exception as e:
+                    last_error = e
+                    if self._is_model_unavailable_error(e):
+                        logger.warning("Gemini model %s unavailable, trying fallback model.", model)
+                        break
+
+                    if not self._is_transient_generation_error(e):
+                        raise
+
+                    if attempt >= self._max_retries:
+                        logger.warning(
+                            "Gemini transient error persisted on model %s; trying next fallback model.",
+                            model,
+                        )
+                        break
+
+                    delay = self._retry_delay_seconds(attempt)
+                    logger.warning(
+                        "Gemini transient error on model %s (attempt %s/%s); retrying in %.2fs.",
+                        model,
+                        attempt,
+                        self._max_retries,
+                        delay,
+                    )
+                    await asyncio.sleep(delay)
 
         raise Exception(
             f"No compatible Gemini model found. Tried: {', '.join(self._model_candidates)}. "

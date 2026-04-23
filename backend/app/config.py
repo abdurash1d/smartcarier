@@ -115,6 +115,11 @@ class Settings(BaseSettings):
     # "gemini-2.5-flash" - Tavsiya etiladi (tez va zamonaviy)
     # "gemini-2.5-pro" - Kuchliroq
     GEMINI_MODEL: str = "gemini-2.5-flash"
+
+    # Gemini transient error retry configuration
+    GEMINI_MAX_RETRIES: int = 3
+    GEMINI_RETRY_BASE_DELAY_SECONDS: float = 1
+    GEMINI_RETRY_MAX_DELAY_SECONDS: float = 8
     
     # AI provider tanlash: "gemini" yoki "openai"
     AI_PROVIDER: str = "gemini"
