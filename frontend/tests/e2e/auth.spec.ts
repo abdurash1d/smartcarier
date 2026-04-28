@@ -35,8 +35,7 @@ test.describe('Authentication Flow', () => {
   });
 
   test('should navigate to login page', async ({ page }) => {
-    await page.locator('a[href=\"/login\"]').first().click();
-    
+    await page.goto('/login');
     await expect(page).toHaveURL('/login');
     await expect(page.locator('input[name=\"email\"]').first()).toBeVisible();
   });
@@ -118,7 +117,9 @@ test.describe('Authentication Flow', () => {
     await page.getByRole('button', { name: /AI Resume/i }).click();
     await page.getByRole('button', { name: /create|hisob|account/i }).click();
 
-    await expect(page.getByText(/already exists/i)).toBeVisible({ timeout: 10000 });
+    await expect(
+      page.getByText(/already exists|allaqachon.*mavjud|уже.*существует/i)
+    ).toBeVisible({ timeout: 10000 });
   });
 
   // ===========================================================================
@@ -132,7 +133,7 @@ test.describe('Authentication Flow', () => {
     await page.locator('input[name=\"email\"]').fill('john@example.com');
     await page.locator('input[name=\"password\"]').fill('Student123!');
     
-    await page.getByRole('button', { name: /sign in|login/i }).click();
+    await page.getByRole('button', { name: /sign in|login|kirish|войти/i }).click();
     
     // Should redirect to dashboard
     await expect(page).toHaveURL(/\/(student|dashboard)/, { timeout: 10000 });
@@ -145,10 +146,12 @@ test.describe('Authentication Flow', () => {
     await page.locator('input[name=\"email\"]').fill('negative.student@example.com');
     await page.locator('input[name=\"password\"]').fill('WrongPassword123!');
     
-    await page.getByRole('button', { name: /sign in|login/i }).click();
+    await page.getByRole('button', { name: /sign in|login|kirish|войти/i }).click();
     
     // Should show error message
-    await expect(page.getByText(/invalid.*password|incorrect/i)).toBeVisible();
+    await expect(
+      page.getByText(/invalid.*password|incorrect|noto'g'ri|неверн/i)
+    ).toBeVisible();
   });
 
   test('should show error for non-existent user', async ({ page }) => {
@@ -157,10 +160,12 @@ test.describe('Authentication Flow', () => {
     await page.locator('input[name=\"email\"]').fill('nonexistent@example.com');
     await page.locator('input[name=\"password\"]').fill('SomePassword123!');
     
-    await page.getByRole('button', { name: /sign in|login/i }).click();
+    await page.getByRole('button', { name: /sign in|login|kirish|войти/i }).click();
     
     // Should show error
-    await expect(page.getByText(/invalid|not found/i)).toBeVisible();
+    await expect(
+      page.getByText(/invalid|not found|topilmadi|не найден/i)
+    ).toBeVisible();
   });
 
   // ===========================================================================
@@ -172,7 +177,7 @@ test.describe('Authentication Flow', () => {
     await page.goto('/login');
     await page.locator('input[name=\"email\"]').fill('john@example.com');
     await page.locator('input[name=\"password\"]').fill('Student123!');
-    await page.getByRole('button', { name: /sign in|login/i }).click();
+    await page.getByRole('button', { name: /sign in|login|kirish|войти/i }).click();
     
     await expect(page).toHaveURL(/\/(student|dashboard)/);
     

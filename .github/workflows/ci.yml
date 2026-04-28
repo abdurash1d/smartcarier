@@ -189,6 +189,8 @@ jobs:
           DATABASE_URL: postgresql://test:test@localhost:5432/smartcareer_test
           JWT_SECRET_KEY: ci-e2e-jwt-secret-0123456789abcdef0123456789
           SECRET_KEY: ci-e2e-app-secret-0123456789abcdef0123456789
+          EMAIL_TRANSPORT: "disabled"
+          OAUTH_ENABLED: "false"
           # Keep debug mode for richer logs in CI; schema is created by Alembic above.
           SMARTCAREER_DEBUG: "true"
           # E2E hits auth endpoints many times across projects (chromium/firefox/webkit/mobile).
