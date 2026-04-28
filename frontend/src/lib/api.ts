@@ -232,6 +232,7 @@ export const resumeApi = {
     user_data: object;
     template?: string;
     tone?: string;
+    language?: "uz" | "ru" | "en";
   }) => api.post("/resumes/generate-ai", data),
   
   update: (id: string, data: Partial<{ title: string; content: object; status: string }>) =>

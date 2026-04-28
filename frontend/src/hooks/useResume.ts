@@ -56,6 +56,7 @@ interface GenerateResumeData {
   };
   template?: "modern" | "classic" | "minimal" | "creative";
   tone?: "professional" | "confident" | "friendly" | "technical";
+  language?: "uz" | "ru" | "en";
 }
 
 const TRANSIENT_AI_ERROR_REGEX =

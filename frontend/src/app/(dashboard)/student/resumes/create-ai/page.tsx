@@ -69,6 +69,7 @@ import { resumeApi } from "@/lib/api";
 import type { Resume, ResumeContent } from "@/types/api";
 import { ResumePreview } from "@/components/resume/ResumePreview";
 import { getSkillSuggestions } from "@/lib/resume/skillProfiles";
+import { getPreferredLocale } from "@/lib/i18n";
 
 // =============================================================================
 // TYPES & SCHEMAS
@@ -393,6 +394,7 @@ export default function AIResumeBuilderPage() {
         },
         template: selectedTemplate as GenerateResumePayload["template"],
         tone: selectedTone as GenerateResumePayload["tone"],
+        language: getPreferredLocale(),
       };
 
       const result = await generateResume(payload);
