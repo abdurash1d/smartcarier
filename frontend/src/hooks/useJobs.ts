@@ -37,6 +37,15 @@ interface JobFilters {
   sort_by?: "created_at" | "salary" | "relevance";
 }
 
+interface JobMatchApiItem {
+  job: Job;
+  match_score: number;
+}
+
+interface JobMatchApiResponse {
+  matches?: JobMatchApiItem[];
+}
+
 // =============================================================================
 // HOOK
 // =============================================================================
@@ -154,17 +163,19 @@ export function useJobs() {
 
     try {
       const response = await jobApi.match(resumeId);
-      const data = response.data as {
-        matches?: (Job & { matchScore?: number })[];
-        items?: (Job & { matchScore?: number })[];
-        jobs?: (Job & { matchScore?: number })[];
-      };
-      const matchedJobs = data.matches || data.items || data.jobs || [];
+      const data = response.data as JobMatchApiResponse;
+      const matchedJobs: (Job & { matchScore?: number })[] = (data.matches || []).map((m) => ({
+        ...m.job,
+        matchScore: m.match_score,
+      }));
 
       setState((prev) => ({
         ...prev,
         jobs: matchedJobs,
         isLoading: false,
+        totalCount: matchedJobs.length,
+        currentPage: 1,
+        totalPages: 1,
       }));
 
       return matchedJobs;

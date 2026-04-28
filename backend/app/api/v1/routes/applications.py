@@ -36,6 +36,7 @@ VERSION: 1.0.0
 import logging
 import time
 import uuid as uuid_module
+import re
 from typing import Optional, List, Dict, Any
 from uuid import UUID
 from datetime import datetime, timezone
@@ -1461,25 +1462,88 @@ async def auto_apply(
 # =============================================================================
 
 def _extract_skills_from_resume(content: Dict[str, Any]) -> List[str]:
-    """Extract skills from resume content."""
-    skills = []
-    
-    skills_data = content.get("skills", {})
-    
-    if isinstance(skills_data, list):
-        skills.extend(skills_data)
-    elif isinstance(skills_data, dict):
-        for category in skills_data.get("technical_skills", []):
-            if isinstance(category, dict):
-                skills.extend(category.get("skills", []))
-        skills.extend(skills_data.get("soft_skills", []))
-        skills.extend(skills_data.get("tools_technologies", []))
-    
-    for exp in content.get("work_experience", []):
-        if isinstance(exp, dict):
-            skills.extend(exp.get("technologies_used", []))
-    
-    return list(set(s.lower().strip() for s in skills if s))
+    """Extract normalized terms from resume content."""
+    values: List[str] = []
+    values.extend(_flatten_to_strings(content.get("skills")))
+    values.extend(_flatten_to_strings(content.get("experience")))
+    values.extend(_flatten_to_strings(content.get("work_experience")))
+    values.extend(_flatten_to_strings(content.get("education")))
+    values.extend(_flatten_to_strings(content.get("certifications")))
+    return _normalize_terms(values)
+
+
+def _normalize_text(value: Any) -> str:
+    if value is None:
+        return ""
+    return re.sub(r"\s+", " ", str(value)).strip().lower()
+
+
+def _tokenize_text(value: Any) -> List[str]:
+    normalized = _normalize_text(value)
+    if not normalized:
+        return []
+    return [token for token in re.split(r"[^\w+#./-]+", normalized) if len(token) > 1]
+
+
+def _flatten_to_strings(value: Any) -> List[str]:
+    fragments: List[str] = []
+    if value is None:
+        return fragments
+    if isinstance(value, str):
+        cleaned = _normalize_text(value)
+        if cleaned:
+            fragments.append(cleaned)
+        return fragments
+    if isinstance(value, (int, float, bool)):
+        fragments.append(_normalize_text(value))
+        return fragments
+    if isinstance(value, list):
+        for item in value:
+            fragments.extend(_flatten_to_strings(item))
+        return fragments
+    if isinstance(value, dict):
+        for item in value.values():
+            fragments.extend(_flatten_to_strings(item))
+        return fragments
+    return fragments
+
+
+def _normalize_terms(values: List[str]) -> List[str]:
+    terms: set[str] = set()
+    for value in values:
+        cleaned = _normalize_text(value)
+        if not cleaned:
+            continue
+        terms.add(cleaned)
+        for token in _tokenize_text(cleaned):
+            terms.add(token)
+    return sorted(terms)
+
+
+def _extract_job_requirement_terms(requirements: Any) -> List[str]:
+    requirement_values: List[str] = []
+    if isinstance(requirements, dict):
+        for key in (
+            "skills",
+            "required_skills",
+            "must_have",
+            "nice_to_have",
+            "technologies",
+            "tools",
+            "experience",
+            "education",
+            "certifications",
+            "keywords",
+            "requirements",
+            "responsibilities",
+            "domain",
+            "industry",
+        ):
+            requirement_values.extend(_flatten_to_strings(requirements.get(key)))
+        requirement_values.extend(_flatten_to_strings(requirements))
+    else:
+        requirement_values.extend(_flatten_to_strings(requirements))
+    return _normalize_terms(requirement_values)
 
 
 def _calculate_job_match_score(
@@ -1489,33 +1553,36 @@ def _calculate_job_match_score(
 ) -> float:
     """Calculate match score between resume and job."""
     score = 0.0
-    
-    # Get job requirements
-    requirements = []
-    if job.requirements:
-        for req in job.requirements:
-            if isinstance(req, str):
-                requirements.append(req.lower())
-    
-    # Skill matching (max 60 points)
-    matches = 0
-    for skill in resume_skills:
-        for req in requirements:
-            if skill in req or req in skill:
-                matches += 1
-                break
-    
-    skill_score = min(matches * 6, 60)
-    score += skill_score
-    
-    # Title matching (max 20 points)
-    job_title_lower = job.title.lower()
-    for exp in resume_content.get("work_experience", []):
+
+    resume_terms = set(_normalize_terms(resume_skills + _flatten_to_strings(resume_content)))
+    requirement_terms = set(_extract_job_requirement_terms(job.requirements))
+
+    # Requirement coverage (max 60 points)
+    if requirement_terms:
+        matched = {
+            req
+            for req in requirement_terms
+            if any(
+                req == term
+                or req in term
+                or term in req
+                for term in resume_terms
+            )
+        }
+        score += (len(matched) / len(requirement_terms)) * 60
+    else:
+        score += 30
+
+    # Title/domain alignment (max 20 points)
+    job_title_tokens = set(_tokenize_text(job.title))
+    resume_title_tokens = set()
+    for exp in (resume_content.get("experience") or resume_content.get("work_experience") or []):
         if isinstance(exp, dict):
-            prev_title = exp.get("job_title", "").lower()
-            if any(word in job_title_lower for word in prev_title.split()):
-                score += 20
-                break
+            resume_title_tokens.update(
+                _tokenize_text(exp.get("position") or exp.get("job_title") or exp.get("role") or exp.get("title"))
+            )
+    if job_title_tokens & resume_title_tokens:
+        score += 20
     
     # Remote bonus (max 10 points)
     if job.is_remote_allowed:
