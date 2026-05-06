@@ -29,6 +29,7 @@ VERSION: 1.0.0
 
 import logging
 import time
+import re
 from typing import Optional, List, Dict, Any
 from uuid import UUID
 from enum import Enum
@@ -1177,43 +1178,112 @@ async def close_job(
 # HELPER FUNCTIONS FOR JOB MATCHING
 # =============================================================================
 
+def _normalize_text(value: Any) -> str:
+    """Normalize text for matching."""
+    if value is None:
+        return ""
+    return re.sub(r"\s+", " ", str(value)).strip().lower()
+
+
+def _tokenize_text(value: Any) -> List[str]:
+    """Tokenize text to searchable tokens."""
+    normalized = _normalize_text(value)
+    if not normalized:
+        return []
+    return [token for token in re.split(r"[^\w+#./-]+", normalized) if len(token) > 1]
+
+
+def _flatten_to_strings(value: Any) -> List[str]:
+    """Recursively flatten nested JSON data to text fragments."""
+    fragments: List[str] = []
+    if value is None:
+        return fragments
+
+    if isinstance(value, str):
+        cleaned = _normalize_text(value)
+        if cleaned:
+            fragments.append(cleaned)
+        return fragments
+
+    if isinstance(value, (int, float, bool)):
+        fragments.append(_normalize_text(value))
+        return fragments
+
+    if isinstance(value, list):
+        for item in value:
+            fragments.extend(_flatten_to_strings(item))
+        return fragments
+
+    if isinstance(value, dict):
+        for item in value.values():
+            fragments.extend(_flatten_to_strings(item))
+        return fragments
+
+    return fragments
+
+
+def _normalize_terms(values: List[str]) -> List[str]:
+    """Normalize and deduplicate phrases + tokens."""
+    terms: set[str] = set()
+    for value in values:
+        cleaned = _normalize_text(value)
+        if not cleaned:
+            continue
+        terms.add(cleaned)
+        for token in _tokenize_text(cleaned):
+            terms.add(token)
+    return sorted(terms)
+
+
+def _extract_job_requirement_terms(requirements: Any) -> List[str]:
+    """Extract comparable requirement terms from job requirements JSON."""
+    requirement_values: List[str] = []
+    if isinstance(requirements, dict):
+        for key in (
+            "skills",
+            "required_skills",
+            "must_have",
+            "nice_to_have",
+            "technologies",
+            "tools",
+            "experience",
+            "education",
+            "certifications",
+            "keywords",
+            "requirements",
+            "responsibilities",
+            "domain",
+            "industry",
+        ):
+            requirement_values.extend(_flatten_to_strings(requirements.get(key)))
+        # Include any remaining nested data for robustness.
+        requirement_values.extend(_flatten_to_strings(requirements))
+    else:
+        requirement_values.extend(_flatten_to_strings(requirements))
+    return _normalize_terms(requirement_values)
+
+
 def _extract_skills_from_resume(content: Dict[str, Any]) -> List[str]:
-    """Extract all skills from resume content."""
-    skills = []
-    
-    # Get from skills section
-    skills_data = content.get("skills", {})
-    
-    if isinstance(skills_data, list):
-        skills.extend(skills_data)
-    elif isinstance(skills_data, dict):
-        # Technical skills
-        for category in skills_data.get("technical_skills", []):
-            if isinstance(category, dict):
-                skills.extend(category.get("skills", []))
-            elif isinstance(category, str):
-                skills.append(category)
-        
-        # Soft skills
-        skills.extend(skills_data.get("soft_skills", []))
-        
-        # Tools and technologies
-        skills.extend(skills_data.get("tools_technologies", []))
-    
-    # Get from work experience
-    for exp in content.get("work_experience", []):
-        if isinstance(exp, dict):
-            skills.extend(exp.get("technologies_used", []))
-    
-    # Normalize and deduplicate
-    skills = list(set(s.lower().strip() for s in skills if s))
-    
-    return skills
+    """Extract resume terms from current and legacy resume schemas."""
+    collected: List[str] = []
+
+    # Current/legacy skills section.
+    collected.extend(_flatten_to_strings(content.get("skills")))
+
+    # Experience sections (current schema + legacy schema).
+    collected.extend(_flatten_to_strings(content.get("experience")))
+    collected.extend(_flatten_to_strings(content.get("work_experience")))
+
+    # Education and optional sections.
+    for key in ("education", "certifications", "projects", "summary", "professional_summary"):
+        collected.extend(_flatten_to_strings(content.get(key)))
+
+    return _normalize_terms(collected)
 
 
 def _extract_experience_level(content: Dict[str, Any]) -> str:
     """Determine experience level from resume content."""
-    work_exp = content.get("work_experience", [])
+    work_exp = content.get("experience") or content.get("work_experience") or []
     
     if not work_exp:
         return "junior"
@@ -1233,24 +1303,43 @@ def _extract_experience_level(content: Dict[str, Any]) -> str:
 
 def _extract_keywords(content: Dict[str, Any]) -> List[str]:
     """Extract important keywords from resume content."""
-    keywords = []
-    
-    # From summary
-    summary = content.get("professional_summary", {})
-    if isinstance(summary, dict):
-        keywords.extend(summary.get("keywords", []))
-    
-    # From job titles
-    for exp in content.get("work_experience", []):
-        if isinstance(exp, dict) and exp.get("job_title"):
-            keywords.append(exp["job_title"].lower())
-    
-    # From education
-    for edu in content.get("education", []):
-        if isinstance(edu, dict) and edu.get("field_of_study"):
-            keywords.append(edu["field_of_study"].lower())
-    
-    return list(set(keywords))
+    keywords: List[str] = []
+
+    summary = content.get("professional_summary")
+    keywords.extend(_flatten_to_strings(summary))
+    keywords.extend(_flatten_to_strings(content.get("summary")))
+    keywords.extend(_flatten_to_strings(content.get("target_position")))
+    keywords.extend(_flatten_to_strings(content.get("job_title")))
+    keywords.extend(_flatten_to_strings(content.get("specialization")))
+
+    experience_blocks = content.get("experience") or content.get("work_experience") or []
+    for exp in experience_blocks:
+        if isinstance(exp, dict):
+            keywords.extend(
+                _flatten_to_strings(
+                    [
+                        exp.get("position"),
+                        exp.get("job_title"),
+                        exp.get("role"),
+                        exp.get("title"),
+                    ]
+                )
+            )
+
+    education_blocks = content.get("education") or []
+    for edu in education_blocks:
+        if isinstance(edu, dict):
+            keywords.extend(
+                _flatten_to_strings(
+                    [
+                        edu.get("field_of_study"),
+                        edu.get("specialization"),
+                        edu.get("degree"),
+                    ]
+                )
+            )
+
+    return _normalize_terms(keywords)
 
 
 def _calculate_match_score(
@@ -1265,47 +1354,39 @@ def _calculate_match_score(
     Returns: (score, skill_matches, missing_skills, reasons)
     """
     score = 0.0
-    reasons = []
-    skill_matches = []
-    missing_skills = []
-    
-    # Normalize job requirements
-    job_requirements = []
-    if job.requirements:
-        for req in job.requirements:
-            if isinstance(req, str):
-                job_requirements.append(req.lower())
-    
+    reasons: List[str] = []
+
+    resume_terms = set(_normalize_terms(resume_skills + resume_keywords))
+    job_requirements = _extract_job_requirement_terms(job.requirements)
+    job_requirement_set = set(job_requirements)
+
+    skill_matches = sorted(
+        {
+            req
+            for req in job_requirement_set
+            if any(
+                req == resume_term
+                or req in resume_term
+                or resume_term in req
+                for resume_term in resume_terms
+            )
+        }
+    )
+    missing_skills = sorted(job_requirement_set - set(skill_matches))
+
     # =========================================================================
-    # SKILL MATCHING (50 points max)
+    # REQUIREMENT COVERAGE (60 points max)
     # =========================================================================
-    
-    # Find skill overlaps
-    for skill in resume_skills:
-        skill_lower = skill.lower()
-        for req in job_requirements:
-            if skill_lower in req or req in skill_lower:
-                if skill not in skill_matches:
-                    skill_matches.append(skill)
-                    score += 5  # 5 points per matching skill
-                break
-    
-    # Find missing skills
-    for req in job_requirements:
-        found = False
-        for skill in resume_skills:
-            if skill.lower() in req or req in skill.lower():
-                found = True
-                break
-        if not found and req not in missing_skills:
-            missing_skills.append(req)
-    
-    # Cap skill score at 50
-    skill_score = min(len(skill_matches) * 5, 50)
-    score = skill_score
-    
-    if skill_matches:
-        reasons.append(f"You have {len(skill_matches)} matching skills")
+    if job_requirement_set:
+        coverage = len(skill_matches) / len(job_requirement_set)
+        skill_score = coverage * 60
+        score += skill_score
+        reasons.append(
+            f"Matched {len(skill_matches)}/{len(job_requirement_set)} requirement terms"
+        )
+    else:
+        score += 30
+        reasons.append("Job requirements are broad, using title/experience matching")
     
     # =========================================================================
     # EXPERIENCE LEVEL MATCHING (20 points)
@@ -1340,24 +1421,26 @@ def _calculate_match_score(
         reasons.append("May be over-qualified for this role")
     
     # =========================================================================
-    # TITLE/KEYWORD MATCHING (20 points)
+    # TITLE / DOMAIN ALIGNMENT (15 points)
     # =========================================================================
-    
-    job_title_lower = job.title.lower()
-    
+    title_tokens = set(_tokenize_text(job.title))
+    keyword_tokens = set()
     for keyword in resume_keywords:
-        if keyword in job_title_lower:
-            score += 10
-            reasons.append(f"Your background matches: {keyword}")
-            break
-    
+        keyword_tokens.update(_tokenize_text(keyword))
+
+    overlap = title_tokens & keyword_tokens
+    if overlap:
+        score += 15
+        reasons.append(
+            f"Title/domain overlap detected: {', '.join(sorted(list(overlap))[:3])}"
+        )
+
     # =========================================================================
-    # REMOTE/LOCATION BONUS (10 points)
+    # LOCATION / REMOTE BONUS (5 points)
     # =========================================================================
-    
     if job.is_remote_allowed or job.job_type == "remote":
         score += 5
-        reasons.append("Remote work available")
+        reasons.append("Remote/hybrid flexibility is available")
     
     # =========================================================================
     # NORMALIZE SCORE TO 0-100

@@ -6,6 +6,11 @@ on:
   pull_request:
     branches: [ main, develop ]
 
+env:
+  # GitHub Actions is deprecating Node.js 20 runtime for JavaScript actions.
+  # Opt in early so checkout/setup/upload actions run on Node 24.
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
 jobs:
   # ===========================================================================
   # BACKEND TESTS
@@ -20,10 +25,10 @@ jobs:
     
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
       
       - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
           cache: 'pip'
@@ -47,7 +52,7 @@ jobs:
           RATE_LIMIT_ENABLED: "true"
       
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v3
+        uses: codecov/codecov-action@v5
         with:
           file: ./backend/coverage.xml
           flags: backend
@@ -62,10 +67,10 @@ jobs:
     
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
       
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: '3.11'
       
@@ -76,18 +81,15 @@ jobs:
       
       - name: Run flake8
         working-directory: ./backend
-        run: flake8 app tests --max-line-length=120 --extend-ignore=E203,W503
-        continue-on-error: true
+        run: flake8 app tests --max-line-length=120 --extend-ignore=E203,W503 || true
       
       - name: Run black (check)
         working-directory: ./backend
-        run: black --check app tests
-        continue-on-error: true
+        run: black --check app tests || true
       
       - name: Run isort (check)
         working-directory: ./backend
-        run: isort --check-only app tests
-        continue-on-error: true
+        run: isort --check-only app tests || true
 
   # ===========================================================================
   # FRONTEND TESTS
@@ -98,10 +100,10 @@ jobs:
     
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
       
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: '18'
           cache: 'npm'
@@ -152,15 +154,15 @@ jobs:
     
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
       
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: '3.11'
       
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: '18'
           cache: 'npm'
@@ -189,6 +191,8 @@ jobs:
           DATABASE_URL: postgresql://test:test@localhost:5432/smartcareer_test
           JWT_SECRET_KEY: ci-e2e-jwt-secret-0123456789abcdef0123456789
           SECRET_KEY: ci-e2e-app-secret-0123456789abcdef0123456789
+          EMAIL_TRANSPORT: "disabled"
+          OAUTH_ENABLED: "false"
           # Keep debug mode for richer logs in CI; schema is created by Alembic above.
           SMARTCAREER_DEBUG: "true"
           # E2E hits auth endpoints many times across projects (chromium/firefox/webkit/mobile).
@@ -220,7 +224,7 @@ jobs:
           tail -n 400 backend-uvicorn.log || true
 
       - name: Upload backend logs
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         if: always()
         with:
           name: backend-logs
@@ -228,11 +232,19 @@ jobs:
           retention-days: 30
       
       - name: Upload Playwright report
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         if: always()
         with:
           name: playwright-report
           path: frontend/playwright-report/
+          retention-days: 30
+
+      - name: Upload Playwright test results
+        uses: actions/upload-artifact@v5
+        if: always()
+        with:
+          name: playwright-test-results
+          path: frontend/test-results/
           retention-days: 30
 
   # ===========================================================================
@@ -244,7 +256,7 @@ jobs:
     
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
       
       - name: Run Trivy vulnerability scanner
         uses: aquasecurity/trivy-action@master
@@ -256,7 +268,7 @@ jobs:
         continue-on-error: true
       
       - name: Upload Trivy results to GitHub Security
-        uses: github/codeql-action/upload-sarif@v2
+        uses: github/codeql-action/upload-sarif@v3
         with:
           sarif_file: 'trivy-results.sarif'
         continue-on-error: true
@@ -271,7 +283,7 @@ jobs:
     
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
       
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -307,7 +319,7 @@ jobs:
     
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
       
       - name: Deploy notification
         run: |

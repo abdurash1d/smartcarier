@@ -23,6 +23,9 @@ VERSION: 2.0.0 (migrated from google-generativeai to google-genai)
 
 import json
 import logging
+import asyncio
+import random
+import re
 from typing import Dict, Any, List, Optional
 
 try:
@@ -61,6 +64,17 @@ class GeminiService:
         model_setting = getattr(settings, 'GEMINI_MODEL', 'gemini-2.5-flash')
         self._model_name = self._normalize_model_name(model_setting)
         self._model_candidates = self._build_model_candidates(self._model_name)
+        self._max_retries = max(1, int(getattr(settings, "GEMINI_MAX_RETRIES", 3) or 3))
+        self._retry_base_delay_seconds = float(
+            getattr(settings, "GEMINI_RETRY_BASE_DELAY_SECONDS", 1) or 1
+        )
+        self._retry_max_delay_seconds = float(
+            getattr(settings, "GEMINI_RETRY_MAX_DELAY_SECONDS", 8) or 8
+        )
+        if self._retry_base_delay_seconds <= 0:
+            self._retry_base_delay_seconds = 1.0
+        if self._retry_max_delay_seconds < self._retry_base_delay_seconds:
+            self._retry_max_delay_seconds = self._retry_base_delay_seconds
         self.client = None
 
         self._initialize()
@@ -71,12 +85,9 @@ class GeminiService:
         model_mapping = {
             "gemini-2.5-flash": "gemini-2.5-flash",
             "gemini-2.5-pro": "gemini-2.5-pro",
+            "gemini-2.5-flash-lite": "gemini-2.5-flash-lite",
             "gemini-2.0-flash": "gemini-2.0-flash",
-            "gemini-2.0-flash-exp": "gemini-2.0-flash-exp",
-            "gemini-2.0-pro": "gemini-2.0-pro-exp",
-            "gemini-2.0-pro-exp": "gemini-2.0-pro-exp",
-            "gemini-1.5-flash": "gemini-1.5-flash",
-            "gemini-1.5-pro": "gemini-1.5-pro",
+            "gemini-2.0-flash-lite": "gemini-2.0-flash-lite",
             "gemini-flash": "gemini-2.5-flash",
             "gemini-pro": "gemini-2.5-pro",
         }
@@ -87,12 +98,10 @@ class GeminiService:
         ordered = [
             preferred_model,
             "gemini-2.5-flash",
+            "gemini-2.5-flash-lite",
             "gemini-2.5-pro",
             "gemini-2.0-flash",
-            "gemini-2.0-flash-exp",
-            "gemini-2.0-pro-exp",
-            "gemini-1.5-flash",
-            "gemini-1.5-pro",
+            "gemini-2.0-flash-lite",
         ]
         deduped: List[str] = []
         for model in ordered:
@@ -110,7 +119,103 @@ class GeminiService:
             or "is not found" in message
             or "not supported for generatecontent" in message
             or "unknown model" in message
+            or "not found for api version" in message
         )
+
+    @staticmethod
+    def _is_transient_generation_error(error: Exception) -> bool:
+        """Detect retryable provider/runtime errors (503/unavailable/rate limit style)."""
+        message = str(error).lower()
+        status_code = str(getattr(error, "status_code", "")).lower()
+        code = str(getattr(error, "code", "")).lower()
+
+        transient_markers = (
+            "503",
+            "service unavailable",
+            "service_unavailable",
+            "unavailable",
+            "temporarily unavailable",
+            "resource exhausted",
+            "resource_exhausted",
+            "rate limit",
+            "rate_limit",
+            "too many requests",
+            "deadline exceeded",
+            "timeout",
+            "timed out",
+            "connection reset",
+            "connection aborted",
+            "connection refused",
+        )
+
+        joined = f"{message} {status_code} {code}"
+        return any(marker in joined for marker in transient_markers)
+
+    def _retry_delay_seconds(self, attempt_number: int) -> float:
+        """
+        Calculate capped exponential backoff with jitter.
+        attempt_number is 1-indexed.
+        """
+        exponential = self._retry_base_delay_seconds * (2 ** max(0, attempt_number - 1))
+        capped = min(exponential, self._retry_max_delay_seconds)
+        jitter = random.uniform(0, capped * 0.25) if capped > 0 else 0.0
+        return capped + jitter
+
+    @staticmethod
+    def _collect_text_fragments(value: Any) -> List[str]:
+        """Recursively collect textual values from nested structures."""
+        if isinstance(value, str):
+            cleaned = value.strip()
+            return [cleaned] if cleaned else []
+        if isinstance(value, dict):
+            chunks: List[str] = []
+            for item in value.values():
+                chunks.extend(GeminiService._collect_text_fragments(item))
+            return chunks
+        if isinstance(value, list):
+            chunks: List[str] = []
+            for item in value:
+                chunks.extend(GeminiService._collect_text_fragments(item))
+            return chunks
+        return []
+
+    def _resolve_resume_language(self, user_data: Dict[str, Any]) -> str:
+        """
+        Resolve resume output language from explicit input or user-provided text.
+        Priority:
+        1) explicit language == uz/ru
+        2) detect Cyrillic => ru
+        3) detect common Uzbek-latin patterns/keywords => uz
+        4) default => uz
+        """
+        explicit = str(user_data.get("language", "") or "").strip().lower()
+        if explicit in {"uz", "ru"}:
+            return explicit
+
+        corpus = " ".join(self._collect_text_fragments(user_data))
+        if not corpus:
+            return "uz"
+
+        if re.search(r"[\u0400-\u04FF]", corpus):
+            return "ru"
+
+        lowered = corpus.lower()
+        uzbek_markers = (
+            "o'",
+            "g'",
+            "sh",
+            "ch",
+            "yo'n",
+            "ko'nik",
+            "tajriba",
+            "ta'lim",
+            "hozirgi",
+            "lavozim",
+        )
+        if any(marker in lowered for marker in uzbek_markers):
+            return "uz"
+
+        return "uz"
 
     async def _generate_with_fallback(self, prompt: str):
         """
@@ -123,29 +228,57 @@ class GeminiService:
             raise Exception("Gemini API not configured")
 
         last_error: Optional[Exception] = None
+        saw_transient_error = False
 
         for model in self._model_candidates:
-            try:
-                response = await self.client.aio.models.generate_content(
-                    model=model,
-                    contents=prompt,
-                )
-
-                if model != self._model_name:
-                    logger.warning(
-                        "Gemini model switched from %s to %s due to compatibility.",
-                        self._model_name,
-                        model,
+            for attempt in range(1, self._max_retries + 1):
+                try:
+                    response = await self.client.aio.models.generate_content(
+                        model=model,
+                        contents=prompt,
                     )
-                    self._model_name = model
 
-                return response, model
-            except Exception as e:
-                last_error = e
-                if self._is_model_unavailable_error(e):
-                    logger.warning("Gemini model %s unavailable, trying fallback model.", model)
-                    continue
-                raise
+                    if model != self._model_name:
+                        logger.warning(
+                            "Gemini model switched from %s to %s due to compatibility.",
+                            self._model_name,
+                            model,
+                        )
+                        self._model_name = model
+
+                    return response, model
+                except Exception as e:
+                    last_error = e
+                    if self._is_model_unavailable_error(e):
+                        logger.warning("Gemini model %s unavailable, trying fallback model.", model)
+                        break
+
+                    if not self._is_transient_generation_error(e):
+                        raise
+                    saw_transient_error = True
+
+                    if attempt >= self._max_retries:
+                        logger.warning(
+                            "Gemini transient error persisted on model %s; trying next fallback model.",
+                            model,
+                        )
+                        break
+
+                    delay = self._retry_delay_seconds(attempt)
+                    logger.warning(
+                        "Gemini transient error on model %s (attempt %s/%s); retrying in %.2fs.",
+                        model,
+                        attempt,
+                        self._max_retries,
+                        delay,
+                    )
+                    await asyncio.sleep(delay)
+
+        if saw_transient_error:
+            raise Exception(
+                "Gemini service is temporarily unavailable due to high demand. "
+                "Please try again in 1-2 minutes."
+            )
 
         raise Exception(
             f"No compatible Gemini model found. Tried: {', '.join(self._model_candidates)}. "
@@ -236,6 +369,19 @@ class GeminiService:
         if not self.is_available:
             return {"error": "Gemini API not configured", "success": False}
 
+        output_language = self._resolve_resume_language(user_data)
+        language_instructions = {
+            "uz": (
+                "Write ALL narrative resume content in Uzbek (Latin script). "
+                "Do not switch to English or Russian."
+            ),
+            "ru": (
+                "Write ALL narrative resume content in Russian (Cyrillic). "
+                "Do not switch to English or Uzbek."
+            ),
+        }
+        language_instruction = language_instructions.get(output_language, language_instructions["uz"])
+
         prompt = f"""
 You are a professional resume writer. Create a comprehensive, ATS-optimized resume based on the following information.
 
@@ -299,6 +445,9 @@ IMPORTANT:
 - Include quantifiable achievements with numbers and percentages
 - Make it ATS-friendly with relevant keywords
 - Keep it professional and concise
+- {language_instruction}
+- Keep JSON keys in English, but values/content must be in the target language.
+- Keep emails, URLs, and proper nouns exactly as provided by user.
 - Return ONLY valid JSON, no markdown or extra text
 """
 

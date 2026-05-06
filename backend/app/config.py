@@ -115,6 +115,11 @@ class Settings(BaseSettings):
     # "gemini-2.5-flash" - Tavsiya etiladi (tez va zamonaviy)
     # "gemini-2.5-pro" - Kuchliroq
     GEMINI_MODEL: str = "gemini-2.5-flash"
+
+    # Gemini transient error retry configuration
+    GEMINI_MAX_RETRIES: int = 3
+    GEMINI_RETRY_BASE_DELAY_SECONDS: float = 1
+    GEMINI_RETRY_MAX_DELAY_SECONDS: float = 8
     
     # AI provider tanlash: "gemini" yoki "openai"
     AI_PROVIDER: str = "gemini"
@@ -246,6 +251,17 @@ class Settings(BaseSettings):
     
     # OAuth enabled
     OAUTH_ENABLED: bool = False
+
+    # =========================================================================
+    # 👑 ADMIN BOOTSTRAP (Ops helper)
+    # =========================================================================
+
+    # If both email and password are provided, backend will create/promote
+    # this account to admin on startup.
+    BOOTSTRAP_ADMIN_EMAIL: str = ""
+    BOOTSTRAP_ADMIN_PASSWORD: str = ""
+    BOOTSTRAP_ADMIN_FULL_NAME: str = "System Admin"
+    BOOTSTRAP_ADMIN_PHONE: str = "+998901111111"
 
     # =========================================================================
     # 🐛 ERROR MONITORING & LOGGING

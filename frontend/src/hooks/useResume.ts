@@ -9,6 +9,7 @@
 "use client";
 
 import { useCallback, useState } from "react";
+import axios from "axios";
 import type { Resume } from "@/types/api";
 import { resumeApi, getErrorMessage } from "@/lib/api";
 import { toast } from "sonner";
@@ -55,7 +56,53 @@ interface GenerateResumeData {
   };
   template?: "modern" | "classic" | "minimal" | "creative";
   tone?: "professional" | "confident" | "friendly" | "technical";
+  language?: "uz" | "ru" | "en";
 }
+
+const TRANSIENT_AI_ERROR_REGEX =
+  /(unavailable|rate.?limit|too many requests|overload|temporar(?:y|ily)|try again|throttl(?:e|ed|ing)|busy)/i;
+
+function collectErrorStrings(value: unknown): string[] {
+  if (typeof value === "string") {
+    return [value];
+  }
+
+  if (Array.isArray(value)) {
+    return value.flatMap((item) => collectErrorStrings(item));
+  }
+
+  if (value && typeof value === "object") {
+    return Object.values(value as Record<string, unknown>).flatMap((item) =>
+      collectErrorStrings(item)
+    );
+  }
+
+  return [];
+}
+
+function isTransientAIOverloadError(error: unknown): boolean {
+  if (!axios.isAxiosError(error)) {
+    return false;
+  }
+
+  const status = error.response?.status;
+  if (status === 429 || status === 503) {
+    return true;
+  }
+
+  const data = error.response?.data;
+  const messageCandidates = [
+    error.message,
+    ...collectErrorStrings(data),
+  ].filter(Boolean);
+
+  return messageCandidates.some((message) =>
+    TRANSIENT_AI_ERROR_REGEX.test(message)
+  );
+}
+
+const TRANSIENT_AI_RETRY_MESSAGE =
+  "AI xizmati vaqtincha band. 20-60 soniyadan keyin qayta urinib ko'ring. Сервис временно перегружен, попробуйте снова через 20-60 секунд.";
 
 function unwrapApiData<T>(payload: unknown): T {
   if (payload && typeof payload === "object" && !Array.isArray(payload)) {
@@ -250,7 +297,9 @@ export function useResume() {
       toast.success("AI resume generated successfully");
       return newResume;
     } catch (error) {
-      const message = getErrorMessage(error);
+      const message = isTransientAIOverloadError(error)
+        ? TRANSIENT_AI_RETRY_MESSAGE
+        : getErrorMessage(error);
       setState((prev) => ({
         ...prev,
         isGenerating: false,

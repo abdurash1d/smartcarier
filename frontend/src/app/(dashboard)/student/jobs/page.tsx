@@ -76,7 +76,7 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { formatRelativeTime, formatSalaryRange, cn } from "@/lib/utils";
-import { jobApi } from "@/lib/api";
+import { jobApi, resumeApi } from "@/lib/api";
 import { toast } from "sonner";
 import type { Job, JobType, ExperienceLevel } from "@/types/api";
 
@@ -637,10 +637,12 @@ const searchSuggestions = [
 
 export default function JobsPage() {
   const router = useRouter();
-  const { jobs, isLoading, fetchJobs } = useJobs();
+  const { jobs, isLoading, fetchJobs, matchJobs } = useJobs();
   const [localJobs, setLocalJobs] = useState<(Job & { matchScore?: number })[]>([]);
   const [selectedJob, setSelectedJob] = useState<(Job & { matchScore?: number }) | null>(null);
   const [savedJobs, setSavedJobs] = useState<Set<string>>(new Set());
+  const [feedMode, setFeedMode] = useState<"matched" | "all">("matched");
+  const [hasPublishedResume, setHasPublishedResume] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [sortBy, setSortBy] = useState("relevance");
@@ -648,10 +650,56 @@ export default function JobsPage() {
   const [showMobileFilters, setShowMobileFilters] = useState(false);
   const [isDesktop, setIsDesktop] = useState(false);
 
+  const loadMatchedJobs = useCallback(async () => {
+    const response = await resumeApi.list({ status: "published", page: 1, limit: 100 });
+    const payload = response.data?.data || response.data;
+    const resumes = Array.isArray(payload?.resumes)
+      ? payload.resumes
+      : Array.isArray(payload)
+        ? payload
+        : [];
+
+    if (resumes.length === 0) {
+      setHasPublishedResume(false);
+      return false;
+    }
+
+    setHasPublishedResume(true);
+    const bestResume = [...resumes].sort((a: any, b: any) => {
+      const left = new Date(a?.updated_at || a?.created_at || 0).getTime();
+      const right = new Date(b?.updated_at || b?.created_at || 0).getTime();
+      return right - left;
+    })[0];
+
+    if (!bestResume?.id) {
+      return false;
+    }
+
+    await matchJobs(bestResume.id);
+    return true;
+  }, [matchJobs]);
+
+  const loadJobsForFeedMode = useCallback(async (mode: "matched" | "all") => {
+    if (mode === "all") {
+      await fetchJobs();
+      return;
+    }
+
+    try {
+      const matchedLoaded = await loadMatchedJobs();
+      if (!matchedLoaded) {
+        setFeedMode("all");
+        await fetchJobs();
+      }
+    } catch {
+      setFeedMode("all");
+      await fetchJobs();
+    }
+  }, [fetchJobs, loadMatchedJobs]);
+
   // Load jobs from backend
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
-    fetchJobs();
+    void loadJobsForFeedMode("matched");
     // Load saved jobs
     jobApi.savedJobs({ limit: 100 }).then((res) => {
       const data = res.data?.data || res.data;
@@ -659,7 +707,7 @@ export default function JobsPage() {
         setSavedJobs(new Set(data.map((j: any) => j.id)));
       }
     }).catch(() => {});
-  }, []);
+  }, [loadJobsForFeedMode]);
 
   useEffect(() => {
     const updateViewport = () => {
@@ -678,6 +726,24 @@ export default function JobsPage() {
   useEffect(() => {
     setLocalJobs(jobs as (Job & { matchScore?: number })[]);
   }, [jobs]);
+
+  const switchToAllJobs = useCallback(async () => {
+    setFeedMode("all");
+    await loadJobsForFeedMode("all");
+  }, [loadJobsForFeedMode]);
+
+  const switchToMatchedJobs = useCallback(async () => {
+    try {
+      const ok = await loadMatchedJobs();
+      if (!ok) {
+        toast.info("Published resume topilmadi. Avval rezyumeni nashr qiling.");
+        return;
+      }
+      setFeedMode("matched");
+    } catch {
+      toast.error("Mos ishlarni yuklashda xatolik yuz berdi.");
+    }
+  }, [loadMatchedJobs]);
 
   // Filter states
   const [filters, setFilters] = useState({
@@ -1107,6 +1173,33 @@ export default function JobsPage() {
 
           {/* Actions */}
           <div className="flex items-center gap-3">
+            <div className="hidden items-center gap-2 rounded-xl border border-surface-200 p-1 dark:border-surface-700 sm:flex">
+              <Button
+                type="button"
+                size="sm"
+                variant={feedMode === "matched" ? "default" : "ghost"}
+                onClick={() => {
+                  void switchToMatchedJobs();
+                }}
+                className={cn(feedMode === "matched" && "bg-gradient-to-r from-purple-500 to-indigo-600")}
+              >
+                <Target className="mr-1 h-3.5 w-3.5" />
+                Mos ishlar
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant={feedMode === "all" ? "default" : "ghost"}
+                onClick={() => {
+                  void switchToAllJobs();
+                }}
+                className={cn(feedMode === "all" && "bg-gradient-to-r from-purple-500 to-indigo-600")}
+              >
+                <Briefcase className="mr-1 h-3.5 w-3.5" />
+                Barcha ishlar
+              </Button>
+            </div>
+
             {/* Mobile Filters Button */}
             <Button
               variant="outline"
@@ -1160,6 +1253,19 @@ export default function JobsPage() {
             </span>{" "}
             jobs
           </p>
+          <div className="flex items-center gap-2">
+            {feedMode === "matched" && (
+              <Badge variant="success" className="gap-1">
+                <Target className="h-3 w-3" />
+                Resume asosida moslangan
+              </Badge>
+            )}
+            {feedMode === "all" && !hasPublishedResume && (
+              <Badge variant="secondary">
+                Published resume topilmadi
+              </Badge>
+            )}
+          </div>
           {activeFiltersCount > 0 && (
             <button
               onClick={resetFilters}
