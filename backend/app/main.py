@@ -54,7 +54,7 @@ from app.database import (
     get_db,
     normalize_legacy_user_role_values,
 )
-from app.models import User, UserRole
+from app.models import User, UserRole, AdminSubRole
 
 # =============================================================================
 # LOGGING CONFIGURATION
@@ -87,6 +87,8 @@ def _bootstrap_admin_user() -> None:
         user = db.query(User).filter(User.email == email).first()
         if user:
             user.role = UserRole.ADMIN
+            if settings.BOOTSTRAP_ADMIN_FORCE_SUPER_ADMIN:
+                user.admin_role = AdminSubRole.SUPER_ADMIN.value
             user.full_name = settings.BOOTSTRAP_ADMIN_FULL_NAME or user.full_name
             user.phone = settings.BOOTSTRAP_ADMIN_PHONE or user.phone
             user.is_active_account = True
@@ -99,6 +101,7 @@ def _bootstrap_admin_user() -> None:
                 full_name=settings.BOOTSTRAP_ADMIN_FULL_NAME,
                 phone=settings.BOOTSTRAP_ADMIN_PHONE,
                 role=UserRole.ADMIN,
+                admin_role=AdminSubRole.SUPER_ADMIN.value if settings.BOOTSTRAP_ADMIN_FORCE_SUPER_ADMIN else None,
                 is_active_account=True,
                 is_verified=True,
             )

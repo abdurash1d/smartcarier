@@ -706,6 +706,16 @@ class User(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin):
 
     def has_admin_permission(self, permission: str) -> bool:
         """Check permission for admin sub-role matrix."""
+        if self.role != UserRole.ADMIN:
+            return False
+
+        # Optional compatibility mode for teams that want every admin account
+        # to have full control without enforcing sub-role RBAC.
+        from app.config import settings
+
+        if not settings.ADMIN_ENFORCE_SUBROLES:
+            return True
+
         admin_role = self.effective_admin_role
         if admin_role is None:
             return False

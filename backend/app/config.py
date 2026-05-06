@@ -262,6 +262,8 @@ class Settings(BaseSettings):
     BOOTSTRAP_ADMIN_PASSWORD: str = ""
     BOOTSTRAP_ADMIN_FULL_NAME: str = "System Admin"
     BOOTSTRAP_ADMIN_PHONE: str = "+998901111111"
+    BOOTSTRAP_ADMIN_FORCE_SUPER_ADMIN: bool = True
+    ADMIN_ENFORCE_SUBROLES: bool = False
 
     # =========================================================================
     # 🐛 ERROR MONITORING & LOGGING
@@ -323,6 +325,8 @@ class Settings(BaseSettings):
         "TOKEN_BLACKLIST_USE_REDIS",
         "SMTP_USE_TLS",
         "OAUTH_ENABLED",
+        "BOOTSTRAP_ADMIN_FORCE_SUPER_ADMIN",
+        "ADMIN_ENFORCE_SUBROLES",
         "PAYMENTS_REQUIRE_WEBHOOK_SECRET",
         mode="before",
     )
@@ -343,6 +347,21 @@ class Settings(BaseSettings):
         """
         if self.DEBUG and "RATE_LIMIT_ENABLED" not in os.environ:
             self.RATE_LIMIT_ENABLED = False
+        return self
+
+    @model_validator(mode="after")
+    def _normalize_sqlite_database_url(self) -> "Settings":
+        """
+        Resolve relative SQLite URLs against backend root for stable local runs.
+
+        This avoids accidental creation of multiple DB files when the server is
+        started from different working directories.
+        """
+        prefix = "sqlite:///./"
+        if self.DATABASE_URL.startswith(prefix):
+            relative_path = self.DATABASE_URL[len(prefix):]
+            absolute_path = (BACKEND_ROOT / relative_path).resolve()
+            self.DATABASE_URL = f"sqlite:///{absolute_path.as_posix()}"
         return self
 
     @model_validator(mode="after")

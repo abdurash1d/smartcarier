@@ -23,7 +23,7 @@ const translations: Record<Locale, TranslationType> = {
 };
 
 // Get nested value from object by path
-function getNestedValue(obj: unknown, path: string): string {
+function getNestedValue(obj: unknown, path: string): string | undefined {
   const keys = path.split(".");
   let value: unknown = obj;
   
@@ -31,11 +31,19 @@ function getNestedValue(obj: unknown, path: string): string {
     if (value && typeof value === "object" && key in value) {
       value = (value as Record<string, unknown>)[key];
     } else {
-      return path; // Return path if not found
+      return undefined;
     }
   }
   
-  return typeof value === "string" ? value : path;
+  return typeof value === "string" ? value : undefined;
+}
+
+function humanizeKey(path: string): string {
+  const lastSegment = path.split(".").pop() || path;
+  return lastSegment
+    .replace(/([a-z])([A-Z])/g, "$1 $2")
+    .replace(/[_-]+/g, " ")
+    .trim();
 }
 
 // Replace template variables
@@ -83,7 +91,15 @@ export function TranslationProvider({ children }: { children: React.ReactNode })
   // Get translation
   const t = useCallback(
     (key: string, variables?: Record<string, string | number>): string => {
-      const translation = getNestedValue(translations[locale], key);
+      const translation =
+        getNestedValue(translations[locale], key) ??
+        getNestedValue(translations[defaultLocale], key) ??
+        humanizeKey(key);
+
+      if (process.env.NODE_ENV !== "production" && !getNestedValue(translations[locale], key)) {
+        console.warn(`[i18n] Missing translation key for locale "${locale}": ${key}`);
+      }
+
       return replaceVariables(translation, variables);
     },
     [locale]
@@ -132,7 +148,10 @@ export function useTranslation() {
 
   const fallbackT = useCallback(
     (key: string, variables?: Record<string, string | number>): string => {
-      const translation = getNestedValue(translations[fallbackLocale], key);
+      const translation =
+        getNestedValue(translations[fallbackLocale], key) ??
+        getNestedValue(translations[defaultLocale], key) ??
+        humanizeKey(key);
       return replaceVariables(translation, variables);
     },
     [fallbackLocale]

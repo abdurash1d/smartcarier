@@ -12,7 +12,7 @@
 
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { motion } from "framer-motion";
@@ -41,6 +41,7 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatRelativeTime, formatSalaryRange } from "@/lib/utils";
+import { userApi } from "@/lib/api";
 
 // =============================================================================
 // ANIMATION VARIANTS
@@ -138,12 +139,30 @@ export default function StudentDashboardPage() {
   const { resumes, isLoading: resumesLoading, fetchResumes } = useResume();
   const { stats: appStats, applications, isLoading: appsLoading, fetchMyApplications } = useApplications();
   const { jobs, isLoading: jobsLoading, fetchJobs } = useJobs();
+  const [summaryCounts, setSummaryCounts] = useState<{ resumes: number; applications: number } | null>(null);
 
   useEffect(() => {
     fetchResumes();
     fetchMyApplications();
     fetchJobs({}, 1);
   }, [fetchJobs, fetchMyApplications, fetchResumes]);
+
+  useEffect(() => {
+    const loadSummaryCounts = async () => {
+      try {
+        const response = await userApi.getProfile();
+        const payload = response.data?.data ?? response.data ?? {};
+        const resumesCount = typeof payload.resume_count === "number" ? payload.resume_count : 0;
+        const applicationsCount = typeof payload.application_count === "number" ? payload.application_count : 0;
+        setSummaryCounts({ resumes: resumesCount, applications: applicationsCount });
+      } catch {
+        setSummaryCounts(null);
+      }
+    };
+
+    if (!user?.id) return;
+    loadSummaryCounts();
+  }, [user?.id]);
 
   const isLoading = resumesLoading || appsLoading;
 
@@ -168,22 +187,28 @@ export default function StudentDashboardPage() {
   const stats = [
     {
       title: t("dashboard.stats.totalResumes"),
-      value: isLoading ? "—" : resumes.length,
+      value: isLoading ? "—" : (summaryCounts?.resumes ?? resumes.length),
       icon: FileText,
       color: "from-purple-500 to-indigo-600",
       bgColor: "bg-purple-100 dark:bg-purple-500/20",
       iconColor: "text-purple-600",
-      change: resumes.length > 0 ? t("dashboard.stats.resumeCount", { count: resumes.length }) : t("dashboard.stats.thisWeek"),
+      change:
+        (summaryCounts?.resumes ?? resumes.length) > 0
+          ? t("dashboard.stats.resumeCount", { count: summaryCounts?.resumes ?? resumes.length })
+          : t("dashboard.stats.thisWeek"),
       changeType: "positive",
     },
     {
       title: t("dashboard.stats.applicationsSent"),
-      value: isLoading ? "—" : appStats.total,
+      value: isLoading ? "—" : (summaryCounts?.applications ?? appStats.total),
       icon: Send,
       color: "from-cyan-500 to-blue-600",
       bgColor: "bg-cyan-100 dark:bg-cyan-500/20",
       iconColor: "text-cyan-600",
-      change: appStats.pending > 0 ? t("dashboard.stats.pendingCount", { count: appStats.pending }) : t("dashboard.stats.noApplications"),
+      change:
+        appStats.pending > 0
+          ? t("dashboard.stats.pendingCount", { count: appStats.pending })
+          : t("dashboard.stats.noApplications"),
       changeType: "positive",
     },
     {
@@ -306,7 +331,7 @@ export default function StudentDashboardPage() {
                 </div>
                 <Link href="/student/settings">
                   <Button variant="outline" size="sm">
-                    {t("dashboard.profile.completed")}
+                    {t("dashboard.profile.complete")}
                   </Button>
                 </Link>
               </div>

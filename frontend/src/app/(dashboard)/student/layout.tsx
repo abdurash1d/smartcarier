@@ -35,7 +35,7 @@ import {
 } from "lucide-react";
 import { useAuth, useRequireAuth } from "@/hooks/useAuth";
 import { useTranslation } from "@/hooks/useTranslation";
-import { api } from "@/lib/api";
+import { api, userApi } from "@/lib/api";
 import { formatRelativeTime } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -60,7 +60,7 @@ const getNavigation = (t: (key: string) => string) => [
     name: t("dashboard.sidebar.myResumes"),
     href: "/student/resumes",
     icon: FileText,
-    badge: "3",
+    badge: undefined as string | undefined,
   },
   {
     name: t("dashboard.sidebar.findJobs"),
@@ -73,7 +73,7 @@ const getNavigation = (t: (key: string) => string) => [
     name: t("dashboard.sidebar.myApplications"),
     href: "/student/applications",
     icon: Send,
-    badge: "2",
+    badge: undefined as string | undefined,
     badgeColor: "warning",
   },
   {
@@ -122,6 +122,36 @@ export default function StudentDashboardLayout({
   const [searchQuery, setSearchQuery] = useState("");
   const [notifications, setNotifications] = useState<any[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [resumeCount, setResumeCount] = useState<number>(0);
+  const [applicationCount, setApplicationCount] = useState<number>(0);
+  const [shortcutHint, setShortcutHint] = useState("Ctrl+K");
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const isApple = /Mac|iPhone|iPad|iPod/i.test(window.navigator.platform);
+    setShortcutHint(isApple ? "⌘K" : "Ctrl+K");
+  }, []);
+
+  useEffect(() => {
+    const loadSidebarCounts = async () => {
+      try {
+        const profileRes = await userApi.getProfile();
+        const payload = profileRes.data?.data ?? profileRes.data ?? {};
+        const nextResumeCount =
+          typeof payload.resume_count === "number" ? payload.resume_count : 0;
+        const nextApplicationCount =
+          typeof payload.application_count === "number" ? payload.application_count : 0;
+
+        setResumeCount(nextResumeCount);
+        setApplicationCount(nextApplicationCount);
+      } catch {
+        // Keep badges hidden on API failure
+      }
+    };
+
+    if (!user?.id) return;
+    loadSidebarCounts();
+  }, [user?.id]);
 
   // Fetch notifications on mount and when dropdown opens
   useEffect(() => {
@@ -152,7 +182,15 @@ export default function StudentDashboardLayout({
   };
 
   // Get translated navigation items
-  const navigation = getNavigation(t);
+  const navigation = getNavigation(t).map((item) => {
+    if (item.href === "/student/resumes") {
+      return { ...item, badge: resumeCount > 0 ? String(resumeCount) : undefined };
+    }
+    if (item.href === "/student/applications") {
+      return { ...item, badge: applicationCount > 0 ? String(applicationCount) : undefined };
+    }
+    return item;
+  });
   const quickActions = getQuickActions(t);
 
   const isActive = (href: string, exact?: boolean) => {
@@ -295,7 +333,7 @@ export default function StudentDashboardLayout({
                 className="w-64 rounded-xl border border-surface-200 bg-surface-50 py-2 pl-10 pr-4 text-sm placeholder-surface-400 focus:border-purple-500 focus:outline-none focus:ring-1 focus:ring-purple-500 lg:w-80"
               />
               <kbd className="absolute right-3 top-1/2 -translate-y-1/2 rounded bg-surface-200 px-1.5 py-0.5 text-xs text-surface-500">
-                ⌘K
+                {shortcutHint}
               </kbd>
             </div>
           </div>
@@ -438,7 +476,7 @@ export default function StudentDashboardLayout({
                       </div>
                       <div className="py-2">
                         <Link
-                          href="/student/settings"
+                          href="/student/settings#profile"
                           onClick={() => setUserMenuOpen(false)}
                           className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm text-surface-600 hover:bg-surface-100 dark:text-surface-400 dark:hover:bg-surface-700"
                         >
@@ -446,7 +484,7 @@ export default function StudentDashboardLayout({
                           {t("dashboard.sidebar.profileSettings")}
                         </Link>
                         <Link
-                          href="/student/settings"
+                          href="/student/settings#security"
                           onClick={() => setUserMenuOpen(false)}
                           className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm text-surface-600 hover:bg-surface-100 dark:text-surface-400 dark:hover:bg-surface-700"
                         >

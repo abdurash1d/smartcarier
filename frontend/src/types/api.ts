@@ -486,6 +486,27 @@ export interface AdminUserStatsResponse {
   stats: AdminUserStats;
 }
 
+export interface AdminManagedUser {
+  id: string;
+  email: string;
+  full_name: string;
+  role: UserRole;
+  is_active: boolean;
+  is_verified: boolean;
+  created_at: string;
+  last_login?: string | null;
+}
+
+export interface AdminManagedUsersResponse {
+  success: boolean;
+  total: number;
+  users: AdminManagedUser[];
+}
+
+export interface AdminUpdateUserStatusRequest {
+  is_active: boolean;
+}
+
 export interface AdminSystemHealthComponent {
   status: string;
   [key: string]: unknown;

@@ -24,6 +24,8 @@ import type {
   AdminDashboardResponse,
   AdminErrorListResponse,
   AdminErrorStatsResponse,
+  AdminManagedUsersResponse,
+  AdminUpdateUserStatusRequest,
   AdminResolveErrorRequest,
   AdminResolveErrorResponse,
   AdminSystemHealthResponse,
@@ -319,6 +321,10 @@ export const adminApi = {
   dashboard: () => api.get<AdminDashboardResponse>("/admin/dashboard"),
   systemHealth: () => api.get<AdminSystemHealthResponse>("/admin/system/health"),
   userStats: () => api.get<AdminUserStatsResponse>("/admin/users/stats"),
+  listUsers: (params?: { role?: "student" | "company" | "admin"; is_active?: boolean; search?: string; limit?: number; offset?: number }) =>
+    api.get<AdminManagedUsersResponse>("/admin/users", { params }),
+  updateUserStatus: (userId: string, data: AdminUpdateUserStatusRequest) =>
+    api.patch(`/admin/users/${userId}/status`, data),
   errors: (params?: { limit?: number; offset?: number; resolved?: boolean; hours?: number }) =>
     api.get<AdminErrorListResponse>("/admin/errors", { params }),
   errorStats: (hours = 24) => api.get<AdminErrorStatsResponse>("/admin/errors/stats", { params: { hours } }),

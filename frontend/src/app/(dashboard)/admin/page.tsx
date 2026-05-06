@@ -373,6 +373,7 @@ export default function AdminDashboardPage() {
           <div className="flex flex-wrap gap-3">
             <Button variant="outline" onClick={() => void loadAdminData(true)} className="border-white/20 bg-white/10 text-white hover:bg-white/15"><RefreshCw className={cn("mr-2 h-4 w-4", refreshing && "animate-spin")} />{copy.refreshData}</Button>
             <Link href="#errors"><Button className="bg-white text-slate-900 hover:bg-slate-100">{copy.jumpToErrors}<ArrowRight className="ml-2 h-4 w-4" /></Button></Link>
+            <Link href="/admin/users"><Button variant="outline" className="border-white/20 bg-white/10 text-white hover:bg-white/15"><Users className="mr-2 h-4 w-4" />{copy.users}</Button></Link>
           </div>
         </div>
       </motion.section>
