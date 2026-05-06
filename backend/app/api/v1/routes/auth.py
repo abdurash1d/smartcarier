@@ -195,8 +195,20 @@ def _require_oauth_state_store(provider: str):
 
 
 def _local_oauth_state_enabled() -> bool:
-    """Allow OAuth state fallback only for local development."""
-    return bool(settings.DEBUG and not settings.REDIS_ENABLED)
+    """
+    Allow OAuth state fallback when Redis-backed state is intentionally disabled.
+
+    Why:
+    - Some local/dev environments set global DEBUG-like env values to production
+      labels (e.g. DEBUG=release), which turns off the old DEBUG-only fallback.
+    - If Redis is disabled, failing closed makes OAuth unusable even for single
+      process development.
+
+    Security note:
+    - In production, prefer REDIS_ENABLED=true so state is shared across workers.
+      Process-local fallback is best-effort and can break across replicas.
+    """
+    return bool(settings.DEBUG or not settings.REDIS_ENABLED)
 
 
 def _oauth_state_key(provider: str, state: str) -> str:
@@ -212,6 +224,17 @@ def _cleanup_local_oauth_states(now: float) -> None:
 def _store_oauth_state(provider: str, state: str) -> None:
     """Persist OAuth state for later callback validation."""
     if _local_oauth_state_enabled():
+        from app.core.redis_client import get_redis
+
+        redis_client = get_redis()
+        if redis_client is not None:
+            redis_client.set(
+                _oauth_state_key(provider, state),
+                "1",
+                ex=settings.OAUTH_STATE_TTL_SECONDS,
+            )
+            return
+
         now = time()
         _cleanup_local_oauth_states(now)
         _LOCAL_OAUTH_STATES[_oauth_state_key(provider, state)] = now + settings.OAUTH_STATE_TTL_SECONDS
@@ -232,6 +255,19 @@ def _consume_oauth_state(provider: str, state: str) -> None:
     provider_label = provider.title()
 
     if _local_oauth_state_enabled():
+        from app.core.redis_client import get_redis
+
+        redis_client = get_redis()
+        if redis_client is not None:
+            if not redis_client.exists(state_key):
+                raise _oauth_error(
+                    status.HTTP_400_BAD_REQUEST,
+                    "INVALID_OAUTH_STATE",
+                    f"Invalid or expired {provider_label} OAuth state.",
+                )
+            redis_client.delete(state_key)
+            return
+
         now = time()
         _cleanup_local_oauth_states(now)
         expires_at = _LOCAL_OAUTH_STATES.pop(state_key, None)

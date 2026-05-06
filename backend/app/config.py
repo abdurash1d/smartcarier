@@ -253,6 +253,17 @@ class Settings(BaseSettings):
     OAUTH_ENABLED: bool = False
 
     # =========================================================================
+    # 👑 ADMIN BOOTSTRAP (Ops helper)
+    # =========================================================================
+
+    # If both email and password are provided, backend will create/promote
+    # this account to admin on startup.
+    BOOTSTRAP_ADMIN_EMAIL: str = ""
+    BOOTSTRAP_ADMIN_PASSWORD: str = ""
+    BOOTSTRAP_ADMIN_FULL_NAME: str = "System Admin"
+    BOOTSTRAP_ADMIN_PHONE: str = "+998901111111"
+
+    # =========================================================================
     # 🐛 ERROR MONITORING & LOGGING
     # =========================================================================
     

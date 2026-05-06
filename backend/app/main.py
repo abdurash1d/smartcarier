@@ -48,7 +48,13 @@ from sqlalchemy.orm import Session
 # Local imports
 from app.config import settings, print_config_summary
 from app.api.v1 import api_router
-from app.database import check_database_connection, get_db, normalize_legacy_user_role_values
+from app.database import (
+    SessionLocal,
+    check_database_connection,
+    get_db,
+    normalize_legacy_user_role_values,
+)
+from app.models import User, UserRole
 
 # =============================================================================
 # LOGGING CONFIGURATION
@@ -61,6 +67,52 @@ logging.basicConfig(
 )
 
 logger = logging.getLogger(__name__)
+
+
+def _bootstrap_admin_user() -> None:
+    """
+    Create or promote an admin account from environment variables.
+
+    Triggered only when both BOOTSTRAP_ADMIN_EMAIL and
+    BOOTSTRAP_ADMIN_PASSWORD are provided.
+    """
+    email = (settings.BOOTSTRAP_ADMIN_EMAIL or "").strip().lower()
+    password = (settings.BOOTSTRAP_ADMIN_PASSWORD or "").strip()
+
+    if not email or not password:
+        return
+
+    db = SessionLocal()
+    try:
+        user = db.query(User).filter(User.email == email).first()
+        if user:
+            user.role = UserRole.ADMIN
+            user.full_name = settings.BOOTSTRAP_ADMIN_FULL_NAME or user.full_name
+            user.phone = settings.BOOTSTRAP_ADMIN_PHONE or user.phone
+            user.is_active_account = True
+            user.is_verified = True
+            user.set_password(password)
+            action = "promoted"
+        else:
+            user = User(
+                email=email,
+                full_name=settings.BOOTSTRAP_ADMIN_FULL_NAME,
+                phone=settings.BOOTSTRAP_ADMIN_PHONE,
+                role=UserRole.ADMIN,
+                is_active_account=True,
+                is_verified=True,
+            )
+            user.set_password(password)
+            db.add(user)
+            action = "created"
+
+        db.commit()
+        logger.info("✅ Bootstrap admin %s: %s", action, email)
+    except Exception as exc:
+        db.rollback()
+        logger.error("❌ Failed to bootstrap admin user: %s", exc)
+    finally:
+        db.close()
 
 # =============================================================================
 # SENTRY INTEGRATION (Error Monitoring)
@@ -190,6 +242,7 @@ async def lifespan(app: FastAPI):
     if check_database_connection():
         logger.info("✅ Database connection successful")
         normalize_legacy_user_role_values()
+        _bootstrap_admin_user()
     else:
         logger.error("❌ Database connection failed!")
 
