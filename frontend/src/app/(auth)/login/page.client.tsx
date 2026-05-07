@@ -9,7 +9,7 @@
  * `useSearchParams()` and interacts with browser APIs.
  */
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useForm } from "react-hook-form";
@@ -37,16 +37,22 @@ import { cn } from "@/lib/utils";
 // VALIDATION SCHEMA
 // =============================================================================
 
-const loginSchema = z.object({
-  email: z
-    .string()
-    .min(1, "Email is required")
-    .email("Please enter a valid email address"),
-  password: z.string().min(1, "Password is required").min(6, "Password must be at least 6 characters"),
-  rememberMe: z.boolean().optional(),
-});
+type TranslateFn = (key: string, variables?: Record<string, string | number>) => string;
 
-type LoginFormData = z.infer<typeof loginSchema>;
+const createLoginSchema = (t: TranslateFn) =>
+  z.object({
+    email: z
+      .string()
+      .min(1, t("validation.required"))
+      .email(t("validation.email")),
+    password: z
+      .string()
+      .min(1, t("validation.required"))
+      .min(6, t("validation.minLength", { min: 6 })),
+    rememberMe: z.boolean().optional(),
+  });
+
+type LoginFormData = z.infer<ReturnType<typeof createLoginSchema>>;
 
 // =============================================================================
 // ANIMATION VARIANTS
@@ -67,6 +73,7 @@ export default function LoginPageClient() {
 
   const { login, isLoading, error, clearError } = useAuth();
   const { t } = useTranslation();
+  const loginSchema = useMemo(() => createLoginSchema(t), [t]);
   const [showPassword, setShowPassword] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
 
@@ -101,10 +108,10 @@ export default function LoginPageClient() {
     window.location.href = `${backendOrigin}/api/v1/auth/oauth/google?redirect=true`;
   };
 
-  const handleLinkedInOAuth = () => {
-    const backendOrigin = getBackendOrigin();
-    window.location.href = `${backendOrigin}/api/v1/auth/oauth/linkedin?redirect=true`;
-  };
+  const localizedError =
+    error === "Invalid email or password"
+      ? t("auth.login.invalidCredentials")
+      : error;
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="mx-auto w-full max-w-md">
@@ -115,8 +122,8 @@ export default function LoginPageClient() {
         transition={{ delay: 0.1 }}
         className="mb-8 text-center"
       >
-        <h1 className="font-display text-3xl font-bold text-surface-900">{t("auth.login.title")}</h1>
-        <p className="mt-2 text-surface-500">{t("auth.login.subtitle")}</p>
+        <h1 className="font-display text-3xl font-bold text-surface-900 dark:text-white">{t("auth.login.title")}</h1>
+        <p className="mt-2 text-surface-500 dark:text-surface-300">{t("auth.login.subtitle")}</p>
       </motion.div>
 
       {/* Alerts */}
@@ -161,7 +168,7 @@ export default function LoginPageClient() {
             className="mb-6 flex items-center gap-3 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800"
           >
             <AlertCircle className="h-5 w-5 flex-shrink-0" />
-            <p>{error}</p>
+            <p>{localizedError}</p>
           </motion.div>
         )}
       </AnimatePresence>
@@ -185,7 +192,7 @@ export default function LoginPageClient() {
               placeholder="you@example.com"
               autoComplete="email"
               className={cn(
-                "flex h-12 w-full rounded-xl border bg-white pl-10 pr-4 text-sm transition-all",
+                "flex h-12 w-full rounded-xl border bg-white pl-10 pr-4 text-sm text-surface-900 transition-all dark:bg-surface-900 dark:text-surface-100",
                 "placeholder:text-surface-400",
                 "focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-0",
                 errors.email ? "border-red-300 focus:ring-red-500" : "border-surface-300 hover:border-surface-400"
@@ -211,7 +218,7 @@ export default function LoginPageClient() {
               placeholder="••••••••"
               autoComplete="current-password"
               className={cn(
-                "flex h-12 w-full rounded-xl border bg-white pl-10 pr-12 text-sm transition-all",
+                "flex h-12 w-full rounded-xl border bg-white pl-10 pr-12 text-sm text-surface-900 transition-all dark:bg-surface-900 dark:text-surface-100",
                 "placeholder:text-surface-400",
                 "focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-0",
                 errors.password ? "border-red-300 focus:ring-red-500" : "border-surface-300 hover:border-surface-400"
@@ -236,7 +243,7 @@ export default function LoginPageClient() {
 
         {/* Remember / Forgot */}
         <div className="flex items-center justify-between">
-          <label className="flex items-center gap-2 text-sm text-surface-600">
+          <label className="flex items-center gap-2 text-sm text-surface-600 dark:text-surface-300">
             <input type="checkbox" className="h-4 w-4 rounded border-surface-300" {...register("rememberMe")} />
             {t("auth.login.rememberMe")}
           </label>
@@ -256,11 +263,11 @@ export default function LoginPageClient() {
           {isSubmitting || isLoading ? (
             <span className="flex items-center justify-center gap-2">
               <Loader2 className="h-4 w-4 animate-spin" />
-              {t("common.loading")}
+              {t("auth.login.signingIn")}
             </span>
           ) : (
             <span className="flex items-center justify-center gap-2">
-              {isSuccess ? t("auth.login.success") : t("auth.login.button")}
+              {isSuccess ? t("auth.login.signIn") : t("auth.login.signIn")}
               <ArrowRight className="h-4 w-4" />
             </span>
           )}
@@ -269,26 +276,23 @@ export default function LoginPageClient() {
         {/* Social */}
         <div className="relative py-2">
           <div className="absolute inset-0 flex items-center">
-            <div className="w-full border-t border-surface-200" />
+            <div className="w-full border-t border-surface-200 dark:border-surface-700" />
           </div>
           <div className="relative flex justify-center">
-            <span className="bg-white px-4 text-xs text-surface-500">{t("auth.login.orContinue")}</span>
+            <span className="bg-white px-4 text-xs text-surface-500 dark:bg-surface-950 dark:text-surface-300">{t("auth.login.orContinueWith")}</span>
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 gap-3">
           <Button type="button" variant="outline" onClick={handleGoogleOAuth}>
             Google
           </Button>
-          <Button type="button" variant="outline" onClick={handleLinkedInOAuth}>
-            LinkedIn
-          </Button>
         </div>
 
-        <p className="text-center text-sm text-surface-600">
+        <p className="text-center text-sm text-surface-600 dark:text-surface-300">
           {t("auth.login.noAccount")}{" "}
           <Link href="/register" className="font-medium text-purple-600 hover:text-purple-700">
-            {t("auth.login.signUp")}
+            {t("auth.login.createAccount")}
           </Link>
         </p>
       </motion.form>
