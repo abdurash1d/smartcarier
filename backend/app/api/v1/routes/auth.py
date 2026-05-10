@@ -56,6 +56,7 @@ from app.schemas.auth import (
     TokenRefreshRequest,
     LogoutRequest,
     ForgotPasswordRequest,
+    ForgotPasswordResponse,
     ResetPasswordRequest,
     ChangePasswordRequest,
     UserResponse,
@@ -317,6 +318,25 @@ async def send_password_reset_email(email: str, user_name: str, token: str):
     except Exception as e:
         logger.error(f"Failed to send password reset email: {e}")
         # Don't raise - email failure shouldn't block the flow
+
+
+def _is_email_delivery_available() -> bool:
+    """
+    Determine whether outbound email is configured for the current runtime.
+    """
+    mode = (settings.EMAIL_TRANSPORT or "auto").strip().lower()
+    smtp_configured = bool(settings.SMTP_USER and settings.SMTP_PASSWORD)
+    sendgrid_configured = bool(settings.SENDGRID_API_KEY)
+
+    if mode == "disabled":
+        return False
+    if mode == "smtp":
+        return smtp_configured
+    if mode == "sendgrid":
+        return sendgrid_configured
+
+    # auto
+    return smtp_configured or sendgrid_configured
 
 
 # =============================================================================
@@ -679,7 +699,7 @@ async def logout(
 
 @router.post(
     "/forgot-password",
-    response_model=MessageResponse,
+    response_model=ForgotPasswordResponse,
     summary="Request password reset",
     description="""
     Request a password reset email.
@@ -694,10 +714,13 @@ async def logout(
 async def forgot_password(
     request: ForgotPasswordRequest,
     background_tasks: BackgroundTasks,
+    http_request: Request,
     db: Session = Depends(get_db)
 ):
     """Send password reset email."""
-    
+    from app.core.rate_limiter import check_login_rate_limit
+    check_login_rate_limit(http_request, request.email)
+
     logger.info(f"Password reset requested for: {request.email}")
     
     # Find user (but don't reveal if exists)
@@ -706,22 +729,36 @@ async def forgot_password(
         User.is_deleted == False
     ).first()
     
+    debug_reset_url: str | None = None
+    email_delivery_available = _is_email_delivery_available()
+
     if user:
         # Create reset token
         reset_token = create_reset_password_token(user.email)
-        
-        # Send email in background
-        background_tasks.add_task(
-            send_password_reset_email,
-            user.email,
-            user.full_name,
-            reset_token
-        )
+
+        if email_delivery_available:
+            # Send email in background
+            background_tasks.add_task(
+                send_password_reset_email,
+                user.email,
+                user.full_name,
+                reset_token
+            )
+        else:
+            logger.warning(
+                "Password reset email not queued: EMAIL transport is unavailable (mode=%s)",
+                settings.EMAIL_TRANSPORT,
+            )
+
+        # Safe debug fallback for local/staging.
+        if settings.DEBUG and not email_delivery_available:
+            debug_reset_url = f"{settings.FRONTEND_URL}/reset-password?token={reset_token}"
     
     # Always return success (prevent email enumeration)
-    return MessageResponse(
+    return ForgotPasswordResponse(
         message="If an account exists with this email, a reset link has been sent.",
-        success=True
+        success=True,
+        debug_reset_url=debug_reset_url,
     )
 
 
@@ -1136,7 +1173,6 @@ async def linkedin_oauth_callback(
             error_code="LINKEDIN_OAUTH_AUTHENTICATION_FAILED",
             message="OAuth authentication failed",
         )
-
 
 
 

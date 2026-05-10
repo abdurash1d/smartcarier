@@ -121,6 +121,13 @@ export function useAuth() {
     if (!res.ok) {
       throw new Error(await parseApiError(res));
     }
+
+    const data = await res.json();
+    return {
+      message: typeof data?.message === "string" ? data.message : "",
+      debug_reset_url:
+        typeof data?.debug_reset_url === "string" ? data.debug_reset_url : null,
+    };
   }, []);
 
   const isStudent = user?.role === "student";
