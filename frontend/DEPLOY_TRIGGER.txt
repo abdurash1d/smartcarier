@@ -1,2 +1,2 @@
-triggered_at_utc=2026-05-08T20:35:38Z
-reason=force_redeploy_frontend
+triggered_at_utc=2026-05-10T15:44:55Z
+reason=professional_redeploy_frontend
