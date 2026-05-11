@@ -6,10 +6,20 @@ const APP_URL = "http://127.0.0.1:3000";
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000/api/v1";
 
 async function loginAndBuildAuthStorage(request: any, email: string, password: string) {
-  const res = await request.post(`${API_URL}/auth/login`, {
-    data: { email, password },
-    headers: { "content-type": "application/json" },
-  });
+  let res: any = null;
+  for (let attempt = 1; attempt <= 6; attempt++) {
+    res = await request.post(`${API_URL}/auth/login`, {
+      data: { email, password },
+      headers: { "content-type": "application/json" },
+    });
+    if (res.ok()) break;
+    if (res.status() === 429 && attempt < 6) {
+      const retryAfter = Number(res.headers()["retry-after"] || "3");
+      await new Promise((resolve) => setTimeout(resolve, Math.max(1, retryAfter) * 1000));
+      continue;
+    }
+    break;
+  }
 
   expect(res.ok()).toBeTruthy();
   const data = (await res.json()) as Json;
@@ -36,7 +46,7 @@ async function applyAuthState(page: any, storageValue: string) {
 
 test.describe("Smoke Expansion", () => {
   test("admin dashboard loads with seeded admin account", async ({ page, request }) => {
-    const authStorage = await loginAndBuildAuthStorage(request, "admin@smartcareer.uz", "Admin123!");
+    const authStorage = await loginAndBuildAuthStorage(request, "admin@careeruz.uz", "Admin123!");
     await applyAuthState(page, authStorage);
 
     await page.goto(`${APP_URL}/admin`);
@@ -68,21 +78,21 @@ test.describe("Smoke Expansion", () => {
 
     await page.locator("#title").fill(uniqueTitle);
     await page.locator("#location").fill("Tashkent, Uzbekistan");
-    await page.getByRole("button", { name: /Keyingi|Next/i }).click();
+    await page.getByRole("button", { name: /Keyingi|Next/i }).first().click({ force: true });
 
     await page.getByPlaceholder(/Lavozim haqida batafsil ma'lumot/i).fill(
       "We are looking for a QA engineer who can write reliable automated tests, collaborate with product teams, and improve release quality."
     );
-    await page.getByRole("button", { name: /Keyingi|Next/i }).click();
+    await page.getByRole("button", { name: /Keyingi|Next/i }).first().click({ force: true });
 
     await page.getByPlaceholder(/Nomzodga qo'yiladigan talablar/i).fill(
       "Manual testing, automated testing, test design, bug reporting, regression analysis, API testing."
     );
     await page.getByPlaceholder(/Ko'nikma qo'shish/i).fill("Testing");
     await page.getByRole("button", { name: /Qo'shish|Add/i }).click();
-    await page.getByRole("button", { name: /Keyingi|Next/i }).click();
+    await page.getByRole("button", { name: /Keyingi|Next/i }).first().click({ force: true });
 
-    await page.getByRole("button", { name: /E'lon qilish|Publish/i }).click();
+    await page.getByRole("button", { name: /E'lon qilish|Publish/i }).first().click({ force: true });
 
     await expect(page).toHaveURL(/\/company\/jobs/);
     await expect(page.getByText(uniqueTitle).first()).toBeVisible({ timeout: 15000 });

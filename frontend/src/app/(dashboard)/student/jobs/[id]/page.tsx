@@ -92,7 +92,7 @@ export default function JobDetailPage() {
     return (
       <div className="mx-auto max-w-4xl space-y-6 p-6">
         <Skeleton className="h-8 w-32" />
-        <div className="rounded-2xl border border-surface-200 bg-white p-6">
+        <div className="rounded-2xl border border-surface-200 bg-white p-6 dark:border-surface-700 dark:bg-surface-800">
           <Skeleton className="h-8 w-2/3" />
           <Skeleton className="mt-2 h-5 w-1/3" />
           <div className="mt-4 flex gap-3">
@@ -152,7 +152,7 @@ export default function JobDetailPage() {
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="rounded-2xl border border-surface-200 bg-white p-6 shadow-sm"
+        className="rounded-2xl border border-surface-200 bg-white p-6 dark:border-surface-700 dark:bg-surface-800 shadow-sm dark:border-surface-700 dark:bg-surface-800"
       >
         {/* Header */}
         <div className="flex items-start justify-between gap-4">
@@ -276,7 +276,7 @@ export default function JobDetailPage() {
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.1 }}
-        className="rounded-2xl border border-surface-200 bg-white p-6 shadow-sm"
+        className="rounded-2xl border border-surface-200 bg-white p-6 dark:border-surface-700 dark:bg-surface-800 shadow-sm dark:border-surface-700 dark:bg-surface-800"
       >
         <h2 className="mb-4 text-lg font-bold text-surface-900">Ish tavsifi</h2>
         <div className="prose prose-sm max-w-none text-surface-600">
@@ -292,7 +292,7 @@ export default function JobDetailPage() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.2 }}
-          className="rounded-2xl border border-surface-200 bg-white p-6 shadow-sm"
+          className="rounded-2xl border border-surface-200 bg-white p-6 dark:border-surface-700 dark:bg-surface-800 shadow-sm dark:border-surface-700 dark:bg-surface-800"
         >
           <h2 className="mb-4 text-lg font-bold text-surface-900">Talablar</h2>
           <div className="space-y-4">

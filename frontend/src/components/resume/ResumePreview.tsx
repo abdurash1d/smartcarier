@@ -16,6 +16,7 @@ import {
 import type { ReactNode } from "react";
 import type { ResumeContent } from "@/types/api";
 import { cn } from "@/lib/utils";
+import { useTranslation } from "@/contexts/TranslationContext";
 
 type LooseRecord = Record<string, unknown>;
 
@@ -24,6 +25,7 @@ interface ResumePreviewProps {
   title?: string;
   className?: string;
   isPlaceholder?: boolean;
+  locale?: "uz" | "ru";
 }
 
 const asArray = <T,>(value: unknown): T[] => Array.isArray(value) ? value as T[] : [];
@@ -45,11 +47,54 @@ const initialsFrom = (name: string) => {
   return (parts[0]?.[0] || "S") + (parts[1]?.[0] || "C");
 };
 
-export function ResumePreview({ content, title, className, isPlaceholder }: ResumePreviewProps) {
+export function ResumePreview({ content, title, className, isPlaceholder, locale }: ResumePreviewProps) {
+  const { locale: contextLocale } = useTranslation();
+  const activeLocale = locale || contextLocale;
+  const copy =
+    activeLocale === "ru"
+      ? {
+          yourName: "Ваше имя",
+          roleFallback: "Профессиональная должность",
+          badge: "CareerUZ Резюме",
+          summary: "Краткий профиль",
+          experience: "Опыт работы",
+          education: "Образование",
+          projects: "Проекты",
+          current: "По настоящее время",
+          position: "Должность",
+          fillForm: "Заполните данные, чтобы увидеть предпросмотр резюме.",
+          links: "Ссылки",
+          portfolio: "Портфолио",
+          skills: "Навыки",
+          technical: "Технические",
+          soft: "Мягкие",
+          languages: "Языки",
+          certifications: "Сертификаты",
+        }
+      : {
+          yourName: "Ismingiz",
+          roleFallback: "Professional unvon",
+          badge: "CareerUZ Rezyume",
+          summary: "Qisqacha profil",
+          experience: "Ish tajribasi",
+          education: "Ta'lim",
+          projects: "Loyihalar",
+          current: "Hozirgi vaqt",
+          position: "Lavozim",
+          fillForm: "Rezyume ko'rinishini ko'rish uchun ma'lumotlarni to'ldiring.",
+          links: "Havolalar",
+          portfolio: "Portfolio",
+          skills: "Ko'nikmalar",
+          technical: "Texnik",
+          soft: "Ijtimoiy",
+          languages: "Tillar",
+          certifications: "Sertifikatlar",
+        };
+
   const rawContent = asRecord(content);
   const personalInfo = asRecord(rawContent.personal_info);
-  const name = firstText(personalInfo.name, personalInfo.full_name, title, "Ismingiz");
-  const role = firstText(personalInfo.professional_title, personalInfo.title, "Professional unvon");
+  const name = firstText(personalInfo.name, personalInfo.full_name, title, copy.yourName);
+  const role = firstText(personalInfo.professional_title, personalInfo.title, copy.roleFallback);
   const email = firstText(personalInfo.email);
   const phone = firstText(personalInfo.phone);
   const location = firstText(personalInfo.location);
@@ -76,7 +121,7 @@ export function ResumePreview({ content, title, className, isPlaceholder }: Resu
           <header className="border-b border-slate-200 pb-8">
             <div className="mb-5 inline-flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.24em] text-emerald-700">
               <Sparkles className="h-3.5 w-3.5" />
-              SmartCareer AI Resume
+              {copy.badge}
             </div>
             <h1 className="text-[34px] font-black leading-tight tracking-tight text-slate-950">
               {name}
@@ -90,20 +135,20 @@ export function ResumePreview({ content, title, className, isPlaceholder }: Resu
           </header>
 
           {summary && (
-            <Section title="Qisqacha profil" kicker="01">
+            <Section title={copy.summary} kicker="01">
               <p className="text-[14px] leading-7 text-slate-600">{summary}</p>
             </Section>
           )}
 
           {experience.length > 0 && (
-            <Section title="Ish tajribasi" kicker="02" icon={<Briefcase className="h-4 w-4" />}>
+            <Section title={copy.experience} kicker="02" icon={<Briefcase className="h-4 w-4" />}>
               <div className="space-y-5">
                 {experience.map((item, index) => {
                   const position = firstText(item.position, item.title, item.job_title);
                   const company = firstText(item.company, item.company_name);
                   const period = [
                     firstText(item.start_date),
-                    item.is_current ? "Hozirgi vaqt" : firstText(item.end_date),
+                    item.is_current ? copy.current : firstText(item.end_date),
                   ].filter(Boolean).join(" - ");
                   const description = firstText(item.description);
                   const achievements = asArray<string>(item.achievements);
@@ -112,7 +157,7 @@ export function ResumePreview({ content, title, className, isPlaceholder }: Resu
                     <div key={`${company}-${position}-${index}`} className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
                       <div className="flex items-start justify-between gap-4">
                         <div>
-                          <h3 className="font-bold text-slate-950">{position || "Lavozim"}</h3>
+                          <h3 className="font-bold text-slate-950">{position || copy.position}</h3>
                           <p className="text-sm font-semibold text-emerald-700">{company}</p>
                         </div>
                         {period && <p className="whitespace-nowrap text-xs font-medium text-slate-500">{period}</p>}
@@ -138,7 +183,7 @@ export function ResumePreview({ content, title, className, isPlaceholder }: Resu
           )}
 
           {education.length > 0 && (
-            <Section title="Ta'lim" kicker="03" icon={<GraduationCap className="h-4 w-4" />}>
+            <Section title={copy.education} kicker="03" icon={<GraduationCap className="h-4 w-4" />}>
               <div className="grid gap-3">
                 {education.map((item, index) => (
                   <div key={`${item.institution}-${index}`} className="rounded-2xl border border-slate-200 p-4">
@@ -154,7 +199,7 @@ export function ResumePreview({ content, title, className, isPlaceholder }: Resu
           )}
 
           {projects.length > 0 && (
-            <Section title="Loyihalar" kicker="04">
+            <Section title={copy.projects} kicker="04">
               <div className="grid gap-3">
                 {projects.map((project, index) => {
                   const projectName = firstText(project.name, project.project_name);
@@ -179,7 +224,7 @@ export function ResumePreview({ content, title, className, isPlaceholder }: Resu
             <div className="flex min-h-64 flex-col items-center justify-center rounded-[28px] border border-dashed border-slate-300 bg-slate-50 text-center">
               <Sparkles className="h-12 w-12 text-emerald-500" />
               <p className="mt-4 max-w-sm text-sm font-medium text-slate-500">
-                Resume ko&apos;rinishini ko&apos;rish uchun ma&apos;lumotlarni to&apos;ldiring.
+                {copy.fillForm}
               </p>
             </div>
           )}
@@ -192,23 +237,23 @@ export function ResumePreview({ content, title, className, isPlaceholder }: Resu
 
           {(linkedin || portfolio) && (
             <div className="mt-8 space-y-3">
-              <SidebarTitle title="Links" />
+              <SidebarTitle title={copy.links} />
               {linkedin && <SidebarText text="LinkedIn" subtext={linkedin} />}
-              {portfolio && <SidebarText text="Portfolio" subtext={portfolio} />}
+              {portfolio && <SidebarText text={copy.portfolio} subtext={portfolio} />}
             </div>
           )}
 
           {(technicalSkills.length > 0 || softSkills.length > 0) && (
             <div className="mt-8 space-y-4">
-              <SidebarTitle icon={<Code2 className="h-4 w-4" />} title="Ko'nikmalar" />
-              {technicalSkills.length > 0 && <SkillGroup label="Texnik" skills={technicalSkills} />}
-              {softSkills.length > 0 && <SkillGroup label="Ijtimoiy" skills={softSkills} muted />}
+              <SidebarTitle icon={<Code2 className="h-4 w-4" />} title={copy.skills} />
+              {technicalSkills.length > 0 && <SkillGroup label={copy.technical} skills={technicalSkills} />}
+              {softSkills.length > 0 && <SkillGroup label={copy.soft} skills={softSkills} muted />}
             </div>
           )}
 
           {languages.length > 0 && (
             <div className="mt-8 space-y-3">
-              <SidebarTitle icon={<Languages className="h-4 w-4" />} title="Tillar" />
+              <SidebarTitle icon={<Languages className="h-4 w-4" />} title={copy.languages} />
               {languages.map((language, index) => (
                 <SidebarText
                   key={`${language.name}-${index}`}
@@ -221,7 +266,7 @@ export function ResumePreview({ content, title, className, isPlaceholder }: Resu
 
           {certifications.length > 0 && (
             <div className="mt-8 space-y-3">
-              <SidebarTitle icon={<Award className="h-4 w-4" />} title="Sertifikatlar" />
+              <SidebarTitle icon={<Award className="h-4 w-4" />} title={copy.certifications} />
               {certifications.map((cert, index) => (
                 <SidebarText
                   key={`${cert.name}-${index}`}

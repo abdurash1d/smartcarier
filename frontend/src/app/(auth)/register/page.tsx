@@ -5,9 +5,9 @@
  *
  * Features:
  * - Multi-step form (3 steps)
- * - Step 1: Email, Password, Confirm Password
- * - Step 2: Full Name, Phone
- * - Step 3: Role selection (Student/Company)
+ * - Step 1: Role selection (Student/Company)
+ * - Step 2: Email, Password, Confirm Password
+ * - Step 3: Full Name, Phone
  * - Progress indicator
  * - Validation on each step
  * - Success animation on completion
@@ -15,7 +15,7 @@
 
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
@@ -32,7 +32,6 @@ import {
   Phone,
   Building2,
   GraduationCap,
-  AlertCircle,
   Loader2,
   CheckCircle,
   ArrowRight,
@@ -43,6 +42,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useTranslation } from "@/hooks/useTranslation";
 import { useAuthStore } from "@/store/authStore";
 import { getBackendOrigin } from "@/lib/runtime-config";
+import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
@@ -51,57 +51,54 @@ import { cn } from "@/lib/utils";
 // VALIDATION SCHEMAS
 // =============================================================================
 
-// Step 1: Account credentials
-const step1Schema = z
-  .object({
-    email: z
+type TranslateFn = (key: string, variables?: Record<string, string | number>) => string;
+
+const createRegisterSchema = (t: TranslateFn) => {
+  const step1Schema = z
+    .object({
+      email: z
+        .string()
+        .min(1, t("auth.register.validation.emailRequired"))
+        .email(t("auth.register.validation.emailInvalid")),
+      password: z
+        .string()
+        .min(1, t("auth.register.validation.passwordRequired"))
+        .min(8, t("auth.register.validation.passwordMin"))
+        .max(72, t("auth.register.validation.passwordMax"))
+        .regex(/[a-z]/, t("auth.register.validation.passwordLowercase"))
+        .regex(/[A-Z]/, t("auth.register.validation.passwordUppercase"))
+        .regex(/[0-9]/, t("auth.register.validation.passwordNumber")),
+      confirmPassword: z.string().min(1, t("auth.register.validation.confirmPasswordRequired")),
+    })
+    .refine((data) => data.password === data.confirmPassword, {
+      message: t("auth.register.validation.passwordMismatch"),
+      path: ["confirmPassword"],
+    });
+
+  const step2Schema = z.object({
+    fullName: z
       .string()
-      .min(1, "Email majburiy")
-      .email("Iltimos, to'g'ri email manzilini kiriting"),
-    password: z
+      .min(1, t("auth.register.validation.fullNameRequired"))
+      .min(2, t("auth.register.validation.fullNameMin"))
+      .max(100, t("auth.register.validation.fullNameMax"))
+      .regex(/^[\p{L}\s'.'-]+$/u, t("auth.register.validation.fullNameLetters")),
+    phone: z
       .string()
-      .min(1, "Parol majburiy")
-      .min(8, "Parol kamida 8 ta belgidan iborat bo'lishi kerak")
-      .max(72, "Parol 72 ta belgidan oshmasligi kerak")
-      .regex(/[a-z]/, "Parol kamida bitta kichik harfni o'z ichiga olishi kerak")
-      .regex(/[A-Z]/, "Parol kamida bitta katta harfni o'z ichiga olishi kerak")
-      .regex(/[0-9]/, "Parol kamida bitta raqamni o'z ichiga olishi kerak"),
-    confirmPassword: z.string().min(1, "Iltimos, parolni tasdiqlang"),
-  })
-  .refine((data) => data.password === data.confirmPassword, {
-    message: "Parollar mos kelmadi",
-    path: ["confirmPassword"],
+      .min(1, t("auth.register.validation.phoneRequired"))
+      .regex(/^\+?[0-9]{9,15}$/, t("auth.register.validation.phoneInvalid")),
   });
 
-// Step 2: Personal info
-const step2Schema = z.object({
-  fullName: z
-    .string()
-    .min(1, "To'liq ism majburiy")
-    .min(2, "Ism kamida 2 ta belgidan iborat bo'lishi kerak")
-    .max(100, "Ism 100 ta belgidan oshmasligi kerak")
-    .regex(/^[\p{L}\s'.'-]+$/u, "Ism faqat harflardan iborat bo'lishi kerak"),
-  phone: z
-    .string()
-    .min(1, "Telefon raqam majburiy")
-    .regex(/^\+?[0-9]{9,15}$/, "Iltimos, to'g'ri telefon raqamini kiriting"),
-});
+  const step3Schema = z.object({
+    role: z.enum(["student", "company"], {
+      required_error: t("auth.register.validation.roleRequired"),
+    }),
+    companyName: z.string().optional(),
+  });
 
-// Step 3: Role selection
-const step3Schema = z.object({
-  role: z.enum(["student", "company"], {
-    required_error: "Iltimos, rolni tanlang",
-  }),
-  companyName: z.string().optional(),
-});
+  return z.intersection(z.intersection(step1Schema, step2Schema), step3Schema);
+};
 
-// Combined schema
-const registerSchema = z.intersection(
-  z.intersection(step1Schema, step2Schema),
-  step3Schema
-);
-
-type RegisterFormData = z.infer<typeof registerSchema>;
+type RegisterFormData = z.infer<ReturnType<typeof createRegisterSchema>>;
 
 // =============================================================================
 // STEP CONFIGURATION
@@ -113,21 +110,21 @@ const RegisterSteps = () => {
   return [
     {
       id: 1,
+      title: t("auth.register.steps.step3.title"),
+      description: t("auth.register.steps.step3.description"),
+      icon: Sparkles,
+    },
+    {
+      id: 2,
       title: t("auth.register.steps.step1.title"),
       description: t("auth.register.steps.step1.description"),
       icon: Lock,
     },
     {
-      id: 2,
+      id: 3,
       title: t("auth.register.steps.step2.title"),
       description: t("auth.register.steps.step2.description"),
       icon: User,
-    },
-    {
-      id: 3,
-      title: t("auth.register.steps.step3.title"),
-      description: t("auth.register.steps.step3.description"),
-      icon: Sparkles,
     },
   ];
 };
@@ -237,11 +234,9 @@ export default function RegisterPage() {
   const router = useRouter();
   const { register: registerUser, isLoading, error, clearError } = useAuth();
   const { t } = useTranslation();
+  const registerSchema = useMemo(() => createRegisterSchema(t), [t]);
 
-  const handleGoogleOAuth = () => {
-    const backendOrigin = getBackendOrigin();
-    window.location.href = `${backendOrigin}/api/v1/auth/oauth/google?redirect=true`;
-  };
+  // Defined after we have `setValue` etc — see role-aware handler below.
   const steps = RegisterSteps();
   const [currentStep, setCurrentStep] = useState(1);
   const [direction, setDirection] = useState(1);
@@ -272,6 +267,21 @@ export default function RegisterPage() {
 
   const password = watch("password");
   const selectedRole = watch("role");
+  const [oauthError, setOauthError] = useState<string | null>(null);
+
+  const handleGoogleOAuth = () => {
+    // Existing users keep their role — but the backend uses this hint when
+    // creating a brand-new account, so require an explicit choice up front.
+    if (!selectedRole) {
+      setOauthError(t("auth.register.validation.roleRequired"));
+      setCurrentStep(1);
+      setDirection(-1);
+      return;
+    }
+    setOauthError(null);
+    const backendOrigin = getBackendOrigin();
+    window.location.href = `${backendOrigin}/api/v1/auth/oauth/google?role=${selectedRole}&redirect=true`;
+  };
 
   // Trigger confetti on success
   useEffect(() => {
@@ -291,13 +301,13 @@ export default function RegisterPage() {
 
     switch (currentStep) {
       case 1:
-        fieldsToValidate = ["email", "password", "confirmPassword"];
+        fieldsToValidate = ["role"];
         break;
       case 2:
-        fieldsToValidate = ["fullName", "phone"];
+        fieldsToValidate = ["email", "password", "confirmPassword"];
         break;
       case 3:
-        fieldsToValidate = ["role"];
+        fieldsToValidate = ["fullName", "phone"];
         break;
     }
 
@@ -486,13 +496,8 @@ export default function RegisterPage() {
       {/* Error Alert */}
       <AnimatePresence mode="wait">
         {error && (
-          <motion.div
-            key="error"
-            {...fadeIn}
-            className="mb-6 flex items-center gap-3 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800"
-          >
-            <AlertCircle className="h-5 w-5 flex-shrink-0" />
-            <p>{error}</p>
+          <motion.div key="error" {...fadeIn} className="mb-6">
+            <Alert variant="error">{error}</Alert>
           </motion.div>
         )}
       </AnimatePresence>
@@ -501,10 +506,10 @@ export default function RegisterPage() {
       <form onSubmit={handleSubmit(onSubmit)}>
         <div className="overflow-hidden">
           <AnimatePresence mode="wait" custom={direction}>
-            {/* Step 1: Account Credentials */}
-            {currentStep === 1 && (
+            {/* Step 2: Account Credentials */}
+            {currentStep === 2 && (
               <motion.div
-                key="step1"
+                key="step2-account"
                 custom={direction}
                 variants={pageVariants}
                 initial="initial"
@@ -520,7 +525,7 @@ export default function RegisterPage() {
                     <input
                       id="email"
                       type="email"
-                      placeholder="you@example.com"
+                      placeholder={t("auth.register.placeholders.email")}
                       autoComplete="email"
                       className={cn(
                         "flex h-12 w-full rounded-xl border bg-white pl-10 pr-4 text-sm transition-all",
@@ -546,7 +551,7 @@ export default function RegisterPage() {
                     <input
                       id="password"
                       type={showPassword ? "text" : "password"}
-                      placeholder="Create a strong password"
+                      placeholder={t("auth.register.placeholders.password")}
                       autoComplete="new-password"
                       className={cn(
                         "flex h-12 w-full rounded-xl border bg-white pl-10 pr-12 text-sm transition-all",
@@ -580,7 +585,7 @@ export default function RegisterPage() {
                     <input
                       id="confirmPassword"
                       type={showConfirmPassword ? "text" : "password"}
-                      placeholder="Confirm your password"
+                      placeholder={t("auth.register.placeholders.confirmPassword")}
                       autoComplete="new-password"
                       className={cn(
                         "flex h-12 w-full rounded-xl border bg-white pl-10 pr-12 text-sm transition-all",
@@ -608,7 +613,7 @@ export default function RegisterPage() {
                 {/* Divider */}
                 <div className="flex items-center gap-3">
                   <div className="h-px flex-1 bg-surface-200" />
-                  <span className="text-xs text-surface-400">Yoki davom eting</span>
+                  <span className="text-xs text-surface-400">{t("auth.register.oauth.divider")}</span>
                   <div className="h-px flex-1 bg-surface-200" />
                 </div>
 
@@ -624,15 +629,15 @@ export default function RegisterPage() {
                     <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05" />
                     <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335" />
                   </svg>
-                  Google bilan ro'yxatdan o'tish
+                  {t("auth.register.oauth.google")}
                 </button>
               </motion.div>
             )}
 
-            {/* Step 2: Personal Info */}
-            {currentStep === 2 && (
+            {/* Step 3: Personal Info */}
+            {currentStep === 3 && (
               <motion.div
-                key="step2"
+                key="step3-personal"
                 custom={direction}
                 variants={pageVariants}
                 initial="initial"
@@ -648,7 +653,7 @@ export default function RegisterPage() {
                     <input
                       id="fullName"
                       type="text"
-                      placeholder="John Doe"
+                      placeholder={t("auth.register.placeholders.fullName")}
                       autoComplete="name"
                       className={cn(
                         "flex h-12 w-full rounded-xl border bg-white pl-10 pr-4 text-sm transition-all",
@@ -674,7 +679,7 @@ export default function RegisterPage() {
                     <input
                       id="phone"
                       type="tel"
-                      placeholder="+998 90 123 4567"
+                      placeholder={t("auth.register.placeholders.phone")}
                       autoComplete="tel"
                       className={cn(
                         "flex h-12 w-full rounded-xl border bg-white pl-10 pr-4 text-sm transition-all",
@@ -697,10 +702,10 @@ export default function RegisterPage() {
               </motion.div>
             )}
 
-            {/* Step 3: Role Selection */}
-            {currentStep === 3 && (
+            {/* Step 1: Role Selection */}
+            {currentStep === 1 && (
               <motion.div
-                key="step3"
+                key="step1-role"
                 custom={direction}
                 variants={pageVariants}
                 initial="initial"
@@ -755,13 +760,13 @@ export default function RegisterPage() {
                         </p>
                         <div className="mt-3 flex flex-wrap gap-2">
                           <span className="inline-flex items-center gap-1 rounded-full bg-purple-100 px-2 py-0.5 text-xs font-medium text-purple-700">
-                            <Sparkles className="h-3 w-3" /> AI Resume
+                            <Sparkles className="h-3 w-3" /> {t("auth.register.badges.student.resume")}
                           </span>
                           <span className="inline-flex items-center gap-1 rounded-full bg-cyan-100 px-2 py-0.5 text-xs font-medium text-cyan-700">
-                            Job Matching
+                            {t("auth.register.badges.student.matching")}
                           </span>
                           <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">
-                            Auto Apply
+                            {t("auth.register.badges.student.autoApply")}
                           </span>
                         </div>
                       </div>
@@ -812,13 +817,13 @@ export default function RegisterPage() {
                         </p>
                         <div className="mt-3 flex flex-wrap gap-2">
                           <span className="inline-flex items-center gap-1 rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700">
-                            Post Jobs
+                            {t("auth.register.badges.company.postJobs")}
                           </span>
                           <span className="inline-flex items-center gap-1 rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700">
-                            AI Matching
+                            {t("auth.register.badges.company.aiMatching")}
                           </span>
                           <span className="inline-flex items-center gap-1 rounded-full bg-pink-100 px-2 py-0.5 text-xs font-medium text-pink-700">
-                            Analytics
+                            {t("auth.register.badges.company.analytics")}
                           </span>
                         </div>
                       </div>
@@ -839,13 +844,13 @@ export default function RegisterPage() {
                       exit={{ opacity: 0, height: 0 }}
                       className="space-y-2 overflow-hidden"
                     >
-                      <Label htmlFor="companyName">Company name (optional)</Label>
+                      <Label htmlFor="companyName">{t("auth.register.companyNameOptional")}</Label>
                       <div className="relative">
                         <Building2 className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-surface-400" />
                         <input
                           id="companyName"
                           type="text"
-                          placeholder="Acme Inc."
+                          placeholder={t("auth.register.placeholders.companyName")}
                           className="flex h-12 w-full rounded-xl border border-surface-300 bg-white pl-10 pr-4 text-sm transition-all placeholder:text-surface-400 hover:border-surface-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-0"
                           {...register("companyName")}
                         />
@@ -902,7 +907,7 @@ export default function RegisterPage() {
               {isLoading ? (
                 <>
                   <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                  Creating account...
+                  {t("auth.register.creating")}
                 </>
               ) : (
                 <>
@@ -927,17 +932,19 @@ export default function RegisterPage() {
             <div className="w-full border-t border-surface-200" />
           </div>
           <div className="relative flex justify-center text-sm">
-            <span className="bg-white px-4 text-surface-500">yoki tezkor kirish</span>
+            <span className="bg-white px-4 text-surface-500">{t("auth.register.oauth.quickAccess")}</span>
           </div>
         </div>
-        <div className="grid grid-cols-2 gap-4">
+        {oauthError && (
+          <div className="mb-3">
+            <Alert variant="error">{oauthError}</Alert>
+          </div>
+        )}
+        <div className="grid grid-cols-1 gap-4">
           <button
             type="button"
-            onClick={() => {
-              const origin = getBackendOrigin();
-              window.location.href = `${origin}/api/v1/auth/oauth/google?redirect=true`;
-            }}
-            className="flex h-12 items-center justify-center gap-2 rounded-xl border-2 border-surface-200 bg-white font-medium text-surface-700 transition-all hover:border-surface-300 hover:bg-surface-50"
+            onClick={handleGoogleOAuth}
+            className="flex h-12 items-center justify-center gap-2 rounded-xl border-2 border-surface-200 bg-white font-medium text-surface-700 transition-all hover:border-surface-300 hover:bg-surface-50 dark:border-surface-700 dark:bg-surface-800 dark:text-surface-200 dark:hover:bg-surface-700"
           >
             <svg className="h-5 w-5" viewBox="0 0 24 24">
               <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
@@ -946,19 +953,6 @@ export default function RegisterPage() {
               <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
             </svg>
             Google
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              const origin = getBackendOrigin();
-              window.location.href = `${origin}/api/v1/auth/oauth/linkedin?redirect=true`;
-            }}
-            className="flex h-12 items-center justify-center gap-2 rounded-xl border-2 border-surface-200 bg-white font-medium text-surface-700 transition-all hover:border-surface-300 hover:bg-surface-50"
-          >
-            <svg className="h-5 w-5" fill="#0A66C2" viewBox="0 0 24 24">
-              <path d="M19 0h-14c-2.761 0-5 2.239-5 5v14c0 2.761 2.239 5 5 5h14c2.762 0 5-2.239 5-5v-14c0-2.761-2.238-5-5-5zm-11 19h-3v-11h3v11zm-1.5-12.268c-.966 0-1.75-.79-1.75-1.764s.784-1.764 1.75-1.764 1.75.79 1.75 1.764-.783 1.764-1.75 1.764zm13.5 12.268h-3v-5.604c0-3.368-4-3.113-4 0v5.604h-3v-11h3v1.765c1.396-2.586 7-2.777 7 2.476v6.759z" />
-            </svg>
-            LinkedIn
           </button>
         </div>
       </motion.div>

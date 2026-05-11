@@ -8,6 +8,7 @@ User profile management including avatar upload.
 
 import logging
 import os
+from pathlib import Path
 from uuid import uuid4
 from typing import Optional
 
@@ -49,7 +50,9 @@ async def upload_avatar(
         contents = await validate_image_upload(file, max_size=5 * 1024 * 1024)
         
         # Generate safe filename with user ID
-        ext = file.filename.split('.')[-1] if '.' in file.filename else 'jpg'
+        _allowed_exts = {'jpg', 'jpeg', 'png', 'gif', 'webp'}
+        raw_ext = Path(file.filename).suffix.lstrip('.').lower() if file.filename else ''
+        ext = raw_ext if raw_ext in _allowed_exts else 'jpg'
         safe_filename = f"{current_user.id}_{uuid4().hex[:8]}.{ext}"
         file_path = os.path.join(UPLOAD_DIR, safe_filename)
         
@@ -92,11 +95,12 @@ async def delete_avatar(
         return {"success": True, "message": "No avatar to delete"}
     
     try:
-        # Delete file if exists
+        # Delete file if exists — resolve to prevent path traversal
         if current_user.avatar_url.startswith('/uploads/'):
-            file_path = current_user.avatar_url.lstrip('/')
-            if os.path.exists(file_path):
-                os.remove(file_path)
+            upload_root = Path(UPLOAD_DIR).resolve()
+            candidate = Path(current_user.avatar_url.lstrip('/')).resolve()
+            if candidate.is_relative_to(upload_root) and candidate.exists():
+                candidate.unlink()
         
         # Remove from user record
         current_user.avatar_url = None

@@ -1,5 +1,5 @@
 # =============================================================================
-# SmartCareer AI - Backend Dockerfile (PRODUCTION)
+# CareerUZ - Backend Dockerfile (PRODUCTION)
 # =============================================================================
 # Multi-stage, non-root user, gunicorn production server
 

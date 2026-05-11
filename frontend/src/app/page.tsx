@@ -52,13 +52,13 @@ import { ThemeToggle } from "@/components/ui/theme-toggle";
 // =============================================================================
 
 const fadeInUp = {
-  initial: { opacity: 0, y: 20 },
+  initial: { opacity: 1, y: 0 },
   animate: { opacity: 1, y: 0 },
   transition: { duration: 0.5 },
 };
 
 const fadeIn = {
-  initial: { opacity: 0 },
+  initial: { opacity: 1 },
   animate: { opacity: 1 },
   transition: { duration: 0.5 },
 };
@@ -72,7 +72,7 @@ const staggerContainer = {
 };
 
 const scaleIn = {
-  initial: { opacity: 0, scale: 0.9 },
+  initial: { opacity: 1, scale: 1 },
   animate: { opacity: 1, scale: 1 },
   transition: { duration: 0.5 },
 };
@@ -202,7 +202,7 @@ const testimonials = [
     company: "EPAM Systems",
     image: null,
     quote:
-      "SmartCareer AI completely transformed my job search. The AI resume generator helped me create a professional resume that got me 5x more interviews!",
+      "CareerUZ completely transformed my job search. The AI resume generator helped me create a professional resume that got me 5x more interviews!",
     rating: 5,
   },
   {
@@ -220,7 +220,7 @@ const testimonials = [
     company: "Click.uz",
     image: null,
     quote:
-      "As a fresh graduate, I didn't know how to write a proper resume. SmartCareer AI created a stunning resume that helped me land my first tech job.",
+      "As a fresh graduate, I didn't know how to write a proper resume. CareerUZ created a stunning resume that helped me land my first tech job.",
     rating: 5,
   },
   {
@@ -263,7 +263,7 @@ function TestimonialCard({
 }) {
   return (
     <motion.div
-      initial={{ opacity: 0, scale: 0.9 }}
+      initial={false}
       animate={{ opacity: isActive ? 1 : 0.5, scale: isActive ? 1 : 0.95 }}
       transition={{ duration: 0.3 }}
       className={`relative rounded-2xl border bg-white p-6 shadow-xl transition-all dark:bg-surface-900/80 ${
@@ -331,7 +331,7 @@ export default function LandingPage() {
               <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-purple-500 to-indigo-600 shadow-lg shadow-purple-500/25">
                 <Sparkles className="h-5 w-5 text-white" />
               </div>
-              <span className="font-display text-xl font-bold text-surface-900 dark:text-surface-100">SmartCareer</span>
+              <span className="font-display text-xl font-bold text-surface-900 dark:text-surface-100">CareerUZ</span>
             </Link>
 
             {/* Nav Links */}
@@ -441,7 +441,7 @@ export default function LandingPage() {
           <div className="text-center">
             {/* Headline */}
             <motion.h1
-              initial={{ opacity: 0, y: 20 }}
+              initial={false}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.3 }}
               className="mx-auto max-w-4xl font-display text-4xl font-bold tracking-tight text-white sm:text-5xl lg:text-6xl xl:text-7xl"
@@ -451,7 +451,7 @@ export default function LandingPage() {
 
             {/* Subheadline */}
             <motion.p
-              initial={{ opacity: 0, y: 20 }}
+              initial={false}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.4 }}
               className="mx-auto mt-6 max-w-2xl text-lg text-purple-100 sm:text-xl"
@@ -461,7 +461,7 @@ export default function LandingPage() {
 
             {/* CTA Buttons */}
             <motion.div
-              initial={{ opacity: 0, y: 20 }}
+              initial={false}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.5 }}
               className="mt-10 flex flex-col items-center justify-center gap-4 sm:flex-row"
@@ -483,7 +483,7 @@ export default function LandingPage() {
 
             {/* Stats */}
             <motion.div
-              initial={{ opacity: 0, y: 20 }}
+              initial={false}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.6 }}
               className="mt-16 grid grid-cols-2 gap-8 sm:grid-cols-4"
@@ -499,7 +499,7 @@ export default function LandingPage() {
 
           {/* Hero Image / Dashboard Preview */}
           <motion.div
-            initial={{ opacity: 0, y: 40 }}
+            initial={false}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.7, duration: 0.8 }}
             className="relative mx-auto mt-16 max-w-5xl"
@@ -517,7 +517,7 @@ export default function LandingPage() {
                   <div className="h-3 w-3 rounded-full bg-green-400" />
                 </div>
                 <div className="ml-4 flex-1 rounded-lg bg-white/10 px-3 py-1 text-xs text-white/70">
-                  smartcareer.uz/dashboard
+                  careeruz.uz/dashboard
                 </div>
               </div>
 
@@ -596,7 +596,7 @@ export default function LandingPage() {
       <section id="features" className="py-20 lg:py-32">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <motion.div
-            initial="initial"
+            initial={false}
             whileInView="animate"
             viewport={{ once: true }}
             variants={staggerContainer}
@@ -626,7 +626,7 @@ export default function LandingPage() {
           </motion.div>
 
           <motion.div
-            initial="initial"
+            initial={false}
             whileInView="animate"
             viewport={{ once: true }}
             variants={staggerContainer}
@@ -713,7 +713,7 @@ export default function LandingPage() {
       <section id="how-it-works" className="bg-surface-50 py-20 lg:py-32 dark:bg-surface-900/40">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <motion.div
-            initial="initial"
+            initial={false}
             whileInView="animate"
             viewport={{ once: true }}
             variants={staggerContainer}
@@ -738,7 +738,7 @@ export default function LandingPage() {
             <div className="absolute left-1/2 top-0 hidden h-full w-0.5 -translate-x-1/2 bg-gradient-to-b from-purple-500 via-cyan-500 to-green-500 md:block" />
 
             <motion.div
-              initial="initial"
+              initial={false}
               whileInView="animate"
               viewport={{ once: true }}
               variants={staggerContainer}
@@ -830,7 +830,7 @@ export default function LandingPage() {
       <section id="pricing" className="py-20 lg:py-32">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <motion.div
-            initial="initial"
+            initial={false}
             whileInView="animate"
             viewport={{ once: true }}
             variants={staggerContainer}
@@ -857,7 +857,7 @@ export default function LandingPage() {
           </motion.div>
 
           <motion.div
-            initial="initial"
+            initial={false}
             whileInView="animate"
             viewport={{ once: true }}
             variants={staggerContainer}
@@ -979,7 +979,7 @@ export default function LandingPage() {
       <section id="testimonials" className="bg-surface-50 py-20 lg:py-32 dark:bg-surface-900/40">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <motion.div
-            initial="initial"
+            initial={false}
             whileInView="animate"
             viewport={{ once: true }}
             variants={staggerContainer}
@@ -1063,7 +1063,7 @@ export default function LandingPage() {
       <section className="py-20 lg:py-32">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <motion.div
-            initial={{ opacity: 0, y: 20 }}
+            initial={false}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
             className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-purple-600 via-indigo-600 to-blue-700 p-8 text-center md:p-16"
@@ -1075,7 +1075,7 @@ export default function LandingPage() {
 
             <div className="relative">
               <motion.div
-                initial={{ scale: 0 }}
+                initial={false}
                 whileInView={{ scale: 1 }}
                 viewport={{ once: true }}
                 transition={{ type: "spring", delay: 0.2 }}
@@ -1118,7 +1118,7 @@ export default function LandingPage() {
                   <Sparkles className="h-5 w-5 text-white" />
                 </div>
                 <span className="font-display text-xl font-bold text-surface-900 dark:text-surface-100">
-                  SmartCareer
+                  CareerUZ
                 </span>
               </Link>
               <p className="mt-4 text-sm text-surface-500 dark:text-surface-400">
@@ -1206,7 +1206,7 @@ export default function LandingPage() {
           {/* Bottom */}
           <div className="mt-12 flex flex-col items-center justify-between gap-4 border-t border-surface-200 pt-8 md:flex-row dark:border-surface-700">
             <p className="text-sm text-surface-500 dark:text-surface-400">
-              © {new Date().getFullYear()} SmartCareer AI. {t("landing.footer.rights")}
+              © {new Date().getFullYear()} CareerUZ. {t("landing.footer.rights")}
             </p>
             <div className="flex gap-4">
               <Link

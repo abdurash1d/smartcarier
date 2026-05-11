@@ -1,4 +1,4 @@
-# 🚀 DEPLOYMENT CHECKLIST - SmartCareer AI
+# 🚀 DEPLOYMENT CHECKLIST - CareerUZ
 
 **Production Deployment Guide**  
 **Auto-generated:** 2026-01-19
@@ -165,7 +165,7 @@ railway up
 # Application
 DEBUG=False
 SECRET_KEY=<generate-new-64-char-key>
-APP_NAME=SmartCareer AI
+APP_NAME=CareerUZ
 APP_VERSION=1.0.0
 
 # Database (Railway provides this)

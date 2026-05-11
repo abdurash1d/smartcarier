@@ -221,6 +221,13 @@ function healthClass(status?: string) {
   return "bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300";
 }
 
+function healthBorderClass(status?: string) {
+  const s = (status || "warning").toLowerCase();
+  if (s === "healthy") return "before:bg-emerald-500";
+  if (s === "unhealthy") return "before:bg-red-500";
+  return "before:bg-amber-500";
+}
+
 function healthIcon(status?: string) {
   const s = (status || "warning").toLowerCase();
   if (s === "healthy") return CheckCircle2;
@@ -228,26 +235,69 @@ function healthIcon(status?: string) {
   return AlertTriangle;
 }
 
-function MetricCard({ title, value, subtitle, icon: Icon, accent, trend }: { title: string; value: string | number; subtitle: string; icon: React.ElementType; accent: string; trend?: string; }) {
+type MetricColor = "blue" | "emerald" | "violet" | "amber";
+
+const METRIC_PALETTE: Record<MetricColor, { bar: string; iconBg: string; iconText: string }> = {
+  blue: {
+    bar: "bg-gradient-to-r from-blue-500 to-cyan-500",
+    iconBg: "bg-blue-100 dark:bg-blue-500/20",
+    iconText: "text-blue-700 dark:text-blue-300",
+  },
+  emerald: {
+    bar: "bg-gradient-to-r from-emerald-500 to-teal-500",
+    iconBg: "bg-emerald-100 dark:bg-emerald-500/20",
+    iconText: "text-emerald-700 dark:text-emerald-300",
+  },
+  violet: {
+    bar: "bg-gradient-to-r from-violet-500 to-purple-500",
+    iconBg: "bg-violet-100 dark:bg-violet-500/20",
+    iconText: "text-violet-700 dark:text-violet-300",
+  },
+  amber: {
+    bar: "bg-gradient-to-r from-amber-500 to-orange-500",
+    iconBg: "bg-amber-100 dark:bg-amber-500/20",
+    iconText: "text-amber-700 dark:text-amber-300",
+  },
+};
+
+function MetricCard({ title, value, subtitle, icon: Icon, color, trend }: { title: string; value: string | number; subtitle: string; icon: React.ElementType; color: MetricColor; trend?: string; }) {
+  const palette = METRIC_PALETTE[color];
   return (
-    <Card className="overflow-hidden">
+    <Card className="group relative overflow-hidden transition-all hover:-translate-y-0.5 hover:shadow-lg">
+      <div className={cn("absolute inset-x-0 top-0 h-1", palette.bar)} />
       <CardContent className="relative p-6">
         <div className="flex items-start justify-between gap-4">
-          <div>
-            <p className="text-sm font-medium text-surface-500">{title}</p>
-            <p className="mt-2 text-3xl font-bold text-surface-900 dark:text-white">{value}</p>
+          <div className="min-w-0 flex-1">
+            <p className="text-xs font-semibold uppercase tracking-wider text-surface-500">{title}</p>
+            <p className="mt-3 font-display text-3xl font-bold text-surface-900 dark:text-white">{value}</p>
             <p className="mt-1 text-xs text-surface-500">{subtitle}</p>
-            {trend && <p className="mt-3 inline-flex items-center gap-1 rounded-full bg-surface-100 px-2.5 py-1 text-xs font-medium text-surface-700 dark:bg-surface-700 dark:text-surface-200"><TrendingUp className="h-3.5 w-3.5" />{trend}</p>}
+            {trend && (
+              <div className="mt-4 inline-flex items-center gap-1.5 rounded-full bg-surface-50 px-2.5 py-1 text-xs font-medium text-surface-700 ring-1 ring-inset ring-surface-200 dark:bg-surface-900/50 dark:text-surface-200 dark:ring-surface-700">
+                <TrendingUp className="h-3 w-3 text-emerald-600 dark:text-emerald-400" />
+                {trend}
+              </div>
+            )}
           </div>
-          <div className={cn("rounded-2xl p-3", accent)}><Icon className="h-6 w-6" /></div>
+          <div className={cn("flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-2xl ring-1 ring-inset ring-surface-200 dark:ring-surface-700", palette.iconBg)}>
+            <Icon className={cn("h-5 w-5", palette.iconText)} />
+          </div>
         </div>
       </CardContent>
     </Card>
   );
 }
 
-function SectionTitle({ eyebrow, title, description }: { eyebrow: string; title: string; description: string; }) {
-  return <div className="max-w-3xl"><p className="text-sm font-semibold uppercase tracking-[0.2em] text-brand-600">{eyebrow}</p><h2 className="mt-2 font-display text-2xl font-bold text-surface-900 dark:text-white">{title}</h2><p className="mt-2 text-sm text-surface-500">{description}</p></div>;
+function SectionTitle({ eyebrow, title, description, icon: Icon }: { eyebrow: string; title: string; description: string; icon?: React.ElementType; }) {
+  return (
+    <div className="max-w-3xl">
+      <div className="flex items-center gap-2">
+        {Icon && <Icon className="h-4 w-4 text-brand-600 dark:text-brand-400" />}
+        <p className="text-xs font-bold uppercase tracking-[0.2em] text-brand-600 dark:text-brand-400">{eyebrow}</p>
+      </div>
+      <h2 className="mt-2 font-display text-2xl font-bold tracking-tight text-surface-900 dark:text-white">{title}</h2>
+      <p className="mt-1.5 text-sm text-surface-500 dark:text-surface-400">{description}</p>
+    </div>
+  );
 }
 
 export default function AdminDashboardPage() {
@@ -302,7 +352,7 @@ export default function AdminDashboardPage() {
       value: data.dashboard?.overview.total_users ?? 0,
       subtitle: copy.totalUsersSubtitle,
       icon: Users,
-      accent: "bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-300",
+      color: "blue" as MetricColor,
       trend: data.userStats ? copy.activeTrend(data.userStats.users.active_last_7_days) : undefined,
     },
     {
@@ -310,21 +360,21 @@ export default function AdminDashboardPage() {
       value: data.dashboard?.overview.new_users_today ?? 0,
       subtitle: copy.newUsersTodaySubtitle,
       icon: UserCheck,
-      accent: "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300",
+      color: "emerald" as MetricColor,
     },
     {
       title: copy.contentTotalsMetric,
       value: data.dashboard ? `${data.dashboard.overview.total_jobs} / ${data.dashboard.overview.total_resumes} / ${data.dashboard.overview.total_applications}` : "0 / 0 / 0",
       subtitle: copy.contentVolume,
       icon: BarChart3,
-      accent: "bg-violet-100 text-violet-700 dark:bg-violet-500/20 dark:text-violet-300",
+      color: "violet" as MetricColor,
     },
     {
       title: copy.errorsLast24h,
       value: data.dashboard?.errors.total_24h ?? data.errorStats?.total_errors ?? 0,
       subtitle: copy.monitoringSignal,
       icon: AlertTriangle,
-      accent: "bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300",
+      color: "amber" as MetricColor,
     },
   ], [copy, data.dashboard, data.errorStats, data.userStats]);
 
@@ -363,17 +413,28 @@ export default function AdminDashboardPage() {
 
   return (
     <motion.div variants={containerVariants} initial="hidden" animate="visible" className="space-y-8">
-      <motion.section variants={itemVariants} className="overflow-hidden rounded-[2rem] border border-surface-200 bg-[radial-gradient(circle_at_top_left,_rgba(59,130,246,0.18),_transparent_32%),linear-gradient(135deg,_rgba(15,23,42,0.96),_rgba(30,41,59,0.92))] p-6 text-white shadow-2xl dark:border-surface-700 sm:p-8">
-        <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
+      <motion.section variants={itemVariants} className="relative overflow-hidden rounded-3xl border border-surface-200 bg-white p-6 shadow-sm dark:border-surface-700 dark:bg-surface-900 sm:p-8">
+        {/* Decorative accent blob */}
+        <div className="pointer-events-none absolute -right-16 -top-16 h-72 w-72 rounded-full bg-gradient-to-br from-brand-500/15 via-cyan-500/10 to-transparent blur-3xl" aria-hidden />
+        <div className="pointer-events-none absolute -bottom-20 -left-20 h-64 w-64 rounded-full bg-gradient-to-tr from-violet-500/10 via-transparent to-transparent blur-3xl" aria-hidden />
+
+        <div className="relative flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
           <div className="max-w-3xl">
-            <div className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs font-medium text-white/80 backdrop-blur"><Shield className="h-3.5 w-3.5" />{copy.heroBadge}</div>
-            <h1 className="mt-4 font-display text-3xl font-bold tracking-tight sm:text-4xl">{copy.heroTitle}</h1>
-            <p className="mt-3 max-w-2xl text-sm text-white/75 sm:text-base">{copy.heroDescription}</p>
+            <div className="inline-flex items-center gap-2 rounded-full border border-brand-200 bg-brand-50 px-3 py-1 text-xs font-semibold text-brand-700 dark:border-brand-500/30 dark:bg-brand-500/10 dark:text-brand-300">
+              <Shield className="h-3.5 w-3.5" />
+              {copy.heroBadge}
+              <span className="ml-1 inline-flex h-1.5 w-1.5 rounded-full bg-emerald-500 shadow-[0_0_0_3px_rgba(16,185,129,0.2)] motion-safe:animate-pulse" aria-hidden />
+            </div>
+            <h1 className="mt-4 font-display text-3xl font-bold tracking-tight text-surface-900 dark:text-white sm:text-4xl">{copy.heroTitle}</h1>
+            <p className="mt-3 max-w-2xl text-sm text-surface-600 dark:text-surface-400 sm:text-base">{copy.heroDescription}</p>
           </div>
-          <div className="flex flex-wrap gap-3">
-            <Button variant="outline" onClick={() => void loadAdminData(true)} className="border-white/20 bg-white/10 text-white hover:bg-white/15"><RefreshCw className={cn("mr-2 h-4 w-4", refreshing && "animate-spin")} />{copy.refreshData}</Button>
-            <Link href="#errors"><Button className="bg-white text-slate-900 hover:bg-slate-100">{copy.jumpToErrors}<ArrowRight className="ml-2 h-4 w-4" /></Button></Link>
-            <Link href="/admin/users"><Button variant="outline" className="border-white/20 bg-white/10 text-white hover:bg-white/15"><Users className="mr-2 h-4 w-4" />{copy.users}</Button></Link>
+          <div className="flex flex-wrap gap-2">
+            <Button variant="outline" onClick={() => void loadAdminData(true)}>
+              <RefreshCw className={cn("mr-2 h-4 w-4", refreshing && "animate-spin")} />
+              {copy.refreshData}
+            </Button>
+            <Link href="#errors"><Button>{copy.jumpToErrors}<ArrowRight className="ml-2 h-4 w-4" /></Button></Link>
+            <Link href="/admin/users"><Button variant="outline"><Users className="mr-2 h-4 w-4" />{copy.users}</Button></Link>
           </div>
         </div>
       </motion.section>
@@ -383,7 +444,7 @@ export default function AdminDashboardPage() {
       <motion.section variants={itemVariants} id={sectionIds.overview} className="space-y-4 scroll-mt-24">
           <SectionTitle eyebrow={copy.overview} title={copy.overviewTitle} description={copy.overviewDescription} />
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          {loadState === "loading" ? Array.from({ length: 4 }).map((_, index) => <Skeleton key={index} className="h-36 rounded-2xl" />) : overviewCards.map((card) => <MetricCard key={card.title} title={card.title} value={card.value} subtitle={card.subtitle} icon={card.icon} accent={card.accent} trend={card.trend} />)}
+          {loadState === "loading" ? Array.from({ length: 4 }).map((_, index) => <Skeleton key={index} className="h-36 rounded-2xl" />) : overviewCards.map((card) => <MetricCard key={card.title} title={card.title} value={card.value} subtitle={card.subtitle} icon={card.icon} color={card.color} trend={card.trend} />)}
         </div>
       </motion.section>
 
@@ -402,32 +463,33 @@ export default function AdminDashboardPage() {
                 const badge = healthClass(item.details.status);
 
                 return (
-                  <Card key={item.key}>
+                  <Card key={item.key} className={cn("relative overflow-hidden before:absolute before:inset-y-0 before:left-0 before:w-1", healthBorderClass(item.details.status))}>
                     <CardContent className="p-5">
                       <div className="flex items-start justify-between gap-4">
-                        <div>
+                        <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-2">
-                            <CategoryIcon className="h-4 w-4 text-surface-500" />
-                            <p className="text-sm font-medium text-surface-500">{item.label}</p>
+                            <CategoryIcon className="h-4 w-4 text-surface-500 dark:text-surface-400" />
+                            <p className="text-xs font-semibold uppercase tracking-wider text-surface-500 dark:text-surface-400">{item.label}</p>
                           </div>
-                          <p className="mt-2 text-lg font-semibold text-surface-900 dark:text-white">
+                          <p className="mt-2 font-display text-lg font-semibold text-surface-900 dark:text-white">
                             {copy.status[String(item.details.status || "warning").toLowerCase() as keyof typeof copy.status] || String(item.details.status)}
                           </p>
-                          <div className="mt-2 flex flex-wrap gap-2 text-xs text-surface-500">
+                          <div className="mt-3 flex flex-wrap gap-1.5 text-xs">
                             {Object.entries(item.details)
                               .filter(([key]) => key !== "status")
                               .slice(0, 3)
                               .map(([key, value]) => (
                                 <span
                                   key={key}
-                                  className="rounded-full bg-surface-100 px-2 py-1 dark:bg-surface-700"
+                                  className="inline-flex items-center gap-1 rounded-md bg-surface-50 px-2 py-1 font-medium text-surface-600 ring-1 ring-inset ring-surface-200 dark:bg-surface-900/60 dark:text-surface-300 dark:ring-surface-700"
                                 >
-                                  {key.replace(/_/g, " ")}: {String(value)}
+                                  <span className="text-surface-400 dark:text-surface-500">{key.replace(/_/g, " ")}:</span>
+                                  <span className="text-surface-900 dark:text-white">{String(value)}</span>
                                 </span>
                               ))}
                           </div>
                         </div>
-                        <div className={cn("rounded-2xl p-3", badge)}>
+                        <div className={cn("flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-2xl", badge)}>
                           <StatusIcon className="h-5 w-5" />
                         </div>
                       </div>
@@ -484,21 +546,49 @@ export default function AdminDashboardPage() {
               <Badge variant="warning">{data.dashboard?.errors.total_24h ?? data.errorStats?.total_errors ?? 0} / 24h</Badge>
             </CardHeader>
             <CardContent>
-              {loadState === "loading" ? <div className="space-y-3">{Array.from({ length: 5 }).map((_, index) => <Skeleton key={index} className="h-20 rounded-xl" />)}</div> : data.errors.length === 0 ? <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-surface-200 py-12 text-center dark:border-surface-700"><CheckCircle2 className="h-10 w-10 text-green-600" /><p className="mt-3 font-medium text-surface-900 dark:text-white">{copy.noErrors}</p><p className="mt-1 text-sm text-surface-500">{copy.noErrorsDescription}</p></div> : (
+              {loadState === "loading" ? <div className="space-y-3">{Array.from({ length: 5 }).map((_, index) => <Skeleton key={index} className="h-20 rounded-xl" />)}</div> : data.errors.length === 0 ? (
+                <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-surface-200 py-14 text-center dark:border-surface-700">
+                  <div className="flex h-14 w-14 items-center justify-center rounded-full bg-emerald-100 ring-8 ring-emerald-50 dark:bg-emerald-500/20 dark:ring-emerald-500/5">
+                    <CheckCircle2 className="h-7 w-7 text-emerald-600 dark:text-emerald-400" />
+                  </div>
+                  <p className="mt-4 font-display text-lg font-semibold text-surface-900 dark:text-white">{copy.noErrors}</p>
+                  <p className="mt-1 max-w-xs text-sm text-surface-500">{copy.noErrorsDescription}</p>
+                </div>
+              ) : (
                 <div className="overflow-hidden rounded-2xl border border-surface-200 dark:border-surface-700">
-                  <div className="grid grid-cols-[1.1fr_1fr_0.8fr_0.8fr_0.8fr] gap-3 border-b border-surface-200 bg-surface-50 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-surface-500 dark:border-surface-700 dark:bg-surface-900/60">
+                  <div className="grid grid-cols-[1.1fr_1fr_0.8fr_0.8fr_0.8fr] gap-3 border-b border-surface-200 bg-surface-50/80 px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-surface-500 dark:border-surface-700 dark:bg-surface-900/60 dark:text-surface-400">
                     <span>{copy.time}</span><span>{copy.error}</span><span>{copy.severity}</span><span>{copy.endpoint}</span><span>{copy.action}</span>
                   </div>
                   <div className="divide-y divide-surface-200 dark:divide-surface-700">
-                    {data.errors.map((errorItem) => (
-                      <div key={errorItem.id} className="grid grid-cols-[1.1fr_1fr_0.8fr_0.8fr_0.8fr] gap-3 px-4 py-4 text-sm">
-                        <div><p className="font-medium text-surface-900 dark:text-white">{formatRelativeTime(errorItem.timestamp)}</p><p className="mt-1 text-xs text-surface-500">{errorItem.category}</p></div>
-                        <div className="min-w-0"><p className="truncate font-medium text-surface-900 dark:text-white">{errorItem.error_type}</p><p className="mt-1 max-h-10 overflow-hidden text-xs text-surface-500">{errorItem.error_message}</p></div>
-                        <div><Badge variant={errorItem.severity === "critical" ? "error" : errorItem.severity === "warning" ? "warning" : "secondary"}>{errorItem.severity}</Badge></div>
-                        <div className="min-w-0 text-surface-500"><p className="truncate">{errorItem.endpoint || errorItem.path || copy.unknown}</p><p className="mt-1 text-xs">{errorItem.method || "-"}</p></div>
-                        <div className="flex items-center gap-2"><Button variant="outline" size="sm" onClick={() => openResolveDialog(errorItem)}>{copy.resolve}</Button><Badge variant={errorItem.resolved ? "success" : "warning"}>{errorItem.resolved ? copy.resolved : copy.open}</Badge></div>
-                      </div>
-                    ))}
+                    {data.errors.map((errorItem) => {
+                      const dot = errorItem.severity === "critical" ? "bg-red-500" : errorItem.severity === "warning" ? "bg-amber-500" : "bg-surface-400";
+                      return (
+                        <div key={errorItem.id} className="grid grid-cols-[1.1fr_1fr_0.8fr_0.8fr_0.8fr] items-start gap-3 px-4 py-4 text-sm transition-colors hover:bg-surface-50 dark:hover:bg-surface-900/40">
+                          <div>
+                            <p className="font-medium text-surface-900 dark:text-white">{formatRelativeTime(errorItem.timestamp, locale)}</p>
+                            <p className="mt-1 text-xs text-surface-500">{errorItem.category}</p>
+                          </div>
+                          <div className="min-w-0">
+                            <p className="truncate font-medium text-surface-900 dark:text-white">{errorItem.error_type}</p>
+                            <p className="mt-1 line-clamp-2 text-xs text-surface-500">{errorItem.error_message}</p>
+                          </div>
+                          <div>
+                            <Badge variant={errorItem.severity === "critical" ? "error" : errorItem.severity === "warning" ? "warning" : "secondary"} className="gap-1.5">
+                              <span className={cn("inline-block h-1.5 w-1.5 rounded-full", dot)} />
+                              {errorItem.severity}
+                            </Badge>
+                          </div>
+                          <div className="min-w-0 text-surface-500">
+                            <p className="truncate font-mono text-xs">{errorItem.endpoint || errorItem.path || copy.unknown}</p>
+                            <p className="mt-1 text-xs">{errorItem.method || "-"}</p>
+                          </div>
+                          <div className="flex flex-col items-start gap-1.5">
+                            <Button variant="outline" size="sm" onClick={() => openResolveDialog(errorItem)}>{copy.resolve}</Button>
+                            <Badge variant={errorItem.resolved ? "success" : "warning"}>{errorItem.resolved ? copy.resolved : copy.open}</Badge>
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               )}

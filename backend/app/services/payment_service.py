@@ -15,7 +15,7 @@ Xususiyatlari:
 - Payment status tracking
 - Refund support
 
-AUTHOR: SmartCareer AI Team
+AUTHOR: CareerUZ Team
 VERSION: 1.0.0
 =============================================================================
 """
@@ -817,8 +817,8 @@ class PaymentService:
         Critical security measure to prevent fake webhooks.
         """
         if not self.stripe_webhook_secret:
-            logger.warning("Stripe webhook secret not configured")
-            return settings.DEBUG  # only allow skipping in dev
+            logger.error("Stripe webhook secret not configured — rejecting webhook")
+            return False
         
         try:
             # Extract timestamp and signature
@@ -1035,7 +1035,7 @@ SUBSCRIPTION_PRICING = {
     },
     SubscriptionTier.ENTERPRISE: {
         "price": "custom",  # Kelishuv asosida
-        "contact": "enterprise@smartcareer.uz",
+        "contact": "enterprise@careeruz.uz",
         "features": [
             "Everything in Premium",
             "Unlimited auto-apply",

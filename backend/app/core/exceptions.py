@@ -3,7 +3,7 @@
 CUSTOM EXCEPTIONS
 =============================================================================
 
-Custom exception classes for the SmartCareer AI application.
+Custom exception classes for the CareerUZ application.
 """
 
 from typing import Any, Dict, Optional

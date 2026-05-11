@@ -10,6 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
+import { UserAvatar } from "@/components/ui/avatar";
 import { formatRelativeTime } from "@/lib/utils";
 import { useTranslation } from "@/hooks/useTranslation";
 
@@ -179,11 +180,16 @@ export default function AdminUsersPage() {
 
   return (
     <div className="space-y-6">
-      <section className="rounded-3xl border border-surface-200 bg-white p-6 dark:border-surface-700 dark:bg-surface-900">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+      <section className="relative overflow-hidden rounded-3xl border border-surface-200 bg-white p-6 shadow-sm dark:border-surface-700 dark:bg-surface-900">
+        <div className="pointer-events-none absolute -right-16 -top-16 h-64 w-64 rounded-full bg-gradient-to-br from-blue-500/15 via-cyan-500/10 to-transparent blur-3xl" aria-hidden />
+        <div className="relative flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div>
-            <h1 className="font-display text-3xl font-bold text-surface-900 dark:text-white">{c.title}</h1>
-            <p className="mt-2 text-sm text-surface-500">{c.subtitle}</p>
+            <div className="inline-flex items-center gap-2 rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700 dark:border-blue-500/30 dark:bg-blue-500/10 dark:text-blue-300">
+              <Users className="h-3.5 w-3.5" />
+              {c.users}
+            </div>
+            <h1 className="mt-3 font-display text-3xl font-bold tracking-tight text-surface-900 dark:text-white">{c.title}</h1>
+            <p className="mt-1.5 text-sm text-surface-500 dark:text-surface-400">{c.subtitle}</p>
           </div>
           <Button variant="outline" onClick={() => void handleRefresh()}>
             <RefreshCw className={`mr-2 h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
@@ -191,7 +197,7 @@ export default function AdminUsersPage() {
           </Button>
         </div>
 
-        <div className="mt-5 grid gap-3 lg:grid-cols-[1.4fr_0.7fr_0.7fr_auto]">
+        <div className="relative mt-6 grid gap-3 lg:grid-cols-[1.4fr_0.7fr_0.7fr_auto]">
           <div className="flex gap-2">
             <Input
               value={searchDraft}
@@ -276,25 +282,31 @@ export default function AdminUsersPage() {
               ))}
             </div>
           ) : users.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-surface-200 py-12 text-center dark:border-surface-700">
-              <p className="font-medium text-surface-900 dark:text-white">{c.noUsers}</p>
-              <p className="mt-1 text-sm text-surface-500">{c.tryAnother}</p>
+            <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-surface-200 py-14 text-center dark:border-surface-700">
+              <div className="flex h-14 w-14 items-center justify-center rounded-full bg-surface-100 ring-8 ring-surface-50 dark:bg-surface-800 dark:ring-surface-900/40">
+                <Search className="h-7 w-7 text-surface-400" />
+              </div>
+              <p className="mt-4 font-display text-lg font-semibold text-surface-900 dark:text-white">{c.noUsers}</p>
+              <p className="mt-1 max-w-xs text-sm text-surface-500">{c.tryAnother}</p>
             </div>
           ) : (
-            <div className="space-y-3">
+            <div className="space-y-2.5">
               {users.map((user) => {
                 const isSaving = savingId === user.id;
                 return (
                   <div
                     key={user.id}
-                    className="grid gap-3 rounded-xl border border-surface-200 p-4 dark:border-surface-700 lg:grid-cols-[1.4fr_0.8fr_0.9fr_auto]"
+                    className="grid gap-3 rounded-xl border border-surface-200 bg-white p-4 transition-colors hover:border-brand-300 dark:border-surface-700 dark:bg-surface-800 dark:hover:border-brand-500/40 lg:grid-cols-[1.6fr_0.8fr_0.9fr_auto]"
                   >
-                    <div>
-                      <p className="font-semibold text-surface-900 dark:text-white">{user.full_name}</p>
-                      <p className="text-sm text-surface-500">{user.email}</p>
-                      <div className="mt-1 text-xs text-surface-500">
-                        <p>{c.createdAt}: {formatRelativeTime(user.created_at)}</p>
-                        <p>{c.lastLogin}: {user.last_login ? formatRelativeTime(user.last_login) : c.never}</p>
+                    <div className="flex items-start gap-3 min-w-0">
+                      <UserAvatar name={user.full_name} size="md" />
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate font-semibold text-surface-900 dark:text-white">{user.full_name}</p>
+                        <p className="truncate text-sm text-surface-500">{user.email}</p>
+                        <div className="mt-1 grid grid-cols-1 gap-x-3 text-xs text-surface-500 sm:grid-cols-2">
+                          <p className="truncate">{c.createdAt}: <span className="font-medium text-surface-700 dark:text-surface-300">{formatRelativeTime(user.created_at, locale)}</span></p>
+                          <p className="truncate">{c.lastLogin}: <span className="font-medium text-surface-700 dark:text-surface-300">{user.last_login ? formatRelativeTime(user.last_login, locale) : c.never}</span></p>
+                        </div>
                       </div>
                     </div>
 
@@ -347,7 +359,7 @@ export default function AdminUsersPage() {
                 {loadingMore ? (
                   <>
                     <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
-                    {c.saving}
+                    {c.loadMore}
                   </>
                 ) : (
                   c.loadMore

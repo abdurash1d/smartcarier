@@ -1,6 +1,7 @@
 import { request } from '@playwright/test';
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
+import { existsSync } from 'node:fs';
 import path from 'node:path';
 
 type Json = Record<string, any>;
@@ -35,7 +36,7 @@ function resolveSeedSecretKey(): string {
 
   // Deterministic across the same repo/branch context while avoiding weak defaults.
   const deterministicSeed = [
-    'smartcareer-e2e-admin-seed-secret-v1',
+    'careeruz-e2e-admin-seed-secret-v1',
     process.env.GITHUB_REPOSITORY || '',
     process.env.GITHUB_REF || '',
     ROOT_DIR,
@@ -58,7 +59,7 @@ sys.path.insert(0, ".")
 from app.config import settings
 from app.models.user import User
 
-ADMIN_EMAIL = "admin@smartcareer.uz"
+ADMIN_EMAIL = "admin@careeruz.uz"
 ADMIN_ROLE_VALUE = "admin"
 ADMIN_SUB_ROLE_VALUE = "super_admin"
 
@@ -177,27 +178,41 @@ finally:
 
   const isCi = Boolean(process.env.CI) || process.env.GITHUB_ACTIONS === 'true';
   const candidateDatabaseUrls = isCi
-    ? [process.env.DATABASE_URL || 'postgresql://test:test@localhost:5432/smartcareer_test']
-    : [process.env.DATABASE_URL || 'sqlite:///./smartcareer.db'];
+    ? [process.env.DATABASE_URL || 'postgresql://test:test@localhost:5432/careeruz_test']
+    : [process.env.DATABASE_URL || 'sqlite:///./careeruz.db'];
 
   let lastError: unknown = null;
   const seedSecretKey = resolveSeedSecretKey();
+  const candidatePythonBinaries = [
+    process.env.PYTHON,
+    path.join(BACKEND_DIR, '.venv311-mac', 'bin', 'python'),
+    path.join(BACKEND_DIR, '.venv', 'bin', 'python'),
+    'python',
+    'python3',
+  ].filter((value): value is string => Boolean(value));
 
   for (const databaseUrl of candidateDatabaseUrls) {
-    try {
-      execFileSync('python', ['-X', 'utf8', '-c', script], {
-        cwd: BACKEND_DIR,
-        stdio: 'pipe',
-        env: {
-          ...process.env,
-          DATABASE_URL: databaseUrl,
-          SECRET_KEY: seedSecretKey,
-          PYTHONUTF8: '1',
-        },
-      });
-      return;
-    } catch (error) {
-      lastError = error;
+    for (const pythonBinary of candidatePythonBinaries) {
+      // Skip local absolute paths that do not exist on this machine.
+      if (pythonBinary.includes(path.sep) && !existsSync(pythonBinary)) {
+        continue;
+      }
+
+      try {
+        execFileSync(pythonBinary, ['-X', 'utf8', '-c', script], {
+          cwd: BACKEND_DIR,
+          stdio: 'pipe',
+          env: {
+            ...process.env,
+            DATABASE_URL: databaseUrl,
+            SECRET_KEY: seedSecretKey,
+            PYTHONUTF8: '1',
+          },
+        });
+        return;
+      } catch (error) {
+        lastError = error;
+      }
     }
   }
 

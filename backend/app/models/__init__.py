@@ -1,6 +1,6 @@
 """
 =============================================================================
-DATABASE MODELS PACKAGE - SmartCareer AI
+DATABASE MODELS PACKAGE - CareerUZ
 =============================================================================
 
 This package contains all SQLAlchemy ORM models for the application.
@@ -95,7 +95,7 @@ user.soft_delete()
 user.restore()
 
 =============================================================================
-AUTHOR: SmartCareer AI Team
+AUTHOR: CareerUZ Team
 VERSION: 1.0.0
 =============================================================================
 """
@@ -217,4 +217,4 @@ __all__ = [
 # =============================================================================
 
 __version__ = "1.0.0"
-__author__ = "SmartCareer AI Team"
+__author__ = "CareerUZ Team"

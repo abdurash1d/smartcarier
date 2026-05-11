@@ -10,7 +10,7 @@ Tests for authentication endpoints:
 - Password reset
 - Rate limiting
 
-AUTHOR: SmartCareer AI Team
+AUTHOR: CareerUZ Team
 VERSION: 1.0.0
 =============================================================================
 """

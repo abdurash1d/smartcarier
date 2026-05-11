@@ -24,7 +24,7 @@ ERROR CODES:
     500 - Internal Server Error
 
 =============================================================================
-AUTHOR: SmartCareer AI Team
+AUTHOR: CareerUZ Team
 VERSION: 1.0.0
 =============================================================================
 """
@@ -39,7 +39,7 @@ import uuid as uuid_module
 import re
 from typing import Optional, List, Dict, Any
 from uuid import UUID
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from enum import Enum
 
 from fastapi import APIRouter, Depends, HTTPException, status, Query, Request
@@ -58,9 +58,10 @@ from app.core.dependencies import (
 )
 from app.core.premium import get_premium_user, get_feature_limit
 from app.models import (
-    User, Job, Resume, Application, 
+    User, Job, Resume, Application,
     ApplicationStatus, JobStatus, UserRole, ResumeStatus
 )
+from app.services import job_matching
 
 try:
     from app.services.email_service import email_service
@@ -320,7 +321,8 @@ class ApplicationData(BaseModel):
     status: str
     cover_letter: Optional[str]
     match_score: Optional[str]
-    
+    match_breakdown: Optional[Dict[str, Any]] = None
+
     applied_at: datetime
     reviewed_at: Optional[datetime]
     interview_at: Optional[datetime]
@@ -409,7 +411,8 @@ def application_to_data(
     include_job: bool = False,
     include_resume: bool = False,
     include_applicant: bool = False,
-    include_notes: bool = False
+    include_notes: bool = False,
+    include_breakdown: bool = False,
 ) -> ApplicationData:
     """Convert Application model to ApplicationData."""
     
@@ -467,6 +470,7 @@ def application_to_data(
         resume=resume_data,
         applicant=applicant_data,
         notes=app.notes if include_notes else None,
+        match_breakdown=app.match_breakdown if include_breakdown else None,
     )
 
 
@@ -695,17 +699,29 @@ async def apply_to_job(
             )
         
         # =====================================================================
+        # COMPUTE MATCH SCORE — snapshot at application time so HR sees the
+        # same numbers the candidate did, even if the resume is edited later.
+        # =====================================================================
+        try:
+            breakdown = job_matching.score_resume_against_job(resume.content, job)
+        except Exception as match_err:  # pragma: no cover — never block apply on scoring
+            logger.warning(f"[{request_id}] Match scoring failed: {match_err}")
+            breakdown = None
+
+        # =====================================================================
         # CREATE APPLICATION
         # =====================================================================
-        
+
         application = Application(
             job_id=job.id,
             user_id=student.id,
             resume_id=resume.id,
             cover_letter=request.cover_letter,
             status=ApplicationStatus.PENDING.value,
+            match_score=f"{breakdown['score']:.0f}%" if breakdown else None,
+            match_breakdown=breakdown,
         )
-        
+
         db.add(application)
         
         # Increment job application count
@@ -929,13 +945,16 @@ async def get_application(
     # Determine what to include based on viewer
     include_applicant = is_job_owner or is_admin
     include_notes = is_job_owner or is_admin
-    
+    # Applicants see their own breakdown (transparency); HR sees it too.
+    include_breakdown = is_applicant or is_job_owner or is_admin
+
     app_data = application_to_data(
         application,
         include_job=True,
         include_resume=True,
         include_applicant=include_applicant,
-        include_notes=include_notes
+        include_notes=include_notes,
+        include_breakdown=include_breakdown,
     )
     
     return create_response(
@@ -1125,12 +1144,240 @@ async def withdraw_application(
     logger.info(f"Application {application.id} withdrawn by user {student.id}")
     
     app_data = application_to_data(application, include_job=True)
-    
+
     return create_response(
         success=True,
         message="Application withdrawn successfully",
         data=app_data.model_dump(),
         start_time=start_time
+    )
+
+
+# =============================================================================
+# HIRING FUNNEL ANALYTICS (COMPANY)
+# =============================================================================
+
+
+@router.get(
+    "/analytics/funnel",
+    response_model=StandardResponse,
+    summary="Hiring funnel analytics for the current company",
+    description="""
+    Aggregates the company's hiring metrics: total jobs/applications/views,
+    funnel by status, conversion rates, top-performing jobs, and recent activity.
+
+    **Access:** Company users only.
+    """,
+)
+async def hiring_funnel_analytics(
+    days: int = Query(30, ge=1, le=365, description="Window for 'recent' metrics"),
+    company: User = Depends(get_current_company),
+    db: Session = Depends(get_db),
+):
+    """Hiring funnel + KPIs for the authenticated company."""
+    start_time = time.time()
+    now = datetime.now(timezone.utc)
+    window_start = now - timedelta(days=days)
+
+    # =====================================================================
+    # JOBS — totals + view aggregation
+    # =====================================================================
+    job_rows = db.query(Job).filter(
+        Job.company_id == company.id,
+        Job.is_deleted == False,
+    ).all()
+    total_jobs = len(job_rows)
+    active_jobs = sum(1 for j in job_rows if j.status == JobStatus.ACTIVE.value)
+    total_views = sum((j.views_count or 0) for j in job_rows)
+    job_ids = [j.id for j in job_rows]
+
+    if not job_ids:
+        empty: Dict[str, Any] = {
+            "totals": {
+                "total_jobs": 0,
+                "active_jobs": 0,
+                "total_applications": 0,
+                "total_views": 0,
+                "avg_match_score": None,
+            },
+            "funnel": {k: 0 for k in (
+                "views", "applications", "reviewing", "shortlisted",
+                "interview", "accepted", "rejected",
+            )},
+            "conversion_rates": {
+                "view_to_apply": 0.0,
+                "apply_to_review": 0.0,
+                "review_to_interview": 0.0,
+                "interview_to_hire": 0.0,
+            },
+            "by_status": [],
+            "top_jobs": [],
+            "recent_activity": {
+                "applications_in_window": 0,
+                "hires_in_window": 0,
+                "window_days": days,
+            },
+        }
+        return create_response(
+            success=True,
+            message="No jobs yet",
+            data=empty,
+            start_time=start_time,
+        )
+
+    # =====================================================================
+    # APPLICATIONS — single aggregated query by status
+    # =====================================================================
+    status_rows = (
+        db.query(Application.status, func.count(Application.id))
+        .filter(Application.job_id.in_(job_ids), Application.is_deleted == False)
+        .group_by(Application.status)
+        .all()
+    )
+    by_status: Dict[str, int] = {status_value: count for status_value, count in status_rows}
+    total_applications = sum(by_status.values())
+
+    reviewing = by_status.get(ApplicationStatus.REVIEWING.value, 0)
+    shortlisted = by_status.get(ApplicationStatus.SHORTLISTED.value, 0)
+    interview = by_status.get(ApplicationStatus.INTERVIEW.value, 0)
+    accepted = by_status.get(ApplicationStatus.ACCEPTED.value, 0)
+    rejected = by_status.get(ApplicationStatus.REJECTED.value, 0)
+    # "Reached review or further" — anything past pending.
+    reached_review = reviewing + shortlisted + interview + accepted + rejected
+    reached_interview = interview + accepted
+
+    # =====================================================================
+    # AVG MATCH SCORE — parses "85%" strings from match_score
+    # =====================================================================
+    score_rows = (
+        db.query(Application.match_score)
+        .filter(
+            Application.job_id.in_(job_ids),
+            Application.is_deleted == False,
+            Application.match_score.isnot(None),
+        )
+        .all()
+    )
+    scores: List[float] = []
+    for (raw,) in score_rows:
+        if not raw:
+            continue
+        digits = "".join(ch for ch in raw if ch.isdigit() or ch == ".")
+        try:
+            scores.append(float(digits))
+        except ValueError:
+            continue
+    avg_match_score = round(sum(scores) / len(scores), 1) if scores else None
+
+    # =====================================================================
+    # TOP-PERFORMING JOBS — most applications, with interview count
+    # =====================================================================
+    per_job_rows = (
+        db.query(
+            Application.job_id,
+            Application.status,
+            func.count(Application.id),
+        )
+        .filter(Application.job_id.in_(job_ids), Application.is_deleted == False)
+        .group_by(Application.job_id, Application.status)
+        .all()
+    )
+    per_job: Dict[Any, Dict[str, int]] = {}
+    for job_id, status_value, count in per_job_rows:
+        bucket = per_job.setdefault(job_id, {})
+        bucket[status_value] = count
+
+    top_jobs = []
+    for job in job_rows:
+        bucket = per_job.get(job.id, {})
+        apps_count = sum(bucket.values())
+        if apps_count == 0 and (job.views_count or 0) == 0:
+            continue
+        top_jobs.append(
+            {
+                "id": str(job.id),
+                "title": job.title,
+                "status": job.status,
+                "views": job.views_count or 0,
+                "applications": apps_count,
+                "interview_count": bucket.get(ApplicationStatus.INTERVIEW.value, 0)
+                + bucket.get(ApplicationStatus.ACCEPTED.value, 0),
+                "accepted_count": bucket.get(ApplicationStatus.ACCEPTED.value, 0),
+            }
+        )
+    top_jobs.sort(key=lambda j: (j["applications"], j["views"]), reverse=True)
+    top_jobs = top_jobs[:10]
+
+    # =====================================================================
+    # RECENT ACTIVITY — applications + hires in the requested window
+    # =====================================================================
+    applications_in_window = (
+        db.query(func.count(Application.id))
+        .filter(
+            Application.job_id.in_(job_ids),
+            Application.is_deleted == False,
+            Application.applied_at >= window_start,
+        )
+        .scalar()
+        or 0
+    )
+    hires_in_window = (
+        db.query(func.count(Application.id))
+        .filter(
+            Application.job_id.in_(job_ids),
+            Application.is_deleted == False,
+            Application.status == ApplicationStatus.ACCEPTED.value,
+            Application.decided_at >= window_start,
+        )
+        .scalar()
+        or 0
+    )
+
+    # =====================================================================
+    # CONVERSION RATES
+    # =====================================================================
+    def safe_pct(numerator: int, denominator: int) -> float:
+        if denominator <= 0:
+            return 0.0
+        return round((numerator / denominator) * 100, 1)
+
+    data = {
+        "totals": {
+            "total_jobs": total_jobs,
+            "active_jobs": active_jobs,
+            "total_applications": total_applications,
+            "total_views": total_views,
+            "avg_match_score": avg_match_score,
+        },
+        "funnel": {
+            "views": total_views,
+            "applications": total_applications,
+            "reviewing": reached_review,
+            "shortlisted": shortlisted + interview + accepted,
+            "interview": reached_interview,
+            "accepted": accepted,
+            "rejected": rejected,
+        },
+        "conversion_rates": {
+            "view_to_apply": safe_pct(total_applications, total_views),
+            "apply_to_review": safe_pct(reached_review, total_applications),
+            "review_to_interview": safe_pct(reached_interview, reached_review),
+            "interview_to_hire": safe_pct(accepted, reached_interview),
+        },
+        "by_status": [{"status": k, "count": v} for k, v in sorted(by_status.items())],
+        "top_jobs": top_jobs,
+        "recent_activity": {
+            "applications_in_window": applications_in_window,
+            "hires_in_window": hires_in_window,
+            "window_days": days,
+        },
+    }
+
+    return create_response(
+        success=True,
+        message="Hiring funnel analytics",
+        data=data,
+        start_time=start_time,
     )
 
 
@@ -1303,18 +1550,25 @@ async def auto_apply(
         # CALCULATE SCORES AND RANK
         # =====================================================================
         
-        # Extract resume skills for matching
-        resume_skills = _extract_skills_from_resume(resume.content)
-        
-        scored_jobs = []
+        # Use the shared matching service so candidate and recruiter see identical numbers.
+        resume_skills = job_matching.extract_skills_from_resume(resume.content)
+        resume_experience = job_matching.extract_experience_level(resume.content)
+        resume_keywords = job_matching.extract_keywords(resume.content)
+
+        scored_jobs: list = []
         for job in jobs:
             if job.id in already_applied:
                 continue
-            
-            score = _calculate_job_match_score(resume_skills, resume.content, job)
-            scored_jobs.append((job, score))
+
+            score, matched, missing, reasons = job_matching.calculate_match_score(
+                resume_skills=resume_skills,
+                resume_experience=resume_experience,
+                resume_keywords=resume_keywords,
+                job=job,
+            )
+            scored_jobs.append((job, score, matched, missing, reasons))
         
-        # Sort by score
+        # Sort by score (highest first)
         scored_jobs.sort(key=lambda x: x[1], reverse=True)
         
         # Limit to max_applications
@@ -1331,9 +1585,9 @@ async def auto_apply(
         applications_skipped = 0
         quota_notice_seen = False
 
-        for job, score in scored_jobs:
+        for job, score, matched, missing, reasons in scored_jobs:
             company_name = job.company.company_name or job.company.full_name if job.company else "Unknown"
-            
+
             result = AutoApplyResult(
                 job_id=str(job.id),
                 job_title=job.title,
@@ -1342,7 +1596,7 @@ async def auto_apply(
                 applied=False,
                 message="",
             )
-            
+
             if request.dry_run:
                 result.message = "Dry run - not applied"
                 applications_skipped += 1
@@ -1357,9 +1611,15 @@ async def auto_apply(
                         job_id=job.id,
                         user_id=student.id,
                         resume_id=resume.id,
-                        cover_letter=f"Auto-applied via SmartCareer AI with {score:.0f}% match score.",
+                        cover_letter=f"Auto-applied via CareerUZ with {score:.0f}% match score.",
                         status=ApplicationStatus.PENDING.value,
                         match_score=f"{score:.0f}%",
+                        match_breakdown={
+                            "score": round(score, 1),
+                            "matched_skills": matched,
+                            "missing_skills": missing,
+                            "reasons": reasons,
+                        },
                     )
                     
                     db.add(application)
@@ -1439,14 +1699,14 @@ async def auto_apply(
                 f"Monthly auto-apply quota reached. {applications_submitted} "
                 f"applications submitted."
             )
-        
+
         return create_response(
             success=True,
             message=message,
             data=response_data.model_dump(),
             start_time=start_time
         )
-        
+
     except HTTPException:
         raise
     except Exception as e:
@@ -1455,141 +1715,3 @@ async def auto_apply(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="An error occurred during auto-apply. Please try again."
         )
-
-
-# =============================================================================
-# HELPER FUNCTIONS
-# =============================================================================
-
-def _extract_skills_from_resume(content: Dict[str, Any]) -> List[str]:
-    """Extract normalized terms from resume content."""
-    values: List[str] = []
-    values.extend(_flatten_to_strings(content.get("skills")))
-    values.extend(_flatten_to_strings(content.get("experience")))
-    values.extend(_flatten_to_strings(content.get("work_experience")))
-    values.extend(_flatten_to_strings(content.get("education")))
-    values.extend(_flatten_to_strings(content.get("certifications")))
-    return _normalize_terms(values)
-
-
-def _normalize_text(value: Any) -> str:
-    if value is None:
-        return ""
-    return re.sub(r"\s+", " ", str(value)).strip().lower()
-
-
-def _tokenize_text(value: Any) -> List[str]:
-    normalized = _normalize_text(value)
-    if not normalized:
-        return []
-    return [token for token in re.split(r"[^\w+#./-]+", normalized) if len(token) > 1]
-
-
-def _flatten_to_strings(value: Any) -> List[str]:
-    fragments: List[str] = []
-    if value is None:
-        return fragments
-    if isinstance(value, str):
-        cleaned = _normalize_text(value)
-        if cleaned:
-            fragments.append(cleaned)
-        return fragments
-    if isinstance(value, (int, float, bool)):
-        fragments.append(_normalize_text(value))
-        return fragments
-    if isinstance(value, list):
-        for item in value:
-            fragments.extend(_flatten_to_strings(item))
-        return fragments
-    if isinstance(value, dict):
-        for item in value.values():
-            fragments.extend(_flatten_to_strings(item))
-        return fragments
-    return fragments
-
-
-def _normalize_terms(values: List[str]) -> List[str]:
-    terms: set[str] = set()
-    for value in values:
-        cleaned = _normalize_text(value)
-        if not cleaned:
-            continue
-        terms.add(cleaned)
-        for token in _tokenize_text(cleaned):
-            terms.add(token)
-    return sorted(terms)
-
-
-def _extract_job_requirement_terms(requirements: Any) -> List[str]:
-    requirement_values: List[str] = []
-    if isinstance(requirements, dict):
-        for key in (
-            "skills",
-            "required_skills",
-            "must_have",
-            "nice_to_have",
-            "technologies",
-            "tools",
-            "experience",
-            "education",
-            "certifications",
-            "keywords",
-            "requirements",
-            "responsibilities",
-            "domain",
-            "industry",
-        ):
-            requirement_values.extend(_flatten_to_strings(requirements.get(key)))
-        requirement_values.extend(_flatten_to_strings(requirements))
-    else:
-        requirement_values.extend(_flatten_to_strings(requirements))
-    return _normalize_terms(requirement_values)
-
-
-def _calculate_job_match_score(
-    resume_skills: List[str],
-    resume_content: Dict[str, Any],
-    job: Job
-) -> float:
-    """Calculate match score between resume and job."""
-    score = 0.0
-
-    resume_terms = set(_normalize_terms(resume_skills + _flatten_to_strings(resume_content)))
-    requirement_terms = set(_extract_job_requirement_terms(job.requirements))
-
-    # Requirement coverage (max 60 points)
-    if requirement_terms:
-        matched = {
-            req
-            for req in requirement_terms
-            if any(
-                req == term
-                or req in term
-                or term in req
-                for term in resume_terms
-            )
-        }
-        score += (len(matched) / len(requirement_terms)) * 60
-    else:
-        score += 30
-
-    # Title/domain alignment (max 20 points)
-    job_title_tokens = set(_tokenize_text(job.title))
-    resume_title_tokens = set()
-    for exp in (resume_content.get("experience") or resume_content.get("work_experience") or []):
-        if isinstance(exp, dict):
-            resume_title_tokens.update(
-                _tokenize_text(exp.get("position") or exp.get("job_title") or exp.get("role") or exp.get("title"))
-            )
-    if job_title_tokens & resume_title_tokens:
-        score += 20
-    
-    # Remote bonus (max 10 points)
-    if job.is_remote_allowed:
-        score += 10
-    
-    # Salary visibility bonus (max 10 points)
-    if job.is_salary_visible and job.salary_min:
-        score += 10
-    
-    return min(score, 100)

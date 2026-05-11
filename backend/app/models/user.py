@@ -4,7 +4,7 @@ USER MODEL
 =============================================================================
 
 PURPOSE:
-    Represents user accounts in SmartCareer AI.
+    Represents user accounts in CareerUZ.
     Supports three user types: students (job seekers), companies, and admins.
 
 =============================================================================
@@ -48,7 +48,7 @@ SECURITY FEATURES
    - Validated before hashing
 
 =============================================================================
-AUTHOR: SmartCareer AI Team
+AUTHOR: CareerUZ Team
 VERSION: 1.0.0
 =============================================================================
 """
@@ -241,7 +241,7 @@ class User(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin):
         # Database-level regex constraints are PostgreSQL-specific
         
         # Table comment for documentation
-        {'comment': 'User accounts for SmartCareer AI (students, companies, admins)'}
+        {'comment': 'User accounts for CareerUZ (students, companies, admins)'}
     )
     
     # =========================================================================

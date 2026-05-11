@@ -40,7 +40,7 @@ export default function AuthLayout({
 
         {/* Logo */}
         <motion.div
-          initial={{ opacity: 0, y: -20 }}
+          initial={false}
           animate={{ opacity: 1, y: 0 }}
           className="mb-8"
         >
@@ -49,7 +49,7 @@ export default function AuthLayout({
               <Sparkles className="h-5 w-5 text-white" />
             </div>
             <span className="font-display text-2xl font-bold text-surface-900 dark:text-white">
-              SmartCareer
+              CareerUZ
             </span>
           </Link>
         </motion.div>
@@ -61,12 +61,12 @@ export default function AuthLayout({
 
         {/* Footer */}
         <motion.div
-          initial={{ opacity: 0 }}
+          initial={false}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.5 }}
           className="mt-8 text-center text-sm text-surface-400 dark:text-surface-500"
         >
-          © {new Date().getFullYear()} SmartCareer AI. {t("landing.footer.rights")}
+          © {new Date().getFullYear()} CareerUZ. {t("landing.footer.rights")}
         </motion.div>
       </div>
 
@@ -116,7 +116,7 @@ export default function AuthLayout({
           <div className="max-w-lg">
             {/* Headline */}
             <motion.h2
-              initial={{ opacity: 0, y: 20 }}
+              initial={false}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.2 }}
               className="font-display text-4xl font-bold leading-tight"
@@ -128,7 +128,7 @@ export default function AuthLayout({
             </motion.h2>
 
             <motion.p
-              initial={{ opacity: 0, y: 20 }}
+              initial={false}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.3 }}
               className="mt-4 text-lg text-purple-100"
@@ -138,7 +138,7 @@ export default function AuthLayout({
 
             {/* Features list */}
             <motion.ul
-              initial={{ opacity: 0, y: 20 }}
+              initial={false}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.4 }}
               className="mt-8 space-y-3"
@@ -155,7 +155,7 @@ export default function AuthLayout({
 
             {/* Stats */}
             <motion.div
-              initial={{ opacity: 0, y: 20 }}
+              initial={false}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.5 }}
               className="mt-12 grid grid-cols-3 gap-8"
@@ -176,7 +176,7 @@ export default function AuthLayout({
 
             {/* Testimonial */}
             <motion.div
-              initial={{ opacity: 0, y: 20 }}
+              initial={false}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.6 }}
               className="mt-12 rounded-2xl bg-white/10 p-6 backdrop-blur-sm"

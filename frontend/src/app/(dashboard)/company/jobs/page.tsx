@@ -30,7 +30,7 @@ import { formatRelativeTime, formatSalaryRange } from "@/lib/utils";
 import type { Job } from "@/types/api";
 
 export default function CompanyJobsPage() {
-  const { t } = useTranslation();
+  const { t, locale } = useTranslation();
   const {
     jobs,
     isLoading,
@@ -205,7 +205,7 @@ export default function CompanyJobsPage() {
                       <span>{job.job_type?.replace("_", " ")}</span>
                       <span>{job.experience_level}</span>
                       {job.salary_min !== undefined && job.salary_max !== undefined && (
-                        <span>{formatSalaryRange(job.salary_min, job.salary_max)}</span>
+                        <span>{formatSalaryRange(job.salary_min, job.salary_max, locale)}</span>
                       )}
                     </div>
 
@@ -227,7 +227,7 @@ export default function CompanyJobsPage() {
                       </div>
                       <div className="flex items-center gap-2 text-sm text-surface-500">
                         <Clock className="h-4 w-4" />
-                        {t("companyJobsPage.posted")} {formatRelativeTime(job.created_at)}
+                        {t("companyJobsPage.posted")} {formatRelativeTime(job.created_at, locale)}
                       </div>
                     </div>
                   </div>

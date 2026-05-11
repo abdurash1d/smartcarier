@@ -29,6 +29,7 @@ sys.path.insert(0, '.')
 
 from app.config import settings
 from app.models import User, UserRole, Resume, Job, Application
+from app.models.user import AdminSubRole
 from app.models.base import Base
 
 # =============================================================================
@@ -51,10 +52,11 @@ def seed_users(db):
     # Admin user
     admin = User(
         id=uuid4(),
-        email="admin@smartcareer.uz",
+        email="admin@careeruz.uz",
         full_name="System Admin",
         phone="+998901111111",
         role=UserRole.ADMIN,
+        admin_role=AdminSubRole.SUPER_ADMIN.value,
         # User model maps DB column "is_active" to attribute "is_active_account"
         is_active_account=True,
         is_verified=True,
@@ -121,57 +123,65 @@ def seed_resumes(db, students):
         id=uuid4(),
         user_id=students[0].id,
         title="Senior Python Developer",
-        template="modern",
         status="published",
-        personal_info={
-            "full_name": students[0].full_name,
-            "email": students[0].email,
-            "phone": students[0].phone,
-            "location": "Tashkent, Uzbekistan",
-            "linkedin": "https://linkedin.com/in/johndoe",
-            "github": "https://github.com/johndoe",
+        content={
+            "personal_info": {
+                "name": students[0].full_name,
+                "email": students[0].email,
+                "phone": students[0].phone,
+                "location": "Tashkent, Uzbekistan",
+                "linkedin": "https://linkedin.com/in/johndoe",
+                "github": "https://github.com/johndoe",
+            },
+            "professional_summary": {
+                "text": "Experienced Python developer with 5+ years in backend development, API design, and cloud technologies."
+            },
+            "work_experience": [
+                {
+                    "job_title": "Senior Backend Developer",
+                    "company_name": "TechCorp",
+                    "location": "Tashkent",
+                    "start_date": "2020-01-01",
+                    "end_date": "present",
+                    "is_current": True,
+                    "responsibilities": ["Leading backend team", "Designing scalable APIs", "Mentoring junior developers"],
+                    "technologies_used": ["Python", "FastAPI", "PostgreSQL", "Redis", "Docker"],
+                },
+                {
+                    "job_title": "Python Developer",
+                    "company_name": "StartupHub",
+                    "location": "Remote",
+                    "start_date": "2018-06-01",
+                    "end_date": "2019-12-31",
+                    "is_current": False,
+                    "responsibilities": ["Developed microservices", "Worked with Django and FastAPI"],
+                    "technologies_used": ["Python", "Django", "FastAPI"],
+                },
+            ],
+            "education": [
+                {
+                    "institution_name": "TUIT",
+                    "degree_type": "Bachelor",
+                    "field_of_study": "Computer Science",
+                    "graduation_date": "2018-06-01",
+                    "gpa": "4.5",
+                }
+            ],
+            "skills": {
+                "technical_skills": [
+                    {"category": "Backend", "skills": ["Python", "FastAPI", "Django", "PostgreSQL", "Redis", "Docker", "AWS", "Git"]}
+                ],
+                "soft_skills": ["Communication", "Mentorship"],
+            },
+            "languages": [
+                {"language": "Uzbek", "level": "Native"},
+                {"language": "English", "level": "Professional"},
+                {"language": "Russian", "level": "Fluent"},
+            ],
         },
-        summary="Experienced Python developer with 5+ years in backend development, API design, and cloud technologies.",
-        experience=[
-            {
-                "company": "TechCorp",
-                "position": "Senior Backend Developer",
-                "location": "Tashkent",
-                "start_date": "2020-01-01",
-                "end_date": None,
-                "is_current": True,
-                "description": "Leading backend team, designing scalable APIs, mentoring junior developers",
-            },
-            {
-                "company": "StartupHub",
-                "position": "Python Developer",
-                "location": "Remote",
-                "start_date": "2018-06-01",
-                "end_date": "2019-12-31",
-                "is_current": False,
-                "description": "Developed microservices, worked with Django and FastAPI",
-            },
-        ],
-        education=[
-            {
-                "institution": "TUIT",
-                "degree": "Bachelor",
-                "field": "Computer Science",
-                "location": "Tashkent",
-                "start_date": "2014-09-01",
-                "end_date": "2018-06-01",
-                "gpa": "4.5",
-            }
-        ],
-        skills=["Python", "FastAPI", "Django", "PostgreSQL", "Redis", "Docker", "AWS", "Git"],
-        languages=[
-            {"language": "Uzbek", "level": "Native"},
-            {"language": "English", "level": "Professional"},
-            {"language": "Russian", "level": "Fluent"},
-        ],
+        raw_text="Senior Python Developer | FastAPI | Django | PostgreSQL | Redis | Docker | AWS",
         ats_score=92,
-        views_count=45,
-        downloads_count=12,
+        view_count=45,
     )
     resumes.append(resume1)
     
@@ -180,45 +190,52 @@ def seed_resumes(db, students):
         id=uuid4(),
         user_id=students[1].id,
         title="Full Stack Developer",
-        template="professional",
         status="published",
-        personal_info={
-            "full_name": students[1].full_name,
-            "email": students[1].email,
-            "phone": students[1].phone,
-            "location": "Tashkent, Uzbekistan",
+        content={
+            "personal_info": {
+                "name": students[1].full_name,
+                "email": students[1].email,
+                "phone": students[1].phone,
+                "location": "Tashkent, Uzbekistan",
+            },
+            "professional_summary": {
+                "text": "Full-stack developer passionate about creating user-friendly web applications."
+            },
+            "work_experience": [
+                {
+                    "job_title": "Full Stack Developer",
+                    "company_name": "WebStudio",
+                    "location": "Tashkent",
+                    "start_date": "2021-03-01",
+                    "end_date": "present",
+                    "is_current": True,
+                    "responsibilities": ["Building modern web apps with React and Node.js"],
+                    "technologies_used": ["JavaScript", "TypeScript", "React", "Node.js", "Next.js", "MongoDB"],
+                }
+            ],
+            "education": [
+                {
+                    "institution_name": "TUIT",
+                    "degree_type": "Bachelor",
+                    "field_of_study": "Software Engineering",
+                    "graduation_date": "2021-06-01",
+                    "gpa": "4.2",
+                }
+            ],
+            "skills": {
+                "technical_skills": [
+                    {"category": "Full Stack", "skills": ["JavaScript", "TypeScript", "React", "Node.js", "Next.js", "MongoDB", "Docker"]}
+                ],
+                "soft_skills": ["Teamwork", "Problem Solving"],
+            },
+            "languages": [
+                {"language": "Uzbek", "level": "Native"},
+                {"language": "English", "level": "Intermediate"},
+            ],
         },
-        summary="Full-stack developer passionate about creating user-friendly web applications.",
-        experience=[
-            {
-                "company": "WebStudio",
-                "position": "Full Stack Developer",
-                "location": "Tashkent",
-                "start_date": "2021-03-01",
-                "end_date": None,
-                "is_current": True,
-                "description": "Building modern web apps with React and Node.js",
-            }
-        ],
-        education=[
-            {
-                "institution": "TUIT",
-                "degree": "Bachelor",
-                "field": "Software Engineering",
-                "location": "Tashkent",
-                "start_date": "2017-09-01",
-                "end_date": "2021-06-01",
-                "gpa": "4.2",
-            }
-        ],
-        skills=["JavaScript", "TypeScript", "React", "Node.js", "Next.js", "MongoDB", "Docker"],
-        languages=[
-            {"language": "Uzbek", "level": "Native"},
-            {"language": "English", "level": "Intermediate"},
-        ],
+        raw_text="Full Stack Developer | React | Node.js | Next.js | MongoDB",
         ats_score=85,
-        views_count=32,
-        downloads_count=8,
+        view_count=32,
     )
     resumes.append(resume2)
     
@@ -255,14 +272,13 @@ def seed_jobs(db, company):
         ],
         salary_min=3000,
         salary_max=5000,
-        currency="USD",
+        salary_currency="USD",
         location="Tashkent, Uzbekistan",
-        location_type="hybrid",
-        employment_type="full_time",
+        is_remote_allowed=True,
+        job_type="hybrid",
         experience_level="senior",
-        skills_required=["Python", "FastAPI", "PostgreSQL", "Docker", "Redis"],
         benefits=["Health insurance", "Remote work", "Professional development", "Flexible schedule"],
-        status="published",
+        status="active",
         views_count=156,
         applications_count=12,
         expires_at=datetime.now(timezone.utc) + timedelta(days=30),
@@ -289,14 +305,13 @@ def seed_jobs(db, company):
         ],
         salary_min=2000,
         salary_max=3500,
-        currency="USD",
+        salary_currency="USD",
         location="Tashkent, Uzbekistan",
-        location_type="office",
-        employment_type="full_time",
+        is_remote_allowed=False,
+        job_type="full_time",
         experience_level="mid",
-        skills_required=["JavaScript", "React", "Node.js", "MongoDB", "Git"],
         benefits=["Health insurance", "Team lunches", "Learning budget"],
-        status="published",
+        status="active",
         views_count=203,
         applications_count=18,
         expires_at=datetime.now(timezone.utc) + timedelta(days=25),
@@ -323,14 +338,13 @@ def seed_jobs(db, company):
         ],
         salary_min=2500,
         salary_max=4000,
-        currency="USD",
+        salary_currency="USD",
         location="Remote",
-        location_type="remote",
-        employment_type="full_time",
+        is_remote_allowed=True,
+        job_type="remote",
         experience_level="mid",
-        skills_required=["Docker", "Kubernetes", "AWS", "Terraform", "Python"],
         benefits=["Remote work", "Flexible hours", "Equipment provided"],
-        status="published",
+        status="active",
         views_count=89,
         applications_count=7,
         expires_at=datetime.now(timezone.utc) + timedelta(days=45),
@@ -358,15 +372,10 @@ def seed_applications(db, jobs, students, resumes):
         resume_id=resumes[0].id,
         status="interview",
         cover_letter="I am very interested in this position and believe my experience aligns well with your requirements.",
-        match_score=92,
-        match_analysis={
-            "matching_skills": ["Python", "FastAPI", "PostgreSQL", "Docker"],
-            "missing_skills": ["Redis"],
-            "experience_match": "Strong match",
-        },
-        interview_date=datetime.now(timezone.utc) + timedelta(days=3),
+        match_score="92%",
+        interview_at=datetime.now(timezone.utc) + timedelta(days=3),
         interview_type="video",
-        interview_link="https://meet.google.com/abc-defg-hij",
+        meeting_link="https://meet.google.com/abc-defg-hij",
     )
     applications.append(app1)
     
@@ -378,7 +387,7 @@ def seed_applications(db, jobs, students, resumes):
         resume_id=resumes[0].id,
         status="pending",
         cover_letter="I would love to contribute to your team as a full-stack developer.",
-        match_score=75,
+        match_score="75%",
     )
     applications.append(app2)
     
@@ -390,12 +399,7 @@ def seed_applications(db, jobs, students, resumes):
         resume_id=resumes[1].id,
         status="reviewing",
         cover_letter="My skills in React and Node.js make me a great fit for this role.",
-        match_score=88,
-        match_analysis={
-            "matching_skills": ["JavaScript", "React", "Node.js", "MongoDB"],
-            "missing_skills": [],
-            "experience_match": "Excellent match",
-        },
+        match_score="88%",
     )
     applications.append(app3)
     
@@ -452,7 +456,7 @@ def main():
         print("✅ DATABASE SEEDED SUCCESSFULLY!")
         print("="*70)
         print("\n📝 Test Accounts:")
-        print(f"   Admin:    admin@smartcareer.uz / Admin123!")
+        print(f"   Admin:    admin@careeruz.uz / Admin123!")
         print(f"   Company:  hr@epam.com / Company123!")
         print(f"   Student1: john@example.com / Student123!")
         print(f"   Student2: jane@example.com / Student123!")

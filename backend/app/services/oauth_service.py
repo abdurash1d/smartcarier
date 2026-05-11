@@ -13,7 +13,7 @@ Xususiyatlari:
 - User info retrieval
 - Auto user creation
 
-AUTHOR: SmartCareer AI Team
+AUTHOR: CareerUZ Team
 VERSION: 1.0.0
 =============================================================================
 """

@@ -19,7 +19,7 @@ ENDPOINTS:
     GET    /users/stats            - User statistikasi
 
 =============================================================================
-AUTHOR: SmartCareer AI Team
+AUTHOR: CareerUZ Team
 VERSION: 1.0.0
 =============================================================================
 """
@@ -779,3 +779,354 @@ async def update_user_status(
 
 
 
+
+
+# =============================================================================
+# JOB MODERATION (ADMIN)
+# =============================================================================
+
+
+class AdminJobUpdate(BaseModel):
+    """Admin-side job status update."""
+
+    status: str = Field(..., description="New job status: draft, active, paused, closed")
+
+    @field_validator("status")
+    @classmethod
+    def _validate(cls, v: str) -> str:
+        valid = {"draft", "active", "paused", "closed"}
+        if v not in valid:
+            raise ValueError(f"status must be one of {sorted(valid)}")
+        return v
+
+
+@router.get(
+    "/jobs",
+    summary="List all jobs across companies (admin)",
+    description="Platform-wide job moderation list with filters and search.",
+)
+async def admin_list_jobs(
+    search: Optional[str] = Query(None, description="Search by title or company name"),
+    status_filter: Optional[str] = Query(None, alias="status",
+                                         description="Filter by job status"),
+    offset: int = Query(0, ge=0),
+    limit: int = Query(20, ge=1, le=100),
+    admin: User = Depends(require_admin_permission("admin.users.read")),
+    db: Session = Depends(get_db),
+):
+    """List jobs across all companies for admin moderation."""
+    from app.models import Job
+
+    q = db.query(Job).filter(Job.is_deleted == False)
+    if status_filter:
+        q = q.filter(Job.status == status_filter)
+    if search:
+        like = f"%{search.lower()}%"
+        company_ids = (
+            db.query(User.id)
+            .filter(
+                User.role == UserRole.COMPANY,
+                func.lower(User.company_name).like(like),
+            )
+            .all()
+        )
+        company_id_list = [c[0] for c in company_ids]
+        q = q.filter(
+            or_(
+                func.lower(Job.title).like(like),
+                Job.company_id.in_(company_id_list) if company_id_list else False,
+            )
+        )
+
+    total = q.count()
+    rows = (
+        q.order_by(Job.created_at.desc())
+        .offset(offset)
+        .limit(limit)
+        .all()
+    )
+
+    jobs_out = []
+    for j in rows:
+        company = j.company
+        jobs_out.append(
+            {
+                "id": str(j.id),
+                "title": j.title,
+                "status": j.status,
+                "job_type": j.job_type,
+                "experience_level": j.experience_level,
+                "location": j.location,
+                "is_remote_allowed": j.is_remote_allowed,
+                "salary_min": j.salary_min,
+                "salary_max": j.salary_max,
+                "views_count": j.views_count or 0,
+                "applications_count": j.applications_count or 0,
+                "created_at": j.created_at.isoformat() if j.created_at else None,
+                "expires_at": j.expires_at.isoformat() if j.expires_at else None,
+                "company": {
+                    "id": str(company.id) if company else None,
+                    "name": (company.company_name or company.full_name) if company else None,
+                    "email": company.email if company else None,
+                    "is_verified": company.is_verified if company else False,
+                },
+            }
+        )
+
+    return {"success": True, "data": {"jobs": jobs_out, "total": total, "offset": offset, "limit": limit}}
+
+
+@router.patch(
+    "/jobs/{job_id}/status",
+    summary="Update job status (admin moderation)",
+)
+async def admin_update_job_status(
+    job_id: UUID,
+    payload: AdminJobUpdate,
+    admin: User = Depends(get_current_super_admin),
+    db: Session = Depends(get_db),
+):
+    """Set a job's status as an admin action (publish/pause/close)."""
+    from app.models import Job
+
+    job = db.query(Job).filter(Job.id == job_id, Job.is_deleted == False).first()
+    if not job:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Job not found")
+
+    previous = job.status
+    job.status = payload.status
+    db.commit()
+    db.refresh(job)
+    logger.info(f"Admin {admin.email} changed job {job.id} status: {previous} -> {job.status}")
+
+    return {
+        "success": True,
+        "message": "Job status updated",
+        "data": {"id": str(job.id), "status": job.status, "previous_status": previous},
+    }
+
+
+@router.delete(
+    "/jobs/{job_id}",
+    summary="Soft-delete a job (admin moderation)",
+)
+async def admin_delete_job(
+    job_id: UUID,
+    admin: User = Depends(get_current_super_admin),
+    db: Session = Depends(get_db),
+):
+    """Soft-delete a job posting."""
+    from app.models import Job
+
+    job = db.query(Job).filter(Job.id == job_id, Job.is_deleted == False).first()
+    if not job:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Job not found")
+
+    job.is_deleted = True
+    job.deleted_at = datetime.now(timezone.utc)
+    db.commit()
+    logger.info(f"Admin {admin.email} soft-deleted job {job.id}")
+
+    return {"success": True, "message": "Job deleted", "data": {"id": str(job.id)}}
+
+
+# =============================================================================
+# COMPANIES MANAGEMENT (ADMIN)
+# =============================================================================
+
+
+class AdminVerifyCompany(BaseModel):
+    """Toggle a company's verified status."""
+
+    is_verified: bool = Field(..., description="Whether the company is verified")
+
+
+@router.get(
+    "/companies",
+    summary="List all companies (admin)",
+    description="Platform-wide company list with hiring activity per company.",
+)
+async def admin_list_companies(
+    search: Optional[str] = Query(None),
+    is_verified: Optional[bool] = Query(None),
+    offset: int = Query(0, ge=0),
+    limit: int = Query(20, ge=1, le=100),
+    admin: User = Depends(require_admin_permission("admin.users.read")),
+    db: Session = Depends(get_db),
+):
+    """List companies with per-company job & application counts."""
+    from app.models import Job, Application
+
+    q = db.query(User).filter(
+        User.role == UserRole.COMPANY,
+        User.is_deleted == False,
+    )
+    if is_verified is not None:
+        q = q.filter(User.is_verified == is_verified)
+    if search:
+        like = f"%{search.lower()}%"
+        q = q.filter(
+            or_(
+                func.lower(User.company_name).like(like),
+                func.lower(User.email).like(like),
+                func.lower(User.full_name).like(like),
+            )
+        )
+
+    total = q.count()
+    companies = (
+        q.order_by(User.created_at.desc())
+        .offset(offset)
+        .limit(limit)
+        .all()
+    )
+
+    # Aggregate per-company counts in one query
+    company_ids = [c.id for c in companies]
+    job_counts = dict(
+        db.query(Job.company_id, func.count(Job.id))
+        .filter(Job.company_id.in_(company_ids), Job.is_deleted == False)
+        .group_by(Job.company_id)
+        .all()
+    ) if company_ids else {}
+
+    app_counts = dict(
+        db.query(Job.company_id, func.count(Application.id))
+        .join(Application, Application.job_id == Job.id)
+        .filter(Job.company_id.in_(company_ids), Application.is_deleted == False)
+        .group_by(Job.company_id)
+        .all()
+    ) if company_ids else {}
+
+    out = []
+    for c in companies:
+        out.append(
+            {
+                "id": str(c.id),
+                "email": c.email,
+                "company_name": c.company_name or c.full_name,
+                "company_website": c.company_website,
+                "contact_name": c.full_name,
+                "phone": c.phone,
+                "is_verified": c.is_verified,
+                "is_active": c.is_active_account,
+                "created_at": c.created_at.isoformat() if c.created_at else None,
+                "last_login": c.last_login.isoformat() if c.last_login else None,
+                "jobs_count": job_counts.get(c.id, 0),
+                "applications_count": app_counts.get(c.id, 0),
+            }
+        )
+
+    return {"success": True, "data": {"companies": out, "total": total, "offset": offset, "limit": limit}}
+
+
+@router.patch(
+    "/companies/{company_id}/verify",
+    summary="Toggle company verified status (admin)",
+)
+async def admin_verify_company(
+    company_id: UUID,
+    payload: AdminVerifyCompany,
+    admin: User = Depends(get_current_super_admin),
+    db: Session = Depends(get_db),
+):
+    """Verify or un-verify a company account."""
+    company = db.query(User).filter(
+        User.id == company_id,
+        User.role == UserRole.COMPANY,
+        User.is_deleted == False,
+    ).first()
+    if not company:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Company not found")
+
+    company.is_verified = payload.is_verified
+    db.commit()
+    logger.info(
+        f"Admin {admin.email} set company {company.id} verified={payload.is_verified}"
+    )
+
+    return {
+        "success": True,
+        "message": "Company verification updated",
+        "data": {"id": str(company.id), "is_verified": company.is_verified},
+    }
+
+
+# =============================================================================
+# PLATFORM-WIDE APPLICATIONS (ADMIN)
+# =============================================================================
+
+
+@router.get(
+    "/applications",
+    summary="List all applications across the platform (admin)",
+)
+async def admin_list_applications(
+    status_filter: Optional[str] = Query(None, alias="status"),
+    search: Optional[str] = Query(None, description="Search by applicant email or job title"),
+    offset: int = Query(0, ge=0),
+    limit: int = Query(20, ge=1, le=100),
+    admin: User = Depends(require_admin_permission("admin.users.read")),
+    db: Session = Depends(get_db),
+):
+    """Platform-wide applications list."""
+    from app.models import Job
+
+    q = db.query(Application).filter(Application.is_deleted == False)
+    if status_filter:
+        q = q.filter(Application.status == status_filter)
+    if search:
+        like = f"%{search.lower()}%"
+        applicant_ids = [
+            r[0] for r in db.query(User.id)
+            .filter(func.lower(User.email).like(like))
+            .all()
+        ]
+        job_ids = [
+            r[0] for r in db.query(Job.id)
+            .filter(func.lower(Job.title).like(like))
+            .all()
+        ]
+        q = q.filter(
+            or_(
+                Application.user_id.in_(applicant_ids) if applicant_ids else False,
+                Application.job_id.in_(job_ids) if job_ids else False,
+            )
+        )
+
+    total = q.count()
+    rows = (
+        q.order_by(Application.applied_at.desc())
+        .offset(offset)
+        .limit(limit)
+        .all()
+    )
+
+    out = []
+    for a in rows:
+        applicant = a.user
+        job = a.job
+        out.append(
+            {
+                "id": str(a.id),
+                "status": a.status,
+                "match_score": a.match_score,
+                "applied_at": a.applied_at.isoformat() if a.applied_at else None,
+                "applicant": {
+                    "id": str(applicant.id) if applicant else None,
+                    "email": applicant.email if applicant else None,
+                    "full_name": applicant.full_name if applicant else None,
+                },
+                "job": {
+                    "id": str(job.id) if job else None,
+                    "title": job.title if job else None,
+                    "company": (
+                        (job.company.company_name or job.company.full_name)
+                        if job and job.company
+                        else None
+                    ),
+                },
+            }
+        )
+
+    return {"success": True, "data": {"applications": out, "total": total, "offset": offset, "limit": limit}}

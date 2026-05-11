@@ -5,6 +5,8 @@ export type SkillProfile = {
   soft: string[];
 };
 
+type ResumeLocale = "uz" | "ru";
+
 export const commonSkills: Readonly<{
   technical: string[];
   soft: string[];
@@ -37,6 +39,216 @@ export const commonSkills: Readonly<{
   ],
 };
 
+const SKILL_LABELS: Record<ResumeLocale, Record<string, string>> = {
+  uz: {
+    "Financial reporting": "Moliyaviy hisobot",
+    "General ledger": "Bosh kitob hisobi",
+    "Tax accounting": "Soliq hisobi",
+    Payroll: "Ish haqi hisobi",
+    "Accounts payable": "Kreditorlik hisoblari",
+    "Accounts receivable": "Debitorlik hisoblari",
+    Reconciliation: "Solishtirma tahlil",
+    "Cost accounting": "Xarajatlar hisobi",
+    Accuracy: "Aniqlik",
+    Integrity: "Halollik",
+    Confidentiality: "Maxfiylik",
+    "Business acumen": "Biznesni tushunish",
+    "Decision making": "Qaror qabul qilish",
+    "Financial modeling": "Moliyaviy modellashtirish",
+    Budgeting: "Byudjetlashtirish",
+    Forecasting: "Prognozlash",
+    "Variance analysis": "Farqlar tahlili",
+    Valuation: "Baholash",
+    "Scenario analysis": "Ssenariy tahlili",
+    "Audit planning": "Audit rejalashtirish",
+    "Risk assessment": "Risklarni baholash",
+    Compliance: "Muvofiqlik nazorati",
+    Documentation: "Hujjatlashtirish",
+    IFRS: "MHXS (IFRS)",
+    "Email communication": "Email orqali muloqot",
+    "Report writing": "Hisobot yozish",
+    "Data entry": "Ma'lumot kiritish",
+    "Document management": "Hujjatlarni boshqarish",
+    "Presentation skills": "Taqdimot ko'nikmalari",
+    "Task prioritization": "Vazifalarni ustuvorlashtirish",
+    "Internet research": "Internet tadqiqoti",
+    "Time management tools": "Vaqt boshqaruvi vositalari",
+    Communication: "Muloqot",
+    Teamwork: "Jamoada ishlash",
+    "Problem solving": "Muammo yechish",
+    "Time management": "Vaqtni boshqarish",
+    Adaptability: "Moslashuvchanlik",
+    "Attention to detail": "Detallarga e'tibor",
+    "Critical thinking": "Tanqidiy fikrlash",
+    Responsibility: "Mas'uliyat",
+    Organization: "Tashkiliylik",
+    "Customer focus": "Mijozga yo'nalish",
+    "Analytical thinking": "Tahliliy fikrlash",
+    Collaboration: "Hamkorlik",
+    Ownership: "Javobgarlikni olish",
+    Leadership: "Liderlik",
+    Creativity: "Ijodkorlik",
+    Empathy: "Empatiya",
+    Patience: "Sabr",
+    Negotiation: "Muzokara",
+    "Service mindset": "Xizmatga yo'naltirilganlik",
+    "Result orientation": "Natijaga yo'nalganlik",
+    "Relationship building": "Aloqa o'rnatish",
+    Resilience: "Barqarorlik",
+    "Strategic thinking": "Strategik fikrlash",
+    Networking: "Tarmoq qurish",
+    Initiative: "Tashabbuskorlik",
+    "Project coordination": "Loyihalarni muvofiqlashtirish",
+    "Data-driven mindset": "Ma'lumotga asoslangan fikrlash",
+    "Audience empathy": "Auditoriyani tushunish",
+    "Conflict resolution": "Nizolarni hal qilish",
+    Accountability: "Javobgarlik",
+    Ethics: "Etika",
+    Objectivity: "Xolislik",
+    Persuasion: "Ishontirish",
+    Curiosity: "Qiziquvchanlik",
+  },
+  ru: {
+    "Financial reporting": "Финансовая отчетность",
+    "General ledger": "Главная книга",
+    "Tax accounting": "Налоговый учет",
+    Payroll: "Расчет заработной платы",
+    "Accounts payable": "Кредиторская задолженность",
+    "Accounts receivable": "Дебиторская задолженность",
+    Reconciliation: "Сверка счетов",
+    "Cost accounting": "Учет затрат",
+    Accuracy: "Точность",
+    Integrity: "Честность",
+    Confidentiality: "Конфиденциальность",
+    "Business acumen": "Бизнес-понимание",
+    "Decision making": "Принятие решений",
+    "Financial modeling": "Финансовое моделирование",
+    Budgeting: "Бюджетирование",
+    Forecasting: "Прогнозирование",
+    "Variance analysis": "Факторный анализ отклонений",
+    Valuation: "Оценка",
+    "Scenario analysis": "Сценарный анализ",
+    "Audit planning": "Планирование аудита",
+    "Risk assessment": "Оценка рисков",
+    Compliance: "Комплаенс",
+    Documentation: "Документирование",
+    IFRS: "МСФО (IFRS)",
+    "Email communication": "Деловая переписка",
+    "Report writing": "Подготовка отчетов",
+    "Data entry": "Ввод данных",
+    "Document management": "Документооборот",
+    "Presentation skills": "Навыки презентации",
+    "Task prioritization": "Приоритизация задач",
+    "Internet research": "Интернет-исследование",
+    "Time management tools": "Инструменты тайм-менеджмента",
+    Communication: "Коммуникация",
+    Teamwork: "Работа в команде",
+    "Problem solving": "Решение проблем",
+    "Time management": "Управление временем",
+    Adaptability: "Адаптивность",
+    "Attention to detail": "Внимание к деталям",
+    "Critical thinking": "Критическое мышление",
+    Responsibility: "Ответственность",
+    Organization: "Организованность",
+    "Customer focus": "Ориентация на клиента",
+    "Analytical thinking": "Аналитическое мышление",
+    Collaboration: "Сотрудничество",
+    Ownership: "Ответственность за результат",
+    Leadership: "Лидерство",
+    Creativity: "Креативность",
+    Empathy: "Эмпатия",
+    Patience: "Терпение",
+    Negotiation: "Переговоры",
+    "Service mindset": "Ориентация на сервис",
+    "Result orientation": "Ориентация на результат",
+    "Relationship building": "Построение отношений",
+    Resilience: "Устойчивость",
+    "Strategic thinking": "Стратегическое мышление",
+    Networking: "Нетворкинг",
+    Initiative: "Инициативность",
+    "Project coordination": "Координация проектов",
+    "Data-driven mindset": "Подход на основе данных",
+    "Audience empathy": "Понимание аудитории",
+    "Conflict resolution": "Разрешение конфликтов",
+    Accountability: "Подотчетность",
+    Ethics: "Этика",
+    Objectivity: "Объективность",
+    Persuasion: "Убеждение",
+    Curiosity: "Любознательность",
+  },
+};
+
+const PROFILE_LABELS: Record<ResumeLocale, Record<string, string>> = {
+  uz: {
+    Accountant: "Hisobchi",
+    Auditor: "Auditor",
+    "Financial Analyst": "Moliyaviy tahlilchi",
+    "Software Developer": "Dasturchi",
+    "Mobile Developer": "Mobil dasturchi",
+    "DevOps Engineer": "DevOps muhandisi",
+    "QA Engineer": "QA muhandisi",
+    "Data Analyst": "Ma'lumotlar tahlilchisi",
+    "Data Scientist": "Data Scientist",
+    "UI UX Designer": "UI/UX dizayner",
+    "Graphic Designer": "Grafik dizayner",
+    "Marketing Manager": "Marketing menejeri",
+    "SMM Specialist": "SMM mutaxassisi",
+    "Sales Manager": "Sotuv menejeri",
+    "Business Development Manager": "Biznesni rivojlantirish menejeri",
+    "Recruiter HR Specialist": "HR/Recruiter mutaxassisi",
+    "Project Manager": "Loyiha menejeri",
+    "Product Manager": "Mahsulot menejeri",
+    "Operations Manager": "Operatsion menejer",
+    "Customer Support Specialist": "Mijozlarni qo'llab-quvvatlash mutaxassisi",
+    Teacher: "O'qituvchi",
+    Translator: "Tarjimon",
+    Lawyer: "Yurist",
+    "Procurement Specialist": "Xaridlar mutaxassisi",
+    "Logistics Specialist": "Logistika mutaxassisi",
+    "Administrative Assistant": "Ma'muriy yordamchi",
+    Doctor: "Shifokor",
+    Nurse: "Hamshira",
+    "Business Analyst": "Biznes tahlilchi",
+    "Content Writer": "Kontent yozuvchi",
+    "Cybersecurity Specialist": "Kiberxavfsizlik mutaxassisi",
+    "System Administrator": "Tizim administratori",
+  },
+  ru: {
+    Accountant: "Бухгалтер",
+    Auditor: "Аудитор",
+    "Financial Analyst": "Финансовый аналитик",
+    "Software Developer": "Разработчик ПО",
+    "Mobile Developer": "Мобильный разработчик",
+    "DevOps Engineer": "DevOps инженер",
+    "QA Engineer": "QA инженер",
+    "Data Analyst": "Аналитик данных",
+    "Data Scientist": "Data Scientist",
+    "UI UX Designer": "UI/UX дизайнер",
+    "Graphic Designer": "Графический дизайнер",
+    "Marketing Manager": "Маркетинг-менеджер",
+    "SMM Specialist": "SMM специалист",
+    "Sales Manager": "Менеджер по продажам",
+    "Business Development Manager": "Менеджер по развитию бизнеса",
+    "Recruiter HR Specialist": "HR/Recruiter специалист",
+    "Project Manager": "Проектный менеджер",
+    "Product Manager": "Продуктовый менеджер",
+    "Operations Manager": "Операционный менеджер",
+    "Customer Support Specialist": "Специалист поддержки клиентов",
+    Teacher: "Преподаватель",
+    Translator: "Переводчик",
+    Lawyer: "Юрист",
+    "Procurement Specialist": "Специалист по закупкам",
+    "Logistics Specialist": "Специалист по логистике",
+    "Administrative Assistant": "Административный ассистент",
+    Doctor: "Врач",
+    Nurse: "Медсестра",
+    "Business Analyst": "Бизнес-аналитик",
+    "Content Writer": "Контент-райтер",
+    "Cybersecurity Specialist": "Специалист по кибербезопасности",
+    "System Administrator": "Системный администратор",
+  },
+};
+
 export const skillProfiles: SkillProfile[] = [
   {
     label: "Software Developer",
@@ -46,6 +258,9 @@ export const skillProfiles: SkillProfile[] = [
       "full stack developer",
       "backend developer",
       "frontend developer",
+      "frontend dasturchi",
+      "backend dasturchi",
+      "full stack dasturchi",
       "programmer",
       "developer",
       "dasturchi",
@@ -82,6 +297,7 @@ export const skillProfiles: SkillProfile[] = [
       "ios developer",
       "react native developer",
       "flutter developer",
+      "mobil ilova dasturchi",
       "mobil dasturchi",
       "android dasturchi",
       "ios dasturchi",
@@ -163,6 +379,7 @@ export const skillProfiles: SkillProfile[] = [
       "data analytics",
       "analitik",
       "malumotlar tahlili",
+      "ma lumotlar tahlili",
       "biznes analitik",
       "analitik dannykh",
     ],
@@ -287,6 +504,7 @@ export const skillProfiles: SkillProfile[] = [
       "product designer",
       "ux designer",
       "ui designer",
+      "veb dizayner",
       "dizayner interfeysa",
       "ux dizayner",
       "interfeys dizayneri",
@@ -947,6 +1165,7 @@ export function uniqueSkills(skills: string[]): string[] {
 
 function scoreProfile(normalizedInput: string, normalizedKeywords: string[]): number {
   let score = 0;
+  const inputTokens = normalizedInput.split(" ").filter(Boolean);
 
   for (const keyword of normalizedKeywords) {
     if (!keyword) {
@@ -954,11 +1173,269 @@ function scoreProfile(normalizedInput: string, normalizedKeywords: string[]): nu
     }
 
     if (normalizedInput.includes(keyword)) {
-      score += 1;
+      score += 3;
+      continue;
+    }
+
+    const keywordTokens = keyword.split(" ").filter(Boolean);
+    if (keywordTokens.length === 0) {
+      continue;
+    }
+
+    const overlap = keywordTokens.filter((token) => token.length > 2 && inputTokens.includes(token)).length;
+    if (overlap > 0) {
+      score += overlap;
     }
   }
 
   return score;
+}
+
+function localizeSkill(skill: string, locale: ResumeLocale): string {
+  const explicit = SKILL_LABELS[locale][skill];
+  if (explicit) {
+    return explicit;
+  }
+  return translateSkillFallback(skill, locale);
+}
+
+function localizeProfileLabel(label: string, locale: ResumeLocale): string {
+  return PROFILE_LABELS[locale][label] || label;
+}
+
+const SKILL_PHRASE_FALLBACK: Record<ResumeLocale, Record<string, string>> = {
+  uz: {
+    "app store deployment": "App Store'ga joylash",
+    "unit testing": "Unit test yozish",
+    "bug reporting": "Xatolarni hisobotlash",
+    "test case design": "Test holatlarini loyihalash",
+    "regression testing": "Regression test",
+    "api testing": "API testlash",
+    "performance testing": "Ishlash testlari",
+    "data visualization": "Ma'lumotlarni vizualizatsiya qilish",
+    "data cleaning": "Ma'lumotlarni tozalash",
+    "market research": "Bozor tadqiqoti",
+    "email marketing": "Email marketing",
+    "content strategy": "Kontent strategiyasi",
+    "lead generation": "Lid yaratish",
+    "campaign management": "Kampaniyalarni boshqarish",
+    "candidate sourcing": "Nomzod izlash",
+    "job description writing": "Vakansiya matnini yozish",
+    "labor law basics": "Mehnat qonunchiligi asoslari",
+    "project planning": "Loyiha rejalashtirish",
+    "risk management": "Risklarni boshqarish",
+    "budget control": "Byudjet nazorati",
+    "scope management": "Scope boshqaruvi",
+    "resource allocation": "Resurs taqsimoti",
+    "product strategy": "Mahsulot strategiyasi",
+    prioritization: "Ustuvorlashtirish",
+    roadmapping: "Yo'l xaritasi tuzish",
+    "process optimization": "Jarayonlarni optimallashtirish",
+    "vendor management": "Ta'minotchilarni boshqarish",
+    "cost optimization": "Xarajatlarni optimallashtirish",
+    "service level management": "Xizmat darajasini boshqarish",
+    "issue troubleshooting": "Muammolarni bartaraf etish",
+    "calendar management": "Kalendarni boshqarish",
+    "document preparation": "Hujjat tayyorlash",
+    "meeting coordination": "Uchrashuvlarni muvofiqlashtirish",
+    "route planning": "Yo'nalishni rejalashtirish",
+    "shipment tracking": "Yukni kuzatish",
+    "inventory management": "Zaxira boshqaruvi",
+    "patient care": "Bemor parvarishi",
+    diagnosis: "Tashxis qo'yish",
+    "treatment planning": "Davolash rejasini tuzish",
+    "requirements gathering": "Talablarni yig'ish",
+    "process mapping": "Jarayon xaritalash",
+    facilitation: "Fasilitatsiya",
+    copywriting: "Kopirayting",
+    editing: "Tahrirlash",
+    proofreading: "Korrektura",
+    "incident response": "Insidentga javob",
+    "network security": "Tarmoq xavfsizligi",
+    "access control": "Kirish nazorati",
+  },
+  ru: {
+    "app store deployment": "Публикация в App Store",
+    "unit testing": "Юнит-тестирование",
+    "bug reporting": "Репортинг багов",
+    "test case design": "Проектирование тест-кейсов",
+    "regression testing": "Регрессионное тестирование",
+    "api testing": "Тестирование API",
+    "performance testing": "Тестирование производительности",
+    "data visualization": "Визуализация данных",
+    "data cleaning": "Очистка данных",
+    "market research": "Исследование рынка",
+    "email marketing": "Email-маркетинг",
+    "content strategy": "Контент-стратегия",
+    "lead generation": "Лидогенерация",
+    "campaign management": "Управление кампаниями",
+    "candidate sourcing": "Поиск кандидатов",
+    "job description writing": "Написание описаний вакансий",
+    "labor law basics": "Основы трудового права",
+    "project planning": "Планирование проекта",
+    "risk management": "Управление рисками",
+    "budget control": "Контроль бюджета",
+    "scope management": "Управление scope",
+    "resource allocation": "Распределение ресурсов",
+    "product strategy": "Продуктовая стратегия",
+    prioritization: "Приоритизация",
+    roadmapping: "Построение roadmap",
+    "process optimization": "Оптимизация процессов",
+    "vendor management": "Управление поставщиками",
+    "cost optimization": "Оптимизация затрат",
+    "service level management": "Управление уровнем сервиса",
+    "issue troubleshooting": "Устранение проблем",
+    "calendar management": "Управление календарем",
+    "document preparation": "Подготовка документов",
+    "meeting coordination": "Координация встреч",
+    "route planning": "Планирование маршрутов",
+    "shipment tracking": "Отслеживание поставок",
+    "inventory management": "Управление запасами",
+    "patient care": "Уход за пациентами",
+    diagnosis: "Диагностика",
+    "treatment planning": "Планирование лечения",
+    "requirements gathering": "Сбор требований",
+    "process mapping": "Картирование процессов",
+    facilitation: "Фасилитация",
+    copywriting: "Копирайтинг",
+    editing: "Редактирование",
+    proofreading: "Вычитка",
+    "incident response": "Реагирование на инциденты",
+    "network security": "Сетевая безопасность",
+    "access control": "Контроль доступа",
+  },
+};
+
+const SKILL_WORD_FALLBACK: Record<ResumeLocale, Record<string, string>> = {
+  uz: {
+    financial: "moliyaviy",
+    reporting: "hisobot",
+    general: "umumiy",
+    ledger: "kitob",
+    tax: "soliq",
+    accounting: "hisobi",
+    accounts: "hisoblar",
+    payable: "to'lov",
+    receivable: "qabul",
+    analysis: "tahlil",
+    management: "boshqaruvi",
+    planning: "rejalashtirish",
+    strategy: "strategiya",
+    control: "nazorat",
+    optimization: "optimallashtirish",
+    operations: "operatsiyalar",
+    operation: "operatsiya",
+    project: "loyiha",
+    product: "mahsulot",
+    business: "biznes",
+    customer: "mijoz",
+    support: "qo'llab-quvvatlash",
+    specialist: "mutaxassis",
+    engineer: "muhandis",
+    administrator: "administrator",
+    developer: "dasturchi",
+    analyst: "tahlilchi",
+    designer: "dizayner",
+    manager: "menejer",
+    recruiter: "rekruter",
+    security: "xavfsizlik",
+    network: "tarmoq",
+    data: "ma'lumot",
+    quality: "sifat",
+    service: "xizmat",
+    level: "daraja",
+    response: "javob",
+    monitoring: "monitoring",
+    performance: "samaradorlik",
+    testing: "testlash",
+    design: "dizayn",
+    documentation: "hujjatlash",
+    communication: "muloqot",
+    coordination: "muvofiqlashtirish",
+    research: "tadqiqot",
+    compliance: "muvofiqlik",
+    risk: "risk",
+    assessment: "baholash",
+    cloud: "bulut",
+  },
+  ru: {
+    financial: "финансовый",
+    reporting: "отчетность",
+    general: "главный",
+    ledger: "реестр",
+    tax: "налоговый",
+    accounting: "учет",
+    accounts: "счета",
+    payable: "кредиторский",
+    receivable: "дебиторский",
+    analysis: "анализ",
+    management: "управление",
+    planning: "планирование",
+    strategy: "стратегия",
+    control: "контроль",
+    optimization: "оптимизация",
+    operations: "операции",
+    operation: "операция",
+    project: "проект",
+    product: "продукт",
+    business: "бизнес",
+    customer: "клиент",
+    support: "поддержка",
+    specialist: "специалист",
+    engineer: "инженер",
+    administrator: "администратор",
+    developer: "разработчик",
+    analyst: "аналитик",
+    designer: "дизайнер",
+    manager: "менеджер",
+    recruiter: "рекрутер",
+    security: "безопасность",
+    network: "сеть",
+    data: "данные",
+    quality: "качество",
+    service: "сервис",
+    level: "уровень",
+    response: "реагирование",
+    monitoring: "мониторинг",
+    performance: "производительность",
+    testing: "тестирование",
+    design: "дизайн",
+    documentation: "документация",
+    communication: "коммуникация",
+    coordination: "координация",
+    research: "исследование",
+    compliance: "комплаенс",
+    risk: "риск",
+    assessment: "оценка",
+    cloud: "облако",
+  },
+};
+
+function translateSkillFallback(skill: string, locale: ResumeLocale): string {
+  // Keep already-localized or mixed-script values untouched.
+  if (/[А-Яа-яЁёЎўҚқҒғҲҳ]/.test(skill)) {
+    return skill;
+  }
+
+  const phraseDict = SKILL_PHRASE_FALLBACK[locale];
+  const wordDict = SKILL_WORD_FALLBACK[locale];
+  const normalized = skill.toLowerCase().trim();
+
+  if (phraseDict[normalized]) {
+    return phraseDict[normalized];
+  }
+
+  // Preserve well-known technical abbreviations and stack names.
+  if (/^(AI|ML|SQL|AWS|GCP|Azure|API|REST|GraphQL|CI\/CD|SRE|KPI|OKR|ERP|CRM|SIEM|IFRS|BPMN|ATS|A\/B)$/i.test(skill)) {
+    return skill;
+  }
+
+  const translated = skill.replace(/[A-Za-z]+/g, (word) => {
+    const lower = word.toLowerCase();
+    return wordDict[lower] || word;
+  });
+
+  return translated;
 }
 
 export function detectSkillProfile(input: string): SkillProfile | null {
@@ -988,7 +1465,8 @@ export function detectSkillProfile(input: string): SkillProfile | null {
 export function getSkillSuggestions(
   input: string,
   selectedTechnical: string[],
-  selectedSoft: string[]
+  selectedSoft: string[],
+  locale: ResumeLocale = "uz"
 ): {
   profile: SkillProfile | null;
   technical: string[];
@@ -1002,8 +1480,12 @@ export function getSkillSuggestions(
     selectedSoft.map((skill) => normalizeText(skill)).filter(Boolean)
   );
 
-  const technicalPool = [...(profile?.technical ?? []), ...commonSkills.technical];
-  const softPool = [...(profile?.soft ?? []), ...commonSkills.soft];
+  const technicalPool = [...(profile?.technical ?? []), ...commonSkills.technical].map((skill) =>
+    localizeSkill(skill, locale)
+  );
+  const softPool = [...(profile?.soft ?? []), ...commonSkills.soft].map((skill) =>
+    localizeSkill(skill, locale)
+  );
 
   const technicalSuggestions = uniqueSkills(technicalPool).filter(
     (skill) => !selectedTechnicalSet.has(normalizeText(skill))
@@ -1013,7 +1495,7 @@ export function getSkillSuggestions(
   );
 
   return {
-    profile,
+    profile: profile ? { ...profile, label: localizeProfileLabel(profile.label, locale) } : null,
     technical: technicalSuggestions.slice(0, 12),
     soft: softSuggestions,
   };

@@ -5,7 +5,7 @@ Users & RBAC Tests
 
 Tests for user management and role-based access control.
 
-AUTHOR: SmartCareer AI Team
+AUTHOR: CareerUZ Team
 VERSION: 1.0.0
 =============================================================================
 """

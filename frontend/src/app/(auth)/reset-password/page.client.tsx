@@ -8,7 +8,6 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { isAxiosError } from "axios";
 import { z } from "zod";
 import {
-  AlertCircle,
   ArrowLeft,
   CheckCircle,
   Eye,
@@ -17,39 +16,66 @@ import {
   Loader2,
   ShieldCheck,
 } from "lucide-react";
+import { Alert } from "@/components/ui/alert";
 import { authApi } from "@/lib/api";
+import { useTranslation } from "@/hooks/useTranslation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
-const resetPasswordSchema = z
-  .object({
-    token: z.string().trim().min(1, "Reset token is required"),
-    newPassword: z
-      .string()
-      .min(8, "Password must be at least 8 characters")
-      .regex(/[A-Z]/, "Password must include at least one uppercase letter")
-      .regex(/[a-z]/, "Password must include at least one lowercase letter")
-      .regex(/\d/, "Password must include at least one number"),
-    confirmPassword: z.string().min(1, "Please confirm your new password"),
-  })
-  .refine((data) => data.newPassword === data.confirmPassword, {
-    message: "Passwords do not match",
-    path: ["confirmPassword"],
-  });
-
-type ResetPasswordFormData = z.infer<typeof resetPasswordSchema>;
+type ResetPasswordFormData = {
+  token: string;
+  newPassword: string;
+  confirmPassword: string;
+};
 
 export default function ResetPasswordPageClient({
   initialToken,
 }: {
   initialToken?: string;
 }) {
+  const { locale } = useTranslation();
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
+  const resetPasswordSchema = z
+    .object({
+      token: z
+        .string()
+        .trim()
+        .min(1, locale === "ru" ? "Токен сброса обязателен" : "Tiklash tokeni majburiy"),
+      newPassword: z
+        .string()
+        .min(
+          8,
+          locale === "ru" ? "Пароль должен содержать минимум 8 символов" : "Parol kamida 8 ta belgidan iborat bo'lishi kerak"
+        )
+        .regex(
+          /[A-Z]/,
+          locale === "ru"
+            ? "Пароль должен содержать хотя бы одну заглавную букву"
+            : "Parolda kamida bitta katta harf bo'lishi kerak"
+        )
+        .regex(
+          /[a-z]/,
+          locale === "ru"
+            ? "Пароль должен содержать хотя бы одну строчную букву"
+            : "Parolda kamida bitta kichik harf bo'lishi kerak"
+        )
+        .regex(
+          /\d/,
+          locale === "ru" ? "Пароль должен содержать хотя бы одну цифру" : "Parolda kamida bitta raqam bo'lishi kerak"
+        ),
+      confirmPassword: z
+        .string()
+        .min(1, locale === "ru" ? "Подтвердите новый пароль" : "Yangi parolni tasdiqlang"),
+    })
+    .refine((data) => data.newPassword === data.confirmPassword, {
+      message: locale === "ru" ? "Пароли не совпадают" : "Parollar mos emas",
+      path: ["confirmPassword"],
+    });
 
   const {
     register,
@@ -87,11 +113,16 @@ export default function ResetPasswordPageClient({
     } catch (err: unknown) {
       if (isAxiosError(err)) {
         const detail = err.response?.data?.detail;
-        setError(typeof detail === "string" ? detail : err.message || "Failed to reset password");
+        setError(
+          typeof detail === "string"
+            ? detail
+            : err.message ||
+                (locale === "ru" ? "Не удалось сбросить пароль" : "Parolni tiklab bo'lmadi")
+        );
       } else if (err instanceof Error) {
         setError(err.message);
       } else {
-        setError("Failed to reset password");
+        setError(locale === "ru" ? "Не удалось сбросить пароль" : "Parolni tiklab bo'lmadi");
       }
     } finally {
       setIsLoading(false);
@@ -104,16 +135,20 @@ export default function ResetPasswordPageClient({
         <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-full bg-green-100">
           <CheckCircle className="h-8 w-8 text-green-600" />
         </div>
-        <h1 className="font-display text-2xl font-bold text-surface-900">Password updated</h1>
+        <h1 className="font-display text-2xl font-bold text-surface-900">
+          {locale === "ru" ? "Пароль обновлен" : "Parol yangilandi"}
+        </h1>
         <p className="mt-3 text-surface-500">
-          Your password has been reset successfully. Redirecting you to the login page...
+          {locale === "ru"
+            ? "Ваш пароль успешно сброшен. Перенаправляем на страницу входа..."
+            : "Parolingiz muvaffaqiyatli tiklandi. Kirish sahifasiga yo'naltirilmoqda..."}
         </p>
         <Link
           href="/login?password_reset=true"
           className="mt-8 inline-flex items-center gap-2 text-sm font-medium text-brand-600 hover:text-brand-500"
         >
           <ArrowLeft className="h-4 w-4" />
-          Back to sign in
+          {locale === "ru" ? "Назад ко входу" : "Kirishga qaytish"}
         </Link>
       </div>
     );
@@ -124,36 +159,45 @@ export default function ResetPasswordPageClient({
       <div className="mb-8 space-y-3">
         <div className="inline-flex items-center gap-2 rounded-full border border-brand-200 bg-brand-50 px-3 py-1 text-xs font-medium text-brand-700">
           <ShieldCheck className="h-4 w-4" />
-          Secure password reset
+          {locale === "ru" ? "Безопасный сброс пароля" : "Xavfsiz parol tiklash"}
         </div>
-        <h1 className="font-display text-3xl font-bold text-surface-900">Reset your password</h1>
-        <p className="text-surface-500">
-          Use the token from your email link to create a new password. If the token is missing,
-          you can paste it manually below.
+        <h1 className="font-display text-3xl font-bold text-surface-900 dark:text-white">
+          {locale === "ru" ? "Сбросьте пароль" : "Parolingizni tiklang"}
+        </h1>
+        <p className="text-surface-500 dark:text-surface-400">
+          {locale === "ru"
+            ? "Используйте токен из письма, чтобы создать новый пароль. Если токен отсутствует, вставьте его вручную ниже."
+            : "Yangi parol yaratish uchun emaildagi tokendan foydalaning. Agar token bo'lmasa, uni quyida qo'lda kiriting."}
         </p>
       </div>
 
       {error && (
-        <div className="mb-6 flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">
-          <AlertCircle className="mt-0.5 h-5 w-5 flex-shrink-0" />
-          <p>{error}</p>
+        <div className="mb-6">
+          <Alert variant="error">{error}</Alert>
         </div>
       )}
 
       {!initialToken && (
-        <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
-          We could not detect a reset token from the link. Paste the token from your email or
-          request a fresh reset link.
+        <div className="mb-6">
+          <Alert variant="warning">
+            {locale === "ru"
+              ? "Не удалось определить токен сброса из ссылки. Вставьте токен из письма или запросите новую ссылку для сброса."
+              : "Havoladan tiklash tokenini aniqlab bo'lmadi. Emaildagi tokenni kiriting yoki yangi tiklash havolasini so'rang."}
+          </Alert>
         </div>
       )}
 
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
         <div className="space-y-2">
-          <Label htmlFor="token">Reset token</Label>
+          <Label htmlFor="token">{locale === "ru" ? "Токен сброса" : "Tiklash tokeni"}</Label>
           <Input
             id="token"
             type="text"
-            placeholder="Paste token from email link"
+            placeholder={
+              locale === "ru"
+                ? "Вставьте токен из письма"
+                : "Email havolasidagi tokenni kiriting"
+            }
             icon={<KeyRound className="h-5 w-5" />}
             error={errors.token?.message}
             autoComplete="off"
@@ -162,12 +206,16 @@ export default function ResetPasswordPageClient({
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="newPassword">New password</Label>
+          <Label htmlFor="newPassword">{locale === "ru" ? "Новый пароль" : "Yangi parol"}</Label>
           <div className="relative">
             <Input
               id="newPassword"
               type={showPassword ? "text" : "password"}
-              placeholder="Enter a strong new password"
+              placeholder={
+                locale === "ru"
+                  ? "Введите надежный новый пароль"
+                  : "Kuchli yangi parolni kiriting"
+              }
               icon={<ShieldCheck className="h-5 w-5" />}
               error={errors.newPassword?.message}
               autoComplete="new-password"
@@ -177,7 +225,15 @@ export default function ResetPasswordPageClient({
               type="button"
               onClick={() => setShowPassword((value) => !value)}
               className="absolute right-3 top-1/2 -translate-y-1/2 text-surface-400 hover:text-surface-600"
-              aria-label={showPassword ? "Hide password" : "Show password"}
+              aria-label={
+                showPassword
+                  ? locale === "ru"
+                    ? "Скрыть пароль"
+                    : "Parolni yashirish"
+                  : locale === "ru"
+                    ? "Показать пароль"
+                    : "Parolni ko'rsatish"
+              }
             >
               {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
             </button>
@@ -185,11 +241,17 @@ export default function ResetPasswordPageClient({
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="confirmPassword">Confirm new password</Label>
+          <Label htmlFor="confirmPassword">
+            {locale === "ru" ? "Подтвердите новый пароль" : "Yangi parolni tasdiqlang"}
+          </Label>
           <Input
             id="confirmPassword"
             type={showPassword ? "text" : "password"}
-            placeholder="Repeat the new password"
+            placeholder={
+              locale === "ru"
+                ? "Повторите новый пароль"
+                : "Yangi parolni takrorlang"
+            }
             icon={<ShieldCheck className="h-5 w-5" />}
             error={errors.confirmPassword?.message}
             autoComplete="new-password"
@@ -198,12 +260,22 @@ export default function ResetPasswordPageClient({
         </div>
 
         <div className="rounded-xl border border-surface-200 bg-surface-50 p-4 text-sm text-surface-600">
-          <p className="font-medium text-surface-800">Password requirements</p>
+          <p className="font-medium text-surface-800">
+            {locale === "ru" ? "Требования к паролю" : "Parol talablari"}
+          </p>
           <ul className="mt-2 list-disc space-y-1 pl-5">
-            <li>At least 8 characters</li>
-            <li>At least one uppercase letter</li>
-            <li>At least one lowercase letter</li>
-            <li>At least one number</li>
+            <li>{locale === "ru" ? "Минимум 8 символов" : "Kamida 8 ta belgi"}</li>
+            <li>
+              {locale === "ru"
+                ? "Минимум одна заглавная буква"
+                : "Kamida bitta katta harf"}
+            </li>
+            <li>
+              {locale === "ru"
+                ? "Минимум одна строчная буква"
+                : "Kamida bitta kichik harf"}
+            </li>
+            <li>{locale === "ru" ? "Минимум одна цифра" : "Kamida bitta raqam"}</li>
           </ul>
         </div>
 
@@ -211,21 +283,21 @@ export default function ResetPasswordPageClient({
           {isLoading ? (
             <span className="flex items-center justify-center gap-2">
               <Loader2 className="h-4 w-4 animate-spin" />
-              Resetting...
+              {locale === "ru" ? "Сбрасываем..." : "Tiklanmoqda..."}
             </span>
           ) : (
-            "Reset password"
+            locale === "ru" ? "Сбросить пароль" : "Parolni tiklash"
           )}
         </Button>
       </form>
 
       <div className="mt-8 flex items-center justify-between gap-4 text-sm">
         <Link href="/forgot-password" className="font-medium text-brand-600 hover:text-brand-500">
-          Need a new reset link?
+          {locale === "ru" ? "Нужна новая ссылка?" : "Yangi tiklash havolasi kerakmi?"}
         </Link>
         <Link href="/login" className="inline-flex items-center gap-2 text-surface-500 hover:text-surface-700">
           <ArrowLeft className="h-4 w-4" />
-          Back to sign in
+          {locale === "ru" ? "Назад ко входу" : "Kirishga qaytish"}
         </Link>
       </div>
     </div>

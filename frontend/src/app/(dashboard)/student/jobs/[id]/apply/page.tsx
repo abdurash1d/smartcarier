@@ -70,40 +70,60 @@ import { aiApi, getErrorMessage } from "@/lib/api";
 import { useJobs } from "@/hooks/useJobs";
 import { useResume } from "@/hooks/useResume";
 import { useApplications } from "@/hooks/useApplications";
+import { useTranslation } from "@/hooks/useTranslation";
 import { toast } from "sonner";
 
-const additionalQuestions = [
-  {
-    id: "q1",
-    question: "Why are you interested in this position?",
-    type: "textarea",
-    required: true,
-  },
-  {
-    id: "q2",
-    question: "What is your expected salary range?",
-    type: "text",
-    required: false,
-  },
-  {
-    id: "q3",
-    question: "When can you start?",
-    type: "select",
-    options: ["Immediately", "2 weeks", "1 month", "Other"],
-    required: true,
-  },
-];
+type AdditionalQuestion = {
+  id: string;
+  question: string;
+  type: "textarea" | "text" | "select";
+  options?: string[];
+  required: boolean;
+};
+type StepItem = { id: number; title: string; icon: React.ComponentType<any> };
+
+function getAdditionalQuestions(isRu: boolean): AdditionalQuestion[] {
+  return [
+    {
+      id: "q1",
+      question: isRu
+        ? "Почему вас интересует эта позиция?"
+        : "Nima uchun bu lavozim sizni qiziqtiradi?",
+      type: "textarea",
+      required: true,
+    },
+    {
+      id: "q2",
+      question: isRu
+        ? "Какой диапазон зарплаты вы ожидаете?"
+        : "Kutilayotgan maosh oralig'ingiz qanday?",
+      type: "text",
+      required: false,
+    },
+    {
+      id: "q3",
+      question: isRu ? "Когда вы можете начать работу?" : "Qachondan ishni boshlay olasiz?",
+      type: "select",
+      options: isRu
+        ? ["Сразу", "Через 2 недели", "Через 1 месяц", "Другое"]
+        : ["Darhol", "2 hafta ichida", "1 oy ichida", "Boshqa"],
+      required: true,
+    },
+  ];
+}
 
 // =============================================================================
 // STEP CONFIGURATION
 // =============================================================================
 
-const steps: { id: number; title: string; icon: React.ComponentType<any> }[] = [
-  { id: 1, title: "Select Resume", icon: FileText },
-  { id: 2, title: "Cover Letter", icon: PenLine },
-  { id: 3, title: "Questions", icon: HelpCircle },
-  { id: 4, title: "Review", icon: CheckSquare },
-];
+function getSteps(isRu: boolean): StepItem[] {
+  return [
+    { id: 1, title: isRu ? "Выбор резюме" : "Rezyume tanlash", icon: FileText },
+    { id: 2, title: isRu ? "Сопроводительное письмо" : "Cover letter", icon: PenLine },
+    { id: 3, title: isRu ? "Savollar" : "Savollar", icon: HelpCircle },
+    { id: 4, title: isRu ? "Проверка" : "Ko'rib chiqish", icon: CheckSquare },
+  ];
+}
 
 function buildResumeText(resume: Resume): string {
   try {
@@ -140,7 +160,7 @@ function StepIndicator({
   currentStep,
   onStepClick,
 }: {
-  steps: { id: number; title: string; icon: React.ComponentType<any> }[];
+  steps: StepItem[];
   currentStep: number;
   onStepClick: (step: number) => void;
 }) {
@@ -195,16 +215,18 @@ function ResumeSelector({
   onSelect: (id: string) => void;
   jobRequirements?: string[];
 }) {
+  const { locale } = useTranslation();
+  const isRu = locale === "ru";
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h3 className="font-display text-lg font-semibold text-surface-900 dark:text-white">
-          Select a Resume
+          {isRu ? "Выберите резюме" : "Rezyumeni tanlang"}
         </h3>
         <Link href="/student/resumes/create-ai">
           <Button variant="outline" size="sm" className="gap-2">
             <Sparkles className="h-4 w-4" />
-            Create New
+            {isRu ? "Создать новое" : "Yangi yaratish"}
           </Button>
         </Link>
       </div>
@@ -269,7 +291,7 @@ function ResumeSelector({
                         className="gap-1 shrink-0"
                       >
                         <Target className="h-3 w-3" />
-                        {resume.matchScore}% match
+                        {resume.matchScore}% {isRu ? "совпадение" : "moslik"}
                       </Badge>
                     )}
                   </div>
@@ -278,7 +300,9 @@ function ResumeSelector({
                   {jobRequirements && matchingSkills && matchingSkills.length > 0 && (
                     <div className="mt-3">
                       <p className="mb-1.5 text-xs text-surface-500">
-                        Matching skills ({matchingSkills.length}/{jobRequirements.length}):
+                        {isRu
+                          ? `Подходящие навыки (${matchingSkills.length}/${jobRequirements.length}):`
+                          : `Mos ko'nikmalar (${matchingSkills.length}/${jobRequirements.length}):`}
                       </p>
                       <div className="flex flex-wrap gap-1">
                         {jobRequirements.map((skill) => {
@@ -306,13 +330,13 @@ function ResumeSelector({
                     {resume.ai_generated && (
                       <span className="flex items-center gap-1">
                         <Sparkles className="h-3 w-3" />
-                        AI Generated
+                        {isRu ? "AI yaratilgan" : "AI yaratilgan"}
                       </span>
                     )}
                     {resume.ats_score && (
                       <span className="flex items-center gap-1">
                         <Star className="h-3 w-3" />
-                        {resume.ats_score}% ATS Score
+                        {resume.ats_score}% ATS
                       </span>
                     )}
                   </div>
@@ -326,14 +350,14 @@ function ResumeSelector({
       {resumes.length === 0 && (
         <div className="rounded-xl border-2 border-dashed border-surface-200 p-8 text-center">
           <FileText className="mx-auto h-12 w-12 text-surface-300" />
-          <h4 className="mt-4 font-semibold text-surface-900">No resumes yet</h4>
+          <h4 className="mt-4 font-semibold text-surface-900">{isRu ? "Резюме пока нет" : "Hali rezyume yo'q"}</h4>
           <p className="mt-2 text-sm text-surface-500">
-            Create a resume to apply for this job
+            {isRu ? "Для отклика сначала создайте резюме" : "Bu ishga ariza berish uchun avval rezyume yarating"}
           </p>
           <Link href="/student/resumes/create-ai">
             <Button className="mt-4 bg-gradient-to-r from-purple-500 to-indigo-600">
               <Sparkles className="mr-2 h-4 w-4" />
-              Create AI Resume
+              {isRu ? "Создать AI-резюме" : "AI rezyume yaratish"}
             </Button>
           </Link>
         </div>
@@ -361,13 +385,15 @@ function CoverLetterEditor({
   jobTitle: string;
   companyName: string;
 }) {
+  const { locale } = useTranslation();
+  const isRu = locale === "ru";
   const [tone, setTone] = useState("professional");
 
   const tones = [
-    { value: "professional", label: "Professional" },
-    { value: "enthusiastic", label: "Enthusiastic" },
-    { value: "confident", label: "Confident" },
-    { value: "creative", label: "Creative" },
+    { value: "professional", label: isRu ? "Профессиональный" : "Professional" },
+    { value: "enthusiastic", label: isRu ? "Энергичный" : "Enthusiastic" },
+    { value: "confident", label: isRu ? "Уверенный" : "Confident" },
+    { value: "creative", label: isRu ? "Креативный" : "Creative" },
   ];
 
   return (
@@ -375,11 +401,11 @@ function CoverLetterEditor({
       <div className="flex items-center justify-between">
         <div>
           <h3 className="font-display text-lg font-semibold text-surface-900 dark:text-white">
-            Cover Letter
+            {isRu ? "Сопроводительное письмо" : "Cover letter"}
           </h3>
-          <p className="text-sm text-surface-500">Optional but recommended</p>
+          <p className="text-sm text-surface-500">{isRu ? "Необязательно, но рекомендуется" : "Ixtiyoriy, lekin tavsiya etiladi"}</p>
         </div>
-        <Badge variant="secondary">Optional</Badge>
+        <Badge variant="secondary">{isRu ? "Ixtiyoriy" : "Ixtiyoriy"}</Badge>
       </div>
 
       {/* AI Generation Card */}
@@ -392,10 +418,10 @@ function CoverLetterEditor({
               </div>
               <div>
                 <p className="font-medium text-surface-900 dark:text-white">
-                  Generate with AI
+                  {isRu ? "Сгенерировать с AI" : "AI bilan yaratish"}
                 </p>
                 <p className="text-sm text-surface-500">
-                  Create a personalized cover letter instantly
+                  {isRu ? "Shaxsiy cover letter ni bir zumda yarating" : "Shaxsiy cover letter ni bir zumda yarating"}
                 </p>
               </div>
             </div>
@@ -419,12 +445,12 @@ function CoverLetterEditor({
                 {isGenerating ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Generating...
+                    {isRu ? "Генерируется..." : "Yaratilmoqda..."}
                   </>
                 ) : (
                   <>
                     <Sparkles className="mr-2 h-4 w-4" />
-                    Generate
+                    {isRu ? "Создать" : "Yaratish"}
                   </>
                 )}
               </Button>
@@ -438,24 +464,28 @@ function CoverLetterEditor({
         <Textarea
           value={value}
           onChange={(e) => onChange(e.target.value)}
-          placeholder={`Dear Hiring Manager at ${companyName},\n\nI am writing to express my interest in the ${jobTitle} position...`}
+          placeholder={
+            isRu
+              ? `Здравствуйте, менеджер по найму ${companyName}.\n\nХочу откликнуться на позицию ${jobTitle}...`
+              : `Hurmatli ${companyName} jamoasi.\n\nMen ${jobTitle} lavozimiga qiziqish bildiraman...`
+          }
           className="min-h-[300px] resize-none"
         />
         <div className="absolute bottom-3 right-3 text-xs text-surface-400">
-          {value.length} / 2000 characters
+          {value.length} / 2000 {isRu ? "символов" : "belgi"}
         </div>
       </div>
 
       {/* Tips */}
       <div className="rounded-xl bg-surface-50 p-4 dark:bg-surface-800/50">
         <h4 className="mb-2 text-sm font-medium text-surface-700 dark:text-surface-300">
-          💡 Tips for a great cover letter:
+          {isRu ? "💡 Yaxshi cover letter uchun tavsiyalar:" : "💡 Yaxshi cover letter uchun tavsiyalar:"}
         </h4>
         <ul className="space-y-1 text-sm text-surface-500">
-          <li>• Mention specific skills that match the job requirements</li>
-          <li>• Share a relevant achievement or project</li>
-          <li>• Show enthusiasm for the company and role</li>
-          <li>• Keep it concise (250-400 words)</li>
+          <li>{isRu ? "• Укажите навыки, которые совпадают с требованиями" : "• Talablarga mos ko'nikmalarni aniq ko'rsating"}</li>
+          <li>{isRu ? "• Добавьте релевантный результат или loyiha" : "• Mos yutuq yoki loyihani kiriting"}</li>
+          <li>{isRu ? "• Покажите мотивацию к компании и роли" : "• Kompaniya va rolga qiziqishingizni ko'rsating"}</li>
+          <li>{isRu ? "• Кратко и по делу (250-400 слов)" : "• Qisqa va lo'nda yozing (250-400 so'z)"}</li>
         </ul>
       </div>
     </div>
@@ -471,19 +501,21 @@ function QuestionsForm({
   answers,
   onChange,
 }: {
-  questions: typeof additionalQuestions;
+  questions: AdditionalQuestion[];
   answers: Record<string, string>;
   onChange: (id: string, value: string) => void;
 }) {
+  const { locale } = useTranslation();
+  const isRu = locale === "ru";
   if (questions.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-12 text-center">
         <CheckCircle className="h-16 w-16 text-green-500" />
         <h3 className="mt-4 font-display text-lg font-semibold text-surface-900 dark:text-white">
-          No additional questions
+          {isRu ? "Дополнительных вопросов нет" : "Qo'shimcha savollar yo'q"}
         </h3>
         <p className="mt-2 text-surface-500">
-          This employer hasn't added any screening questions
+          {isRu ? "Работодатель не добавил скрининг-вопросы" : "Ish beruvchi qo'shimcha saralash savollarini qo'shmagan"}
         </p>
       </div>
     );
@@ -493,10 +525,10 @@ function QuestionsForm({
     <div className="space-y-6">
       <div>
         <h3 className="font-display text-lg font-semibold text-surface-900 dark:text-white">
-          Additional Questions
+          {isRu ? "Дополнительные вопросы" : "Qo'shimcha savollar"}
         </h3>
         <p className="text-sm text-surface-500">
-          Please answer the following questions from the employer
+          {isRu ? "Пожалуйста, ответьте на вопросы работодателя" : "Iltimos, ish beruvchi savollariga javob bering"}
         </p>
       </div>
 
@@ -514,7 +546,7 @@ function QuestionsForm({
             <Textarea
               value={answers[q.id] || ""}
               onChange={(e) => onChange(q.id, e.target.value)}
-              placeholder="Type your answer..."
+              placeholder={isRu ? "Javobingizni yozing..." : "Javobingizni yozing..."}
               rows={4}
             />
           ) : q.type === "select" ? (
@@ -523,7 +555,7 @@ function QuestionsForm({
               onChange={(e) => onChange(q.id, e.target.value)}
               className="w-full rounded-lg border border-surface-300 bg-white px-4 py-2.5 dark:border-surface-700 dark:bg-surface-800"
             >
-              <option value="">Select an option</option>
+              <option value="">{isRu ? "Вариантni tanlang" : "Variantni tanlang"}</option>
               {q.options?.map((opt) => (
                 <option key={opt} value={opt}>
                   {opt}
@@ -534,7 +566,7 @@ function QuestionsForm({
             <Input
               value={answers[q.id] || ""}
               onChange={(e) => onChange(q.id, e.target.value)}
-              placeholder="Type your answer..."
+              placeholder={isRu ? "Javobingizni yozing..." : "Javobingizni yozing..."}
             />
           )}
         </div>
@@ -558,16 +590,18 @@ function ReviewSection({
   resume: Resume | null;
   coverLetter: string;
   answers: Record<string, string>;
-  questions: typeof additionalQuestions;
+  questions: AdditionalQuestion[];
 }) {
+  const { locale } = useTranslation();
+  const isRu = locale === "ru";
   return (
     <div className="space-y-6">
       <div>
         <h3 className="font-display text-lg font-semibold text-surface-900 dark:text-white">
-          Review Your Application
+          {isRu ? "Проверьте заявку" : "Arizangizni tekshiring"}
         </h3>
         <p className="text-sm text-surface-500">
-          Please review your application before submitting
+          {isRu ? "Перед отправкой проверьте данные" : "Yuborishdan oldin arizangizni tekshiring"}
         </p>
       </div>
 
@@ -606,16 +640,16 @@ function ReviewSection({
               <FileText className="h-5 w-5 text-purple-600" />
             </div>
             <div>
-              <p className="text-sm font-medium text-surface-500">Resume</p>
+              <p className="text-sm font-medium text-surface-500">{isRu ? "Rezyume" : "Rezyume"}</p>
               <p className="font-semibold text-surface-900 dark:text-white">
-                {resume?.title || "No resume selected"}
+                {resume?.title || (isRu ? "Резюме не выбрано" : "Rezyume tanlanmagan")}
               </p>
             </div>
           </div>
           {resume && (
             <Badge variant="success" className="gap-1">
               <CheckCircle className="h-3 w-3" />
-              Ready
+              {isRu ? "Готово" : "Tayyor"}
             </Badge>
           )}
         </div>
@@ -629,19 +663,19 @@ function ReviewSection({
               <PenLine className="h-5 w-5 text-blue-600" />
             </div>
             <div>
-              <p className="text-sm font-medium text-surface-500">Cover Letter</p>
+              <p className="text-sm font-medium text-surface-500">{isRu ? "Сопроводительное письмо" : "Cover letter"}</p>
               <p className="font-semibold text-surface-900 dark:text-white">
-                {coverLetter ? `${coverLetter.length} characters` : "Not provided"}
+                {coverLetter ? `${coverLetter.length} ${isRu ? "символов" : "belgi"}` : (isRu ? "Не добавлено" : "Qo'shilmagan")}
               </p>
             </div>
           </div>
           {coverLetter ? (
             <Badge variant="success" className="gap-1">
               <CheckCircle className="h-3 w-3" />
-              Included
+              {isRu ? "Добавлено" : "Qo'shilgan"}
             </Badge>
           ) : (
-            <Badge variant="secondary">Optional</Badge>
+            <Badge variant="secondary">{isRu ? "Ixtiyoriy" : "Ixtiyoriy"}</Badge>
           )}
         </div>
         {coverLetter && (
@@ -660,10 +694,10 @@ function ReviewSection({
             </div>
             <div>
               <p className="text-sm font-medium text-surface-500">
-                Additional Questions
+                {isRu ? "Дополнительные вопросы" : "Qo'shimcha savollar"}
               </p>
               <p className="font-semibold text-surface-900 dark:text-white">
-                {Object.keys(answers).length}/{questions.length} answered
+                {Object.keys(answers).length}/{questions.length} {isRu ? "отвечено" : "javob berilgan"}
               </p>
             </div>
           </div>
@@ -675,7 +709,7 @@ function ReviewSection({
                 </p>
                 <p className="mt-1 text-sm text-surface-600">
                   {answers[q.id] || (
-                    <span className="italic text-surface-400">Not answered</span>
+                    <span className="italic text-surface-400">{isRu ? "Не отвечено" : "Javob berilmagan"}</span>
                   )}
                 </p>
               </div>
@@ -690,11 +724,12 @@ function ReviewSection({
           <CheckCircle className="h-5 w-5 shrink-0 text-green-600" />
           <div>
             <p className="font-medium text-green-800 dark:text-green-300">
-              Ready to submit
+              {isRu ? "Отправке готово" : "Yuborishga tayyor"}
             </p>
             <p className="mt-1 text-sm text-green-600 dark:text-green-400">
-              By submitting, you confirm that the information provided is accurate
-              and you agree to the company's application terms.
+              {isRu
+                ? "Отправляя заявку, вы подтверждаете корректность данных и соглашаетесь с условиями компании."
+                : "Arizani yuborish orqali ma'lumotlarning to'g'riligini tasdiqlaysiz va kompaniya shartlariga rozilik bildirasiz."}
             </p>
           </div>
         </div>
@@ -708,6 +743,8 @@ function ReviewSection({
 // =============================================================================
 
 function SuccessScreen({ job, onViewApplications }: { job: Job; onViewApplications: () => void }) {
+  const { locale } = useTranslation();
+  const isRu = locale === "ru";
   useEffect(() => {
     // Trigger confetti
     const duration = 3000;
@@ -766,11 +803,11 @@ function SuccessScreen({ job, onViewApplications }: { job: Job; onViewApplicatio
         transition={{ delay: 0.4 }}
       >
         <h2 className="font-display text-2xl font-bold text-surface-900 dark:text-white">
-          Application Submitted! 🎉
+          {isRu ? "Заявка отправлена! 🎉" : "Ariza yuborildi! 🎉"}
         </h2>
         <p className="mt-2 text-surface-500">
-          Your application for <strong>{job.title}</strong> at{" "}
-          <strong>{job.company?.name}</strong> has been sent successfully.
+          {isRu ? "Ваша заявка на" : "Sizning"} <strong>{job.title}</strong> {isRu ? "в" : "uchun"}{" "}
+          <strong>{job.company?.name}</strong> {isRu ? "успешно отправлена." : "muvaffaqiyatli yuborildi."}
         </p>
       </motion.div>
 
@@ -782,32 +819,32 @@ function SuccessScreen({ job, onViewApplications }: { job: Job; onViewApplicatio
         className="mt-8 w-full max-w-md"
       >
         <h3 className="mb-4 font-semibold text-surface-900 dark:text-white">
-          What happens next?
+          {isRu ? "Что дальше?" : "Keyingi qadamlar"}
         </h3>
         <div className="space-y-3 text-left">
           {[
             {
               step: 1,
-              title: "Application Received",
-              desc: "The employer has been notified",
+              title: isRu ? "Заявка получена" : "Ariza qabul qilindi",
+              desc: isRu ? "Ish beruvchiga xabar berildi" : "Ish beruvchiga xabar berildi",
               status: "completed",
             },
             {
               step: 2,
-              title: "Under Review",
-              desc: "Your application is being reviewed",
+              title: isRu ? "На проверке" : "Ko'rib chiqilmoqda",
+              desc: isRu ? "Ваша заявка рассматривается" : "Arizangiz ko'rib chiqilmoqda",
               status: "current",
             },
             {
               step: 3,
-              title: "Interview",
-              desc: "You may be invited for an interview",
+              title: isRu ? "Собеседование" : "Intervyu",
+              desc: isRu ? "Вас могут пригласить на интервью" : "Siz intervyuga taklif qilinishingiz mumkin",
               status: "pending",
             },
             {
               step: 4,
-              title: "Decision",
-              desc: "You'll receive a response",
+              title: isRu ? "Решение" : "Yakuniy qaror",
+              desc: isRu ? "Вы получите ответ" : "Sizga javob yuboriladi",
               status: "pending",
             },
           ].map((item) => (
@@ -860,13 +897,13 @@ function SuccessScreen({ job, onViewApplications }: { job: Job; onViewApplicatio
         className="mt-8 flex gap-3"
       >
         <Link href="/student/jobs">
-          <Button variant="outline">Browse More Jobs</Button>
+          <Button variant="outline">{isRu ? "Посмотреть другие вакансии" : "Yana ishlarni ko'rish"}</Button>
         </Link>
         <Button
           onClick={onViewApplications}
           className="bg-gradient-to-r from-purple-500 to-indigo-600"
         >
-          View My Applications
+          {isRu ? "Посмотреть мои заявки" : "Arizalarimni ko'rish"}
         </Button>
       </motion.div>
     </motion.div>
@@ -878,6 +915,8 @@ function SuccessScreen({ job, onViewApplications }: { job: Job; onViewApplicatio
 // =============================================================================
 
 export default function ApplyPage() {
+  const { locale } = useTranslation();
+  const isRu = locale === "ru";
   const router = useRouter();
   const params = useParams();
   const jobId = params!.id as string;
@@ -898,6 +937,8 @@ export default function ApplyPage() {
   const [selectedResumeId, setSelectedResumeId] = useState<string | null>(null);
   const [coverLetter, setCoverLetter] = useState("");
   const [answers, setAnswers] = useState<Record<string, string>>({});
+  const steps = getSteps(isRu);
+  const additionalQuestions = getAdditionalQuestions(isRu);
 
   // Load job and resumes
   // Load job + resumes once on mount
@@ -956,7 +997,7 @@ export default function ApplyPage() {
   // Generate AI cover letter
   const handleGenerateCoverLetter = async (tone: string) => {
     if (!job || !selectedResume) {
-      toast.error("Select a resume before generating a cover letter.");
+      toast.error(isRu ? "Сначала выберите резюме." : "Cover letter yaratishdan oldin rezyumeni tanlang.");
       return;
     }
 
@@ -983,7 +1024,7 @@ export default function ApplyPage() {
       };
 
       if (data.success === false) {
-        throw new Error(data.message || "AI cover letter generation failed.");
+        throw new Error(data.message || (isRu ? "AI не смог сгенерировать письмо." : "AI cover letter yaratolmadi."));
       }
 
       const generatedLetter =
@@ -995,11 +1036,11 @@ export default function ApplyPage() {
         data.data?.letter;
 
       if (!generatedLetter) {
-        throw new Error(data.message || "AI cover letter generation returned no content.");
+        throw new Error(data.message || (isRu ? "AI пустой natija qaytardi." : "AI bo'sh natija qaytardi."));
       }
 
       setCoverLetter(generatedLetter);
-      toast.success("Cover letter generated");
+      toast.success(isRu ? "Сопроводительное письмо готово" : "Cover letter yaratildi");
     } catch (error) {
       toast.error(getErrorMessage(error));
     } finally {
@@ -1010,7 +1051,7 @@ export default function ApplyPage() {
   // Submit application
   const handleSubmit = async () => {
     if (!job || !selectedResumeId) {
-      toast.error("Please select a resume before submitting.");
+      toast.error(isRu ? "Перед отправкой выберите резюме." : "Yuborishdan oldin rezyume tanlang.");
       return;
     }
 
@@ -1059,12 +1100,12 @@ export default function ApplyPage() {
     return (
       <div className="flex flex-col items-center justify-center py-16 text-center">
         <AlertCircle className="h-16 w-16 text-red-500" />
-        <h2 className="mt-4 text-xl font-semibold text-surface-900">Job not found</h2>
+        <h2 className="mt-4 text-xl font-semibold text-surface-900">{isRu ? "Вакансия не найдена" : "Ish topilmadi"}</h2>
         <p className="mt-2 text-surface-500">
-          This job posting may have been removed or is no longer available.
+          {isRu ? "Вакансия удалена или больше недоступна." : "Bu vakansiya o'chirilgan yoki endi mavjud emas."}
         </p>
         <Link href="/student/jobs">
-          <Button className="mt-6">Browse Other Jobs</Button>
+          <Button className="mt-6">{isRu ? "Другие вакансии" : "Boshqa ishlarni ko'rish"}</Button>
         </Link>
       </div>
     );
@@ -1089,15 +1130,15 @@ export default function ApplyPage() {
         className="mb-6 inline-flex items-center gap-2 text-sm text-surface-500 hover:text-surface-700"
       >
         <ArrowLeft className="h-4 w-4" />
-        Back to Job
+        {isRu ? "Назад к вакансии" : "Vakansiyaga qaytish"}
       </Link>
 
       {/* Header */}
       <div className="mb-8">
         <h1 className="font-display text-2xl font-bold text-surface-900 dark:text-white">
-          Apply for {job.title}
+          {isRu ? "Отклик на" : "Ariza yuborish:"} {job.title}
         </h1>
-        <p className="mt-1 text-surface-500">at {job.company?.name}</p>
+        <p className="mt-1 text-surface-500">{isRu ? "компания" : "kompaniya"}: {job.company?.name}</p>
       </div>
 
       {/* Step Indicator */}
@@ -1196,7 +1237,7 @@ export default function ApplyPage() {
           disabled={currentStep === 1}
         >
           <ArrowLeft className="mr-2 h-4 w-4" />
-          Back
+          {isRu ? "Назад" : "Orqaga"}
         </Button>
 
         <Button
@@ -1207,16 +1248,16 @@ export default function ApplyPage() {
           {isSubmitting ? (
             <>
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              Submitting...
+              {isRu ? "Отправка..." : "Yuborilmoqda..."}
             </>
           ) : currentStep === 4 ? (
             <>
               <Send className="mr-2 h-4 w-4" />
-              Submit Application
+              {isRu ? "Отправить заявку" : "Arizani yuborish"}
             </>
           ) : (
             <>
-              Next
+              {isRu ? "Далее" : "Keyingi"}
               <ArrowRight className="ml-2 h-4 w-4" />
             </>
           )}

@@ -179,7 +179,7 @@ export default function SavedJobsPage() {
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, scale: 0.95 }}
                   transition={{ delay: i * 0.05 }}
-                  className="group relative flex flex-col rounded-2xl border border-surface-200 bg-white p-5 shadow-sm transition-all hover:border-purple-200 hover:shadow-md"
+                  className="group relative flex flex-col rounded-2xl border border-surface-200 bg-white p-5 shadow-sm transition-all hover:border-purple-200 hover:shadow-md dark:border-surface-700 dark:bg-surface-800 dark:hover:border-purple-700"
                 >
                   {/* Remove button */}
                   <button

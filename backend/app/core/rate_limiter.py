@@ -11,13 +11,14 @@ Features:
 - Configurable windows and limits
 - Brute-force protection for login
 
-AUTHOR: SmartCareer AI Team
+AUTHOR: CareerUZ Team
 VERSION: 1.0.0
 =============================================================================
 """
 
 import time
 import logging
+import threading
 from typing import Dict, Tuple, Optional
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
@@ -48,14 +49,30 @@ class RateLimiter:
         """Initialize rate limiter."""
         # Storage: {key: [(timestamp, count), ...]}
         self._storage: Dict[str, list] = defaultdict(list)
-        
+
         # Failed login attempts: {identifier: [(timestamp, ip), ...]}
         self._failed_logins: Dict[str, list] = defaultdict(list)
-        
+
         # Locked accounts: {identifier: unlock_time}
         self._locked_accounts: Dict[str, datetime] = {}
-        
+
+        self._lock = threading.Lock()
+        self._last_cleanup = time.time()
+
         logger.info("RateLimiter initialized (in-memory mode)")
+
+    def _maybe_cleanup(self):
+        """Prune completely-stale keys every 5 minutes to prevent unbounded growth.
+        Must be called while holding self._lock."""
+        now = time.time()
+        if now - self._last_cleanup < 300:
+            return
+        self._last_cleanup = now
+        cutoff = now - 3600
+        stale = [k for k, entries in self._storage.items()
+                 if not entries or all(ts < cutoff for ts, _ in entries)]
+        for k in stale:
+            del self._storage[k]
     
     def check_rate_limit(
         self,
@@ -74,37 +91,31 @@ class RateLimiter:
         Returns:
             Tuple of (is_allowed, retry_after_seconds)
         """
-        now = time.time()
-        window_start = now - window_seconds
-        
-        # Clean old entries
-        if identifier in self._storage:
-            self._storage[identifier] = [
-                (ts, count) for ts, count in self._storage[identifier]
-                if ts > window_start
-            ]
-        
-        # Count requests in current window
-        current_count = sum(
-            count for ts, count in self._storage[identifier]
-        )
-        
-        if current_count >= max_requests:
-            # Calculate retry after
-            oldest_ts = min(ts for ts, _ in self._storage[identifier])
-            retry_after = int(window_seconds - (now - oldest_ts)) + 1
-            
-            logger.warning(
-                f"Rate limit exceeded for {identifier[:20]}... "
-                f"({current_count}/{max_requests} in {window_seconds}s)"
-            )
-            
-            return False, retry_after
-        
-        # Add current request
-        self._storage[identifier].append((now, 1))
-        
-        return True, None
+        with self._lock:
+            now = time.time()
+            window_start = now - window_seconds
+
+            # Clean old entries for this key
+            if identifier in self._storage:
+                self._storage[identifier] = [
+                    (ts, count) for ts, count in self._storage[identifier]
+                    if ts > window_start
+                ]
+
+            current_count = sum(count for ts, count in self._storage[identifier])
+
+            if current_count >= max_requests:
+                oldest_ts = min(ts for ts, _ in self._storage[identifier])
+                retry_after = int(window_seconds - (now - oldest_ts)) + 1
+                logger.warning(
+                    f"Rate limit exceeded for {identifier[:20]}... "
+                    f"({current_count}/{max_requests} in {window_seconds}s)"
+                )
+                return False, retry_after
+
+            self._storage[identifier].append((now, 1))
+            self._maybe_cleanup()
+            return True, None
     
     def record_failed_login(
         self,
@@ -125,57 +136,53 @@ class RateLimiter:
         Returns:
             Tuple of (is_locked, unlock_after_seconds, remaining_attempts)
         """
-        now = datetime.now(timezone.utc)
-        
-        # Check if already locked
-        if identifier in self._locked_accounts:
-            unlock_time = self._locked_accounts[identifier]
-            if now < unlock_time:
-                seconds_left = int((unlock_time - now).total_seconds())
-                logger.warning(f"Account locked: {identifier[:20]}... ({seconds_left}s remaining)")
+        with self._lock:
+            now = datetime.now(timezone.utc)
+
+            # Check if already locked
+            if identifier in self._locked_accounts:
+                unlock_time = self._locked_accounts[identifier]
+                if now < unlock_time:
+                    seconds_left = int((unlock_time - now).total_seconds())
+                    logger.warning(f"Account locked: {identifier[:20]}... ({seconds_left}s remaining)")
+                    return True, seconds_left, 0
+                else:
+                    del self._locked_accounts[identifier]
+                    self._failed_logins[identifier] = []
+
+            # Record failed attempt
+            self._failed_logins[identifier].append((now, ip_address))
+
+            # Clean old attempts outside the lockout window
+            window_start = now - timedelta(minutes=lockout_minutes)
+            self._failed_logins[identifier] = [
+                (ts, ip) for ts, ip in self._failed_logins[identifier]
+                if ts > window_start
+            ]
+
+            recent_attempts = len(self._failed_logins[identifier])
+            remaining = max(0, max_attempts - recent_attempts)
+
+            if recent_attempts >= max_attempts:
+                unlock_time = now + timedelta(minutes=lockout_minutes)
+                self._locked_accounts[identifier] = unlock_time
+                seconds_left = lockout_minutes * 60
+                logger.critical(
+                    f"Account locked due to {recent_attempts} failed attempts: "
+                    f"{identifier[:20]}... from IPs: {[ip for _, ip in self._failed_logins[identifier]]}"
+                )
                 return True, seconds_left, 0
-            else:
-                # Unlock account
-                del self._locked_accounts[identifier]
-                self._failed_logins[identifier] = []
-        
-        # Record failed attempt
-        self._failed_logins[identifier].append((now, ip_address))
-        
-        # Clean old attempts (older than lockout window)
-        window_start = now - timedelta(minutes=lockout_minutes)
-        self._failed_logins[identifier] = [
-            (ts, ip) for ts, ip in self._failed_logins[identifier]
-            if ts > window_start
-        ]
-        
-        # Count recent attempts
-        recent_attempts = len(self._failed_logins[identifier])
-        remaining = max(0, max_attempts - recent_attempts)
-        
-        # Check if should lock
-        if recent_attempts >= max_attempts:
-            unlock_time = now + timedelta(minutes=lockout_minutes)
-            self._locked_accounts[identifier] = unlock_time
-            seconds_left = lockout_minutes * 60
-            
-            logger.critical(
-                f"Account locked due to {recent_attempts} failed attempts: "
-                f"{identifier[:20]}... from IPs: {[ip for _, ip in self._failed_logins[identifier]]}"
-            )
-            
-            return True, seconds_left, 0
-        
-        logger.info(f"Failed login recorded: {identifier[:20]}... ({remaining} attempts remaining)")
-        
-        return False, None, remaining
+
+            logger.info(f"Failed login recorded: {identifier[:20]}... ({remaining} attempts remaining)")
+            return False, None, remaining
     
     def clear_failed_logins(self, identifier: str):
         """Clear failed login attempts after successful login."""
-        if identifier in self._failed_logins:
-            del self._failed_logins[identifier]
-        if identifier in self._locked_accounts:
-            del self._locked_accounts[identifier]
+        with self._lock:
+            if identifier in self._failed_logins:
+                del self._failed_logins[identifier]
+            if identifier in self._locked_accounts:
+                del self._locked_accounts[identifier]
         logger.info(f"Failed login attempts cleared: {identifier[:20]}...")
     
     def is_account_locked(self, identifier: str) -> Tuple[bool, Optional[int]]:
@@ -185,19 +192,19 @@ class RateLimiter:
         Returns:
             Tuple of (is_locked, unlock_after_seconds)
         """
-        if identifier not in self._locked_accounts:
-            return False, None
-        
-        now = datetime.now(timezone.utc)
-        unlock_time = self._locked_accounts[identifier]
-        
-        if now >= unlock_time:
-            # Unlock
-            del self._locked_accounts[identifier]
-            return False, None
-        
-        seconds_left = int((unlock_time - now).total_seconds())
-        return True, seconds_left
+        with self._lock:
+            if identifier not in self._locked_accounts:
+                return False, None
+
+            now = datetime.now(timezone.utc)
+            unlock_time = self._locked_accounts[identifier]
+
+            if now >= unlock_time:
+                del self._locked_accounts[identifier]
+                return False, None
+
+            seconds_left = int((unlock_time - now).total_seconds())
+            return True, seconds_left
 
 
 # =============================================================================

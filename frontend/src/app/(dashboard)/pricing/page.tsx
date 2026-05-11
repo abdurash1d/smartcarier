@@ -16,6 +16,7 @@ import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { useAuthStore } from "@/store/authStore";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import { useTranslation } from "@/hooks/useTranslation";
 
 // =============================================================================
 // TYPES
@@ -40,26 +41,26 @@ interface PricingPlan {
 // PRICING DATA
 // =============================================================================
 
-const pricingPlans: PricingPlan[] = [
+const getPricingPlans = (isRu: boolean): PricingPlan[] => [
   {
     id: "free",
-    name: "Free",
+    name: isRu ? "Бесплатный" : "Bepul",
     price: {
       monthly: 0,
       yearly: 0,
     },
-    description: "Perfect for trying out SmartCareer AI",
+    description: isRu ? "Идеально для знакомства со CareerUZ" : "CareerUZ ni sinab ko'rish uchun",
     features: [
-      "1 AI-generated resume",
-      "5 job applications/month",
-      "Basic job matching",
-      "Email support",
+      isRu ? "1 AI-резюме" : "1 ta AI rezyume",
+      isRu ? "5 заявок в месяц" : "Oyiga 5 ta ariza",
+      isRu ? "Базовый подбор вакансий" : "Asosiy ish moslashtirish",
+      isRu ? "Поддержка по email" : "Email qo'llab-quvvatlash",
     ],
     notIncluded: [
-      "Unlimited AI generations",
-      "Auto-apply feature",
-      "Priority support",
-      "Analytics dashboard",
+      isRu ? "Безлимитные AI-генерации" : "Cheksiz AI yaratish",
+      isRu ? "Автоотклик" : "Avto-ariza funksiyasi",
+      isRu ? "Приоритетная поддержка" : "Ustuvor qo'llab-quvvatlash",
+      isRu ? "Панель аналитики" : "Analitika paneli",
     ],
     icon: Sparkles,
     color: "bg-gray-500",
@@ -71,15 +72,15 @@ const pricingPlans: PricingPlan[] = [
       monthly: 4,
       yearly: 40,
     },
-    description: "For serious job seekers and students",
+    description: isRu ? "Для активных соискателей и студентов" : "Faol ish izlovchilar va talabalar uchun",
     features: [
-      "Unlimited AI resume generation",
-      "50 job applications/month",
-      "Auto-apply to matching jobs",
-      "Priority job matching",
-      "Advanced analytics dashboard",
-      "Premium resume templates",
-      "Priority email support",
+      isRu ? "Безлимитная AI генерация резюме" : "Cheksiz AI rezyume yaratish",
+      isRu ? "50 заявок в месяц" : "Oyiga 50 ta ariza",
+      isRu ? "Автоотклик на подходящие вакансии" : "Mos ishlar uchun avto-ariza",
+      isRu ? "Приоритетный подбор" : "Ustuvor ish moslashtirish",
+      isRu ? "Расширенная аналитика" : "Kengaytirilgan analitika",
+      isRu ? "Премиум шаблоны резюме" : "Premium rezyume shablonlari",
+      isRu ? "Приоритетная email поддержка" : "Ustuvor email qo'llab-quvvatlash",
     ],
     popular: true,
     icon: Zap,
@@ -92,17 +93,17 @@ const pricingPlans: PricingPlan[] = [
       monthly: 0,  // Custom
       yearly: 0,   // Custom
     },
-    description: "For teams and organizations",
+    description: isRu ? "Для команд и организаций" : "Jamoalar va tashkilotlar uchun",
     features: [
-      "Everything in Premium",
-      "Unlimited job applications",
-      "Team management (up to 50 users)",
-      "Custom branding",
-      "API access",
-      "Dedicated account manager",
-      "24/7 priority support",
-      "SLA guarantee",
-      "Custom integrations",
+      isRu ? "Все возможности Premium" : "Premium dagi hamma imkoniyat",
+      isRu ? "Безлимитные заявки" : "Cheksiz arizalar",
+      isRu ? "Управление командой (до 50 пользователей)" : "Jamoa boshqaruvi (50 foydalanuvchigacha)",
+      isRu ? "Кастомный брендинг" : "Maxsus brending",
+      isRu ? "Доступ к API" : "API kirish",
+      isRu ? "Выделенный менеджер" : "Alohida menejer",
+      isRu ? "24/7 приоритетная поддержка" : "24/7 ustuvor yordam",
+      isRu ? "SLA гарантия" : "SLA kafolati",
+      isRu ? "Кастомные интеграции" : "Maxsus integratsiyalar",
     ],
     icon: Crown,
     color: "bg-purple-500",
@@ -114,20 +115,23 @@ const pricingPlans: PricingPlan[] = [
 // =============================================================================
 
 export default function PricingPage() {
+  const { locale } = useTranslation();
+  const isRu = locale === "ru";
   const router = useRouter();
   const { user, isAuthenticated } = useAuthStore();
+  const pricingPlans = getPricingPlans(isRu);
   const [billingCycle, setBillingCycle] = useState<"monthly" | "yearly">("monthly");
   const [loading, setLoading] = useState(false);
 
   const handleSelectPlan = async (planId: string) => {
     if (!isAuthenticated) {
-      toast.error("Please login to subscribe");
+      toast.error(isRu ? "Войдите в систему для оформления подписки" : "Obuna uchun tizimga kiring");
       router.push("/login?redirect=/pricing");
       return;
     }
 
     if (planId === "free") {
-      toast.info("You're already on the free plan!");
+      toast.info(isRu ? "Вы уже на бесплатном тарифе!" : "Siz allaqachon bepul tarifdasiz!");
       return;
     }
 
@@ -150,10 +154,12 @@ export default function PricingPage() {
         {/* Header */}
         <div className="text-center mb-12">
           <h1 className="text-4xl md:text-5xl font-bold text-surface-900 dark:text-white mb-4">
-            Choose Your Plan
+            {isRu ? "Выберите тариф" : "Tarifni tanlang"}
           </h1>
           <p className="text-lg text-surface-600 dark:text-surface-400 mb-8 max-w-2xl mx-auto">
-            Unlock the full power of AI-driven career tools. Start free, upgrade anytime.
+            {isRu
+              ? "Откройте все возможности AI-инструментов для карьеры. Начните бесплатно и улучшайте в любой момент."
+              : "AI asosidagi karyera vositalarining to'liq imkoniyatlarini oching. Bepul boshlang va istalgan payt tarifni oshiring."}
           </p>
 
           {/* Billing Toggle */}
@@ -166,7 +172,7 @@ export default function PricingPage() {
                   : "text-surface-600 dark:text-surface-400 hover:text-surface-900 dark:hover:text-white"
               }`}
             >
-              Monthly
+              {isRu ? "Ежемесячно" : "Oylik"}
             </button>
             <button
               onClick={() => setBillingCycle("yearly")}
@@ -176,9 +182,9 @@ export default function PricingPage() {
                   : "text-surface-600 dark:text-surface-400 hover:text-surface-900 dark:hover:text-white"
               }`}
             >
-              Yearly
+              {isRu ? "Ежегодно" : "Yillik"}
               <span className="absolute -top-2 -right-2 bg-green-500 text-white text-xs px-2 py-0.5 rounded-full">
-                Save 17%
+                {isRu ? "Экономия 17%" : "17% tejaladi"}
               </span>
             </button>
           </div>
@@ -203,7 +209,7 @@ export default function PricingPage() {
                 {/* Popular Badge */}
                 {plan.popular && (
                   <div className="absolute top-0 right-0 bg-brand-500 text-white text-xs font-bold px-3 py-1 rounded-bl-lg">
-                    MOST POPULAR
+                    {isRu ? "ПОПУЛЯРНЫЙ" : "ENG MASHHUR"}
                   </div>
                 )}
 
@@ -227,7 +233,7 @@ export default function PricingPage() {
                   <div className="mb-6">
                     {plan.id === "enterprise" ? (
                       <div className="text-4xl font-bold text-surface-900 dark:text-white">
-                        Custom
+                        {isRu ? "Индивидуально" : "Maxsus"}
                       </div>
                     ) : (
                       <div>
@@ -235,11 +241,11 @@ export default function PricingPage() {
                           ${price}
                         </span>
                         <span className="text-surface-600 dark:text-surface-400 ml-2">
-                          /{billingCycle === "monthly" ? "mo" : "yr"}
+                          /{billingCycle === "monthly" ? (isRu ? "мес" : "oy") : (isRu ? "год" : "yil")}
                         </span>
                         {billingCycle === "yearly" && plan.id !== "free" && (
                           <div className="text-sm text-green-600 dark:text-green-400 mt-1">
-                            Save ${plan.price.monthly * 12 - plan.price.yearly}/year
+                            {isRu ? "Экономия" : "Tejaladi"} ${plan.price.monthly * 12 - plan.price.yearly}/{isRu ? "год" : "yil"}
                           </div>
                         )}
                       </div>
@@ -255,12 +261,12 @@ export default function PricingPage() {
                     size="lg"
                   >
                     {isCurrentPlan ? (
-                      "Current Plan"
+                      isRu ? "Текущий тариф" : "Joriy tarif"
                     ) : plan.id === "enterprise" ? (
-                      "Contact Sales"
+                      isRu ? "Связаться с отделом продаж" : "Savdo bo'limi bilan bog'lanish"
                     ) : (
                       <>
-                        Get Started
+                        {isRu ? "Начать" : "Boshlash"}
                         <ArrowRight className="ml-2 h-4 w-4" />
                       </>
                     )}
@@ -300,10 +306,10 @@ export default function PricingPage() {
         {/* FAQ or Additional Info */}
         <div className="mt-16 text-center">
           <p className="text-surface-600 dark:text-surface-400 mb-4">
-            All plans include access to our AI-powered tools and regular updates.
+            {isRu ? "Все тарифы включают доступ к AI инструментам и регулярным обновлениям." : "Barcha tariflar AI vositalari va muntazam yangilanishlarni o'z ichiga oladi."}
           </p>
           <p className="text-sm text-surface-500 dark:text-surface-500">
-            Need help choosing? <a href="/contact" className="text-brand-500 hover:underline">Contact us</a>
+            {isRu ? "Нужна помощь с выбором?" : "Tanlashda yordam kerakmi?"} <a href="/contact" className="text-brand-500 hover:underline">{isRu ? "Свяжитесь с нами" : "Biz bilan bog'laning"}</a>
           </p>
         </div>
       </div>

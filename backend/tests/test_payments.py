@@ -9,7 +9,7 @@ Tests for payment system:
 - Double payment prevention
 - Security
 
-AUTHOR: SmartCareer AI Team
+AUTHOR: CareerUZ Team
 VERSION: 1.0.0
 =============================================================================
 """

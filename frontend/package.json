@@ -1,7 +1,7 @@
 {
-  "name": "smartcareer-ai-frontend",
+  "name": "careeruz-frontend",
   "version": "1.0.0",
-  "description": "SmartCareer AI - AI-Powered Career Platform",
+  "description": "CareerUZ - AI-Powered Career Platform",
   "private": true,
   "scripts": {
     "dev": "next dev",

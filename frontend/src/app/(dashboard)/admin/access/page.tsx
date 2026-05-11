@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
+import { UserAvatar } from "@/components/ui/avatar";
 import { cn, formatRelativeTime } from "@/lib/utils";
 import { useTranslation } from "@/hooks/useTranslation";
 
@@ -194,6 +195,14 @@ function normalizeAdminRole(value: unknown): AdminAccessRole | null {
 function getRoleTone(role?: AdminAccessRole | null): string {
   return ADMIN_ROLE_OPTIONS.find((option) => option.value === role)?.tone || "bg-surface-100 text-surface-700 dark:bg-surface-700 dark:text-surface-200";
 }
+
+const ROLE_BAR: Record<AdminAccessRole, string> = {
+  super_admin: "bg-gradient-to-r from-red-500 to-rose-500",
+  operations_admin: "bg-gradient-to-r from-blue-500 to-cyan-500",
+  finance_admin: "bg-gradient-to-r from-emerald-500 to-teal-500",
+  security_admin: "bg-gradient-to-r from-amber-500 to-orange-500",
+  support_agent: "bg-gradient-to-r from-violet-500 to-purple-500",
+};
 
 function parseMatrix(data: unknown): AdminRoleMatrixItem[] {
   if (!isRecord(data)) return FALLBACK_MATRIX;
@@ -421,17 +430,19 @@ export default function AdminAccessPage() {
 
   return (
     <div className="space-y-8">
-      <section className="overflow-hidden rounded-[2rem] border border-surface-200 bg-[radial-gradient(circle_at_top_left,_rgba(59,130,246,0.16),_transparent_34%),linear-gradient(135deg,_rgba(15,23,42,0.98),_rgba(30,41,59,0.9))] p-6 text-white shadow-2xl dark:border-surface-700 sm:p-8">
-        <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+      <section className="relative overflow-hidden rounded-3xl border border-surface-200 bg-white p-6 shadow-sm dark:border-surface-700 dark:bg-surface-900 sm:p-8">
+        <div className="pointer-events-none absolute -right-16 -top-16 h-72 w-72 rounded-full bg-gradient-to-br from-amber-500/15 via-rose-500/10 to-transparent blur-3xl" aria-hidden />
+        <div className="pointer-events-none absolute -bottom-20 -left-20 h-64 w-64 rounded-full bg-gradient-to-tr from-violet-500/10 via-transparent to-transparent blur-3xl" aria-hidden />
+        <div className="relative flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
           <div className="max-w-3xl">
-            <div className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs font-medium text-white/80 backdrop-blur">
+            <div className="inline-flex items-center gap-2 rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-700 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300">
               <Shield className="h-3.5 w-3.5" />
               {copy.badge}
             </div>
-            <h1 className="mt-4 font-display text-3xl font-bold tracking-tight sm:text-4xl">{copy.title}</h1>
-            <p className="mt-3 max-w-2xl text-sm text-white/75 sm:text-base">{copy.description}</p>
+            <h1 className="mt-4 font-display text-3xl font-bold tracking-tight text-surface-900 dark:text-white sm:text-4xl">{copy.title}</h1>
+            <p className="mt-3 max-w-2xl text-sm text-surface-600 dark:text-surface-400 sm:text-base">{copy.description}</p>
           </div>
-          <Button variant="outline" onClick={() => void loadAccessData(true)} className="border-white/20 bg-white/10 text-white hover:bg-white/15">
+          <Button variant="outline" onClick={() => void loadAccessData(true)}>
             <RefreshCw className={cn("mr-2 h-4 w-4", refreshing && "animate-spin")} />
             {copy.refreshData}
           </Button>
@@ -474,25 +485,27 @@ export default function AdminAccessPage() {
           {loadState === "loading"
             ? Array.from({ length: 3 }).map((_, index) => <Skeleton key={index} className="h-64 rounded-2xl" />)
             : matrix.map((item) => (
-                <Card key={item.role} className="overflow-hidden">
+                <Card key={item.role} className="group relative overflow-hidden transition-all hover:-translate-y-0.5 hover:shadow-lg">
+                  <div className={cn("absolute inset-x-0 top-0 h-1", ROLE_BAR[item.role] || "bg-surface-300")} />
                   <CardHeader className="pb-3">
-                    <CardTitle className="flex items-center justify-between text-lg">
-                      <span>{copy.roleLabels[item.role] || item.label}</span>
-                      <Badge className={getRoleTone(item.role)}>{item.role}</Badge>
+                    <CardTitle className="flex items-start justify-between gap-3 text-lg">
+                      <span className="flex-1">{copy.roleLabels[item.role] || item.label}</span>
+                      <Badge className={cn("shrink-0", getRoleTone(item.role))}>{item.role}</Badge>
                     </CardTitle>
                   </CardHeader>
-                  <CardContent className="space-y-4">
+                  <CardContent className="space-y-3">
                     {item.sections.length === 0 ? (
                       <p className="text-sm text-surface-500">{copy.noPermissions}</p>
                     ) : (
                       item.sections.map((section) => (
-                        <div key={`${item.role}-${section.key}`} className="space-y-2 rounded-xl border border-surface-200 p-3 dark:border-surface-700">
-                          <p className="text-sm font-semibold text-surface-900 dark:text-white">{copy.labels[section.label] || section.label}</p>
-                          <div className="space-y-1.5">
+                        <div key={`${item.role}-${section.key}`} className="space-y-2 rounded-xl bg-surface-50 p-3 ring-1 ring-inset ring-surface-200 dark:bg-surface-900/40 dark:ring-surface-700">
+                          <p className="text-xs font-bold uppercase tracking-wider text-surface-500 dark:text-surface-400">{copy.labels[section.label] || section.label}</p>
+                          <div className="space-y-1">
                             {section.permissions.map((permission) => (
-                              <p key={permission.key} className="text-sm text-surface-600 dark:text-surface-300">
-                                - {copy.labels[permission.key] || copy.labels[permission.label] || permission.label}
-                              </p>
+                              <div key={permission.key} className="flex items-start gap-2 text-sm text-surface-700 dark:text-surface-300">
+                                <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 flex-shrink-0 text-emerald-600 dark:text-emerald-400" />
+                                <span>{copy.labels[permission.key] || copy.labels[permission.label] || permission.label}</span>
+                              </div>
                             ))}
                           </div>
                         </div>
@@ -521,8 +534,11 @@ export default function AdminAccessPage() {
                 ))}
               </div>
             ) : sortedUsers.length === 0 ? (
-              <div className="rounded-2xl border border-dashed border-surface-200 py-12 text-center dark:border-surface-700">
-                <p className="text-sm text-surface-500">{copy.noAdminUsers}</p>
+              <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-surface-200 py-14 text-center dark:border-surface-700">
+                <div className="flex h-14 w-14 items-center justify-center rounded-full bg-surface-100 ring-8 ring-surface-50 dark:bg-surface-800 dark:ring-surface-900/40">
+                  <Users className="h-7 w-7 text-surface-400" />
+                </div>
+                <p className="mt-4 max-w-xs text-sm text-surface-500">{copy.noAdminUsers}</p>
               </div>
             ) : (
               <div className="space-y-3">
@@ -534,16 +550,19 @@ export default function AdminAccessPage() {
                   return (
                     <div
                       key={adminUser.id}
-                      className="grid gap-3 rounded-2xl border border-surface-200 p-4 dark:border-surface-700 lg:grid-cols-[1.4fr_0.8fr_1fr_auto]"
+                      className="grid gap-3 rounded-2xl border border-surface-200 bg-white p-4 transition-colors hover:border-brand-300 dark:border-surface-700 dark:bg-surface-800 dark:hover:border-brand-500/40 lg:grid-cols-[1.6fr_0.8fr_1fr_auto]"
                     >
-                      <div>
-                        <p className="font-semibold text-surface-900 dark:text-white">{adminUser.full_name}</p>
-                        <p className="text-sm text-surface-500">{adminUser.email}</p>
-                        <p className="mt-1 text-xs text-surface-500">
-                          {copy.lastLogin}: {adminUser.last_login ? formatRelativeTime(adminUser.last_login) : copy.noRecentActivity}
-                        </p>
+                      <div className="flex items-start gap-3">
+                        <UserAvatar name={adminUser.full_name} size="md" />
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate font-semibold text-surface-900 dark:text-white">{adminUser.full_name}</p>
+                          <p className="truncate text-sm text-surface-500">{adminUser.email}</p>
+                          <p className="mt-1 text-xs text-surface-500">
+                            {copy.lastLogin}: <span className="font-medium text-surface-700 dark:text-surface-300">{adminUser.last_login ? formatRelativeTime(adminUser.last_login, locale) : copy.noRecentActivity}</span>
+                          </p>
+                        </div>
                       </div>
-                      <div className="flex items-center gap-2">
+                      <div className="flex flex-wrap items-center gap-1.5">
                         <Badge variant={adminUser.is_active ? "success" : "secondary"}>{adminUser.is_active ? copy.active : copy.inactive}</Badge>
                         <Badge variant={adminUser.is_verified ? "success" : "warning"}>{adminUser.is_verified ? copy.verified : copy.unverified}</Badge>
                       </div>

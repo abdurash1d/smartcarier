@@ -280,6 +280,13 @@ export interface Application {
   decided_at?: string;
   notes?: string;
   updated_at: string;
+  match_score?: string | null;
+  match_breakdown?: {
+    score: number;
+    matched_skills: string[];
+    missing_skills: string[];
+    reasons: string[];
+  } | null;
   job?: Job;
   resume?: Resume;
   applicant?: User;
