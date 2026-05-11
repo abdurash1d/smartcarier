@@ -111,6 +111,22 @@ export default function SettingsPage() {
   const [isSavingPrivacy, setIsSavingPrivacy] = useState(false);
 
   useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const allowedTabs = new Set(["profile", "security", "notifications", "privacy"]);
+    const applyHashTab = () => {
+      const hash = window.location.hash.replace("#", "");
+      if (allowedTabs.has(hash)) {
+        setActiveTab(hash);
+      }
+    };
+
+    applyHashTab();
+    window.addEventListener("hashchange", applyHashTab);
+    return () => window.removeEventListener("hashchange", applyHashTab);
+  }, []);
+
+  useEffect(() => {
     api.get("/users/me/notification-preferences")
       .then((res) => res.data?.data && setNotifications(res.data.data))
       .catch(() => {});

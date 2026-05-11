@@ -1,6 +1,6 @@
 # ⚡ PERFORMANCE OPTIMIZATION GUIDE
 
-**Make SmartCareer AI Fast & Scalable**  
+**Make CareerUZ Fast & Scalable**  
 **Generated:** 2026-01-19
 
 ---
@@ -310,7 +310,7 @@ async def generate_resume(user: User):
 from celery import Celery
 
 celery = Celery(
-    'smartcareer',
+    'careeruz',
     broker='redis://localhost:6379/1',
     backend='redis://localhost:6379/2'
 )
@@ -378,7 +378,7 @@ import Image from 'next/image';
 
 <Image
   src="/logo.png"
-  alt="SmartCareer AI"
+  alt="CareerUZ"
   width={200}
   height={50}
   priority  // For above-fold images

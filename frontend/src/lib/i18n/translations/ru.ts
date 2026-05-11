@@ -184,11 +184,11 @@ export const ru = {
     testimonials: {
       badge: "ОТЗЫВЫ",
       title: "Отзывы пользователей",
-      subtitle: "Тысячи специалистов уже нашли работу мечты с SmartCareer AI",
+      subtitle: "Тысячи специалистов уже нашли работу мечты с CareerUZ",
     },
     cta: {
       title: "Готовы ускорить свою карьеру?",
-      subtitle: "Присоединяйтесь к тысячам специалистов, которые нашли работу мечты с SmartCareer AI. Начните свой путь сегодня!",
+      subtitle: "Присоединяйтесь к тысячам специалистов, которые нашли работу мечты с CareerUZ. Начните свой путь сегодня!",
       button: "Начать бесплатно",
     },
     footer: {
@@ -216,7 +216,7 @@ export const ru = {
     sidebar: {
       title: "Постройте карьеру мечты с",
       titleHighlight: "AI-инструментами",
-      subtitle: "Более 10 000 специалистов в Узбекистане ускорили свою карьеру с SmartCareer AI.",
+      subtitle: "Более 10 000 специалистов в Узбекистане ускорили свою карьеру с CareerUZ.",
       features: [
         "AI-генератор резюме",
         "Умный подбор вакансий",
@@ -230,7 +230,7 @@ export const ru = {
         success: "Успешность",
       },
       testimonial: {
-        quote: "SmartCareer AI помог мне найти работу мечты в топовой технологической компании!",
+        quote: "CareerUZ помог мне найти работу мечты в топовой технологической компании!",
         author: "Азиз К.",
         role: "Разработчик",
       },
@@ -251,6 +251,12 @@ export const ru = {
       registered: "Аккаунт успешно создан! Пожалуйста, войдите.",
       passwordReset: "Пароль успешно обновлён. Теперь войдите с новым паролем.",
       invalidCredentials: "Неверный email или пароль",
+      validation: {
+        emailRequired: "Email обязателен",
+        emailInvalid: "Пожалуйста, введите корректный email",
+        passwordRequired: "Пароль обязателен",
+        passwordMin: "Пароль должен содержать минимум 6 символов",
+      },
       demo: "Демо аккаунт",
     },
     register: {
@@ -263,6 +269,33 @@ export const ru = {
       confirmPassword: "Подтвердите пароль",
       continue: "Продолжить",
       createButton: "Создать аккаунт",
+      creating: "Создание аккаунта...",
+      companyNameOptional: "Название компании (необязательно)",
+      placeholders: {
+        email: "you@example.com",
+        password: "Создайте надежный пароль",
+        confirmPassword: "Повторите пароль",
+        fullName: "Имя Фамилия",
+        phone: "+998 90 123 45 67",
+        companyName: "Например, Acme LLC",
+      },
+      oauth: {
+        divider: "Или продолжить",
+        quickAccess: "Или быстрый вход",
+        google: "Зарегистрироваться через Google",
+      },
+      badges: {
+        student: {
+          resume: "AI Резюме",
+          matching: "Подбор вакансий",
+          autoApply: "Авто-отклик",
+        },
+        company: {
+          postJobs: "Публикация вакансий",
+          aiMatching: "AI подбор",
+          analytics: "Аналитика",
+        },
+      },
       steps: {
         step1: {
           title: "Создать аккаунт",
@@ -274,11 +307,11 @@ export const ru = {
         },
         step3: {
           title: "Выберите роль",
-          description: "Как вы будете использовать SmartCareer?",
+          description: "Как вы будете использовать CareerUZ?",
         },
       },
       phoneHelper: "Мы используем это для восстановления аккаунта и уведомлений о вакансиях",
-      howWillYouUse: "Как вы будете использовать SmartCareer?",
+      howWillYouUse: "Как вы будете использовать CareerUZ?",
       studentRole: "Я соискатель",
       companyRole: "Я работодатель",
       studentDescription: "Ищу работу, создаю резюме и развиваю карьеру",
@@ -297,6 +330,25 @@ export const ru = {
         uppercase: "Заглавная буква",
         number: "Цифра",
       },
+      validation: {
+        emailRequired: "Email обязателен",
+        emailInvalid: "Пожалуйста, введите корректный email",
+        passwordRequired: "Пароль обязателен",
+        passwordMin: "Пароль должен содержать минимум 8 символов",
+        passwordMax: "Пароль не должен превышать 72 символа",
+        passwordLowercase: "Пароль должен содержать минимум одну строчную букву",
+        passwordUppercase: "Пароль должен содержать минимум одну заглавную букву",
+        passwordNumber: "Пароль должен содержать минимум одну цифру",
+        confirmPasswordRequired: "Пожалуйста, подтвердите пароль",
+        passwordMismatch: "Пароли не совпадают",
+        fullNameRequired: "Полное имя обязательно",
+        fullNameMin: "Имя должно содержать минимум 2 символа",
+        fullNameMax: "Имя не должно превышать 100 символов",
+        fullNameLetters: "Имя должно содержать только буквы",
+        phoneRequired: "Номер телефона обязателен",
+        phoneInvalid: "Пожалуйста, введите корректный номер телефона",
+        roleRequired: "Пожалуйста, выберите роль",
+      },
       terms: {
         text: "Создавая аккаунт, вы соглашаетесь с нашими",
         termsLink: "Условиями использования",
@@ -304,7 +356,7 @@ export const ru = {
         privacyLink: "Политикой конфиденциальности",
       },
       success: {
-        title: "Добро пожаловать в SmartCareer! 🎉",
+        title: "Добро пожаловать в CareerUZ! 🎉",
         message: "Ваш аккаунт успешно создан.",
         redirecting: "Перенаправление на страницу входа...",
       },
@@ -370,6 +422,9 @@ export const ru = {
       notifications: "Уведомления",
       profileSettings: "Настройки профиля",
       accountSettings: "Настройки аккаунта",
+      companies: "Компании",
+      jobs: "Вакансии",
+      applications: "Заявки",
     },
     
     // Profile completion
@@ -433,6 +488,10 @@ export const ru = {
       browseAll: "Смотреть все",
       match: "совп.",
       empty: "Вакансий пока нет",
+      matchedSkills: "Совпавшие навыки",
+      noResume: "Сначала создайте резюме, чтобы получать рекомендации",
+      createResumeCTA: "Создать резюме",
+      matchLabel: "Совпадение",
     },
     
     // Upcoming interview
@@ -740,6 +799,10 @@ export const ru = {
     resumeGenerated: "Резюме создано! 🎉",
     aiResumeReady: "Ваше AI-резюме готово",
     editResume: "Редактировать резюме",
+    generateFirst: "Сначала создайте резюме через AI.",
+    pdfDownloaded: "PDF резюме успешно скачан.",
+    pdfDownloadError: "Ошибка при скачивании PDF.",
+    roleMatchedSuggestions: "Рекомендации под вашу профессию",
   },
 
   // Jobs Page

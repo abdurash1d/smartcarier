@@ -83,7 +83,7 @@ Frontend running at: http://localhost:3000
 
 ```
 Admin:
-  Email: admin@smartcareer.uz
+  Email: admin@careeruz.uz
   Password: Admin123!
 
 Company:
@@ -165,7 +165,7 @@ Student:
 ```env
 GEMINI_API_KEY=xxx          # Or OPENAI_API_KEY
 AI_PROVIDER=gemini          # Or openai
-DATABASE_URL=sqlite:///./smartcareer.db
+DATABASE_URL=sqlite:///./careeruz.db
 SECRET_KEY=your-secret-key
 ```
 
@@ -300,7 +300,7 @@ npm run dev
 
 ## 📞 SUPPORT
 
-- Email: support@smartcareer.uz
+- Email: support@careeruz.uz
 - GitHub Issues: [Your Repo]
 - Documentation: http://localhost:8000/docs
 

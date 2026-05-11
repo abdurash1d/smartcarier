@@ -93,14 +93,22 @@ class CacheClient:
             return False
     
     def clear_pattern(self, pattern: str):
-        """Clear all keys matching pattern"""
+        """Clear all keys matching pattern using non-blocking SCAN."""
         if not self.enabled:
             return False
-        
+
         try:
-            keys = self.redis.keys(pattern)
-            if keys:
-                self.redis.delete(*keys)
+            cursor = 0
+            deleted = 0
+            while True:
+                cursor, keys = self.redis.scan(cursor, match=pattern, count=100)
+                if keys:
+                    self.redis.delete(*keys)
+                    deleted += len(keys)
+                if cursor == 0:
+                    break
+            if deleted:
+                logger.debug(f"Cache clear_pattern deleted {deleted} keys matching '{pattern}'")
             return True
         except Exception as e:
             logger.error(f"Cache clear pattern error: {e}")

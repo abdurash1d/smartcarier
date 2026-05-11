@@ -12,14 +12,14 @@ import { defineConfig, devices } from '@playwright/test';
 export default defineConfig({
   testDir: './tests/e2e',
   globalSetup: './tests/e2e/global-setup.ts',
-  /* Run tests in files in parallel */
-  fullyParallel: true,
+  /* Keep auth/rate-limited flows deterministic across local and CI runs. */
+  fullyParallel: false,
   /* Fail the build on CI if you accidentally left test.only in the source code. */
   forbidOnly: !!process.env.CI,
   /* Retry on CI only */
   retries: process.env.CI ? 2 : 0,
-  /* Opt out of parallel tests on CI. */
-  workers: process.env.CI ? 1 : undefined,
+  /* Run E2E sequentially to avoid backend login rate-limit collisions. */
+  workers: 1,
   /* Reporter to use. See https://playwright.dev/docs/test-reporters */
   reporter: [
     ['html'],

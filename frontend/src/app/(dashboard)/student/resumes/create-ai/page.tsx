@@ -70,17 +70,18 @@ import type { Resume, ResumeContent } from "@/types/api";
 import { ResumePreview } from "@/components/resume/ResumePreview";
 import { getSkillSuggestions } from "@/lib/resume/skillProfiles";
 import { getPreferredLocale } from "@/lib/i18n";
+import { useTranslation } from "@/contexts/TranslationContext";
 
 // =============================================================================
 // TYPES & SCHEMAS
 // =============================================================================
 
 const personalInfoSchema = z.object({
-  fullName: z.string().min(2, "Name is required"),
-  email: z.string().email("Valid email required"),
-  phone: z.string().min(9, "Phone is required"),
+  fullName: z.string().min(2, "Ism majburiy"),
+  email: z.string().email("To'g'ri email kiriting"),
+  phone: z.string().min(9, "Telefon raqam majburiy"),
   location: z.string().optional(),
-  professionalTitle: z.string().min(2, "Professional title is required"),
+  professionalTitle: z.string().min(2, "Lavozim nomi majburiy"),
   linkedinUrl: z.string().url().optional().or(z.literal("")),
   portfolioUrl: z.string().url().optional().or(z.literal("")),
 });
@@ -88,12 +89,12 @@ const personalInfoSchema = z.object({
 const experienceSchema = z.object({
   experiences: z.array(
     z.object({
-      company: z.string().min(1, "Company name is required"),
-      position: z.string().min(1, "Position is required"),
-      startDate: z.string().min(1, "Start date is required"),
+      company: z.string().min(1, "Kompaniya nomi majburiy"),
+      position: z.string().min(1, "Lavozim majburiy"),
+      startDate: z.string().min(1, "Boshlanish sanasi majburiy"),
       endDate: z.string().optional(),
       isCurrent: z.boolean().optional(),
-      description: z.string().min(10, "Description is required"),
+      description: z.string().min(10, "Tavsif majburiy"),
     })
   ),
 });
@@ -101,10 +102,10 @@ const experienceSchema = z.object({
 const educationSchema = z.object({
   education: z.array(
     z.object({
-      institution: z.string().min(1, "Institution is required"),
-      degree: z.string().min(1, "Degree is required"),
-      field: z.string().min(1, "Field is required"),
-      year: z.string().min(1, "Year is required"),
+      institution: z.string().min(1, "O'quv yurti majburiy"),
+      degree: z.string().min(1, "Daraja majburiy"),
+      field: z.string().min(1, "Yo'nalish majburiy"),
+      year: z.string().min(1, "Yil majburiy"),
     })
   ),
 });
@@ -151,25 +152,25 @@ type ResumeFormData = z.infer<typeof resumeSchema>;
 // =============================================================================
 
 const steps = [
-  { id: 1, title: "Shaxsiy ma'lumot", icon: User, description: "Asosiy aloqa ma'lumotlari" },
-  { id: 2, title: "Tajriba", icon: Briefcase, description: "Ish tarixi" },
-  { id: 3, title: "Ta'lim", icon: GraduationCap, description: "O'quv ma'lumotlari" },
-  { id: 4, title: "Ko'nikmalar", icon: Code, description: "Sizning mutaxassisligingiz" },
-  { id: 5, title: "Qo'shimcha", icon: Award, description: "Qo'shimcha bo'limlar" },
+  { id: 1, titleKey: "aiResumeBuilder.personalInfo", icon: User, descriptionKey: "aiResumeBuilder.basicDetails" },
+  { id: 2, titleKey: "aiResumeBuilder.experience", icon: Briefcase, descriptionKey: "aiResumeBuilder.workHistory" },
+  { id: 3, titleKey: "aiResumeBuilder.education", icon: GraduationCap, descriptionKey: "aiResumeBuilder.academicBackground" },
+  { id: 4, titleKey: "aiResumeBuilder.skills", icon: Code, descriptionKey: "aiResumeBuilder.yourExpertise" },
+  { id: 5, titleKey: "aiResumeBuilder.additional", icon: Award, descriptionKey: "aiResumeBuilder.extraSections" },
 ];
 
 const templates = [
-  { id: "modern", name: "Zamonaviy", description: "Toza, zamonaviy dizayn" },
-  { id: "classic", name: "Klassik", description: "An'anaviy professional" },
-  { id: "minimal", name: "Minimal", description: "Oddiy va elegant" },
-  { id: "creative", name: "Kreativ", description: "Boshqalardan ajralib turing" },
+  { id: "modern", nameKey: "aiResumeBuilder.modern", descriptionKey: "aiResumeBuilder.modernDesc" },
+  { id: "classic", nameKey: "aiResumeBuilder.classic", descriptionKey: "aiResumeBuilder.classicDesc" },
+  { id: "minimal", nameKey: "aiResumeBuilder.minimal", descriptionKey: "aiResumeBuilder.minimalDesc" },
+  { id: "creative", nameKey: "aiResumeBuilder.creative", descriptionKey: "aiResumeBuilder.creativeDesc" },
 ];
 
 const tones = [
-  { id: "professional", name: "Professional", description: "Rasmiy va korporativ" },
-  { id: "confident", name: "Ishonchli", description: "Qat'iy va dadil" },
-  { id: "friendly", name: "Do'stona", description: "Iliq va ochiq" },
-  { id: "technical", name: "Texnik", description: "Tafsilotlarga e'tibor beruvchi" },
+  { id: "professional", nameKey: "aiResumeBuilder.professional", descriptionKey: "aiResumeBuilder.professionalDesc" },
+  { id: "confident", nameKey: "aiResumeBuilder.confident", descriptionKey: "aiResumeBuilder.confidentDesc" },
+  { id: "friendly", nameKey: "aiResumeBuilder.friendly", descriptionKey: "aiResumeBuilder.friendlyDesc" },
+  { id: "technical", nameKey: "aiResumeBuilder.technical", descriptionKey: "aiResumeBuilder.technicalDesc" },
 ];
 
 // =============================================================================
@@ -179,6 +180,7 @@ const tones = [
 export default function AIResumeBuilderPage() {
   const router = useRouter();
   const { user } = useAuth();
+  const { t, locale } = useTranslation();
   const { generateResume, isGenerating } = useResume();
   const [currentStep, setCurrentStep] = useState(1);
   const [selectedTemplate, setSelectedTemplate] = useState("modern");
@@ -244,9 +246,10 @@ export default function AIResumeBuilderPage() {
         getSkillSuggestions(
           roleSignal,
           formData.technicalSkills || [],
-          formData.softSkills || []
+          formData.softSkills || [],
+          locale
         ),
-      [formData.softSkills, formData.technicalSkills, roleSignal]
+      [formData.softSkills, formData.technicalSkills, locale, roleSignal]
     );
 
   // Field arrays
@@ -416,7 +419,7 @@ export default function AIResumeBuilderPage() {
 
   const handleDownloadGenerated = async () => {
     if (!generatedResume) {
-      toast.info("Avval resumeni AI orqali yarating.");
+      toast.info(t("aiResumeBuilder.generateFirst"));
       return;
     }
 
@@ -433,9 +436,9 @@ export default function AIResumeBuilderPage() {
       link.click();
       link.remove();
       window.URL.revokeObjectURL(url);
-      toast.success("Resume PDF yuklab olindi.");
+      toast.success(t("aiResumeBuilder.pdfDownloaded"));
     } catch {
-      toast.error("PDF yuklab olishda xatolik yuz berdi.");
+      toast.error(t("aiResumeBuilder.pdfDownloadError"));
     } finally {
       setIsDownloadingPdf(false);
     }
@@ -490,16 +493,16 @@ export default function AIResumeBuilderPage() {
           <div className="flex items-center justify-between">
             <div>
               <h1 className="font-display text-xl font-bold text-surface-900 dark:text-white">
-                AI Resume Yaratuvchi
+                {t("aiResumeBuilder.title")}
               </h1>
               <p className="text-sm text-surface-500">
-                {steps[currentStep - 1].description}
+                {t(steps[currentStep - 1].descriptionKey)}
               </p>
             </div>
             {lastSaved && (
               <span className="flex items-center gap-1 text-xs text-surface-400">
                 <Save className="h-3 w-3" />
-                Saqlandi {lastSaved.toLocaleTimeString()}
+                {t("aiResumeBuilder.saved")} {lastSaved.toLocaleTimeString()}
               </span>
             )}
           </div>
@@ -507,8 +510,8 @@ export default function AIResumeBuilderPage() {
           {/* Progress Bar */}
           <div className="mt-4">
             <div className="mb-2 flex justify-between text-xs">
-              <span>{currentStep}-qadam, jami {steps.length}</span>
-              <span>{Math.round(progress)}% bajarildi</span>
+              <span>{t("aiResumeBuilder.stepOf")} {currentStep}/{steps.length}</span>
+              <span>{Math.round(progress)}% {t("aiResumeBuilder.complete")}</span>
             </div>
             <Progress value={progress} className="h-2" />
           </div>
@@ -529,7 +532,7 @@ export default function AIResumeBuilderPage() {
                 )}
               >
                 <step.icon className="h-4 w-4" />
-                <span className="hidden sm:block">{step.title}</span>
+                <span className="hidden sm:block">{t(step.titleKey)}</span>
               </button>
             ))}
           </div>
@@ -549,38 +552,38 @@ export default function AIResumeBuilderPage() {
               >
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div className="sm:col-span-2">
-                    <Label htmlFor="fullName">To'liq ism *</Label>
+                    <Label htmlFor="fullName">{t("aiResumeBuilder.fullName")}</Label>
                     <Input
                       id="fullName"
-                      placeholder="Ism Familiya"
+                      placeholder={t("auth.register.placeholders.fullName")}
                       icon={<User className="h-4 w-4" />}
                       error={errors.fullName?.message}
                       {...register("fullName")}
                     />
                   </div>
                   <div>
-                    <Label htmlFor="email">Email *</Label>
+                    <Label htmlFor="email">{t("aiResumeBuilder.email")}</Label>
                     <Input
                       id="email"
                       type="email"
-                      placeholder="email@misol.com"
+                      placeholder={t("auth.register.placeholders.email")}
                       icon={<Mail className="h-4 w-4" />}
                       error={errors.email?.message}
                       {...register("email")}
                     />
                   </div>
                   <div>
-                    <Label htmlFor="phone">Telefon *</Label>
+                    <Label htmlFor="phone">{t("aiResumeBuilder.phone")}</Label>
                     <Input
                       id="phone"
-                      placeholder="+998 90 123 4567"
+                      placeholder={t("auth.register.placeholders.phone")}
                       icon={<Phone className="h-4 w-4" />}
                       error={errors.phone?.message}
                       {...register("phone")}
                     />
                   </div>
                   <div>
-                    <Label htmlFor="location">Joylashuv</Label>
+                    <Label htmlFor="location">{t("aiResumeBuilder.location")}</Label>
                     <Input
                       id="location"
                       placeholder="Tashkent, Uzbekistan"
@@ -589,17 +592,17 @@ export default function AIResumeBuilderPage() {
                     />
                   </div>
                   <div>
-                    <Label htmlFor="professionalTitle">Professional unvon *</Label>
-                    <Input
-                      id="professionalTitle"
-                      placeholder="masalan: Senior Software Engineer"
-                      icon={<Briefcase className="h-4 w-4" />}
-                      error={errors.professionalTitle?.message}
-                      {...register("professionalTitle")}
+                    <Label htmlFor="professionalTitle">{t("aiResumeBuilder.professionalTitle")}</Label>
+                  <Input
+                    id="professionalTitle"
+                    placeholder={t("aiResumeBuilder.professionalTitlePlaceholder")}
+                    icon={<Briefcase className="h-4 w-4" />}
+                    error={errors.professionalTitle?.message}
+                    {...register("professionalTitle")}
                     />
                   </div>
                   <div>
-                    <Label htmlFor="linkedinUrl">LinkedIn URL</Label>
+                    <Label htmlFor="linkedinUrl">{t("aiResumeBuilder.linkedinUrl")}</Label>
                     <Input
                       id="linkedinUrl"
                       placeholder="https://linkedin.com/in/..."
@@ -608,7 +611,7 @@ export default function AIResumeBuilderPage() {
                     />
                   </div>
                   <div>
-                    <Label htmlFor="portfolioUrl">Portfolio / Veb-sayt</Label>
+                    <Label htmlFor="portfolioUrl">{t("aiResumeBuilder.portfolioUrl")}</Label>
                     <Input
                       id="portfolioUrl"
                       placeholder="https://yoursite.com"
@@ -646,28 +649,28 @@ export default function AIResumeBuilderPage() {
 
                     <div className="grid gap-4 sm:grid-cols-2">
                       <div>
-                        <Label>Kompaniya nomi *</Label>
+                        <Label>{t("aiResumeBuilder.companyName")}</Label>
                         <Input
                           placeholder="Kompaniya nomi"
                           {...register(`experiences.${index}.company`)}
                         />
                       </div>
                       <div>
-                        <Label>Lavozim *</Label>
+                        <Label>{t("aiResumeBuilder.position")}</Label>
                         <Input
                           placeholder="Lavozim nomi"
                           {...register(`experiences.${index}.position`)}
                         />
                       </div>
                       <div>
-                        <Label>Boshlanish sanasi *</Label>
+                        <Label>{t("aiResumeBuilder.startDate")}</Label>
                         <Input
                           type="month"
                           {...register(`experiences.${index}.startDate`)}
                         />
                       </div>
                       <div>
-                        <Label>Tugash sanasi</Label>
+                        <Label>{t("aiResumeBuilder.endDate")}</Label>
                         <Input
                           type="month"
                           placeholder="Hozirgi vaqtgacha"
@@ -680,13 +683,13 @@ export default function AIResumeBuilderPage() {
                             {...register(`experiences.${index}.isCurrent`)}
                             className="rounded border-surface-300"
                           />
-                          Hozirda ishlayapman
+                          {t("aiResumeBuilder.currentlyWorking")}
                         </label>
                       </div>
                       <div className="sm:col-span-2">
-                        <Label>Tavsif *</Label>
+                        <Label>{t("aiResumeBuilder.description")}</Label>
                         <Textarea
-                          placeholder="Vazifalaringiz va yutuqlaringizni tasvirlab bering..."
+                          placeholder={t("aiResumeBuilder.descriptionPlaceholder")}
                           rows={4}
                           {...register(`experiences.${index}.description`)}
                         />
@@ -711,7 +714,7 @@ export default function AIResumeBuilderPage() {
                   }
                 >
                   <Plus className="mr-2 h-4 w-4" />
-                  Tajriba qo'shish
+                  {t("aiResumeBuilder.addExperience")}
                 </Button>
               </motion.div>
             )}
@@ -742,28 +745,28 @@ export default function AIResumeBuilderPage() {
 
                     <div className="grid gap-4 sm:grid-cols-2">
                       <div className="sm:col-span-2">
-                        <Label>O'quv yurti *</Label>
+                        <Label>{t("aiResumeBuilder.institution")}</Label>
                         <Input
                           placeholder="O'quv yurt nomi"
                           {...register(`education.${index}.institution`)}
                         />
                       </div>
                       <div>
-                        <Label>Daraja *</Label>
+                        <Label>{t("aiResumeBuilder.degree")}</Label>
                         <Input
                           placeholder="Bakalavriat"
                           {...register(`education.${index}.degree`)}
                         />
                       </div>
                       <div>
-                        <Label>Yo'nalish *</Label>
+                        <Label>{t("aiResumeBuilder.fieldOfStudy")}</Label>
                         <Input
                           placeholder="Kompyuter fanlari"
                           {...register(`education.${index}.field`)}
                         />
                       </div>
                       <div>
-                        <Label>Bitirish yili *</Label>
+                        <Label>{t("aiResumeBuilder.graduationYear")}</Label>
                         <Input
                           placeholder="2024"
                           {...register(`education.${index}.year`)}
@@ -787,7 +790,7 @@ export default function AIResumeBuilderPage() {
                   }
                 >
                   <Plus className="mr-2 h-4 w-4" />
-                  Ta'lim qo'shish
+                  {t("aiResumeBuilder.addEducation")}
                 </Button>
               </motion.div>
             )}
@@ -803,15 +806,15 @@ export default function AIResumeBuilderPage() {
               >
                 {/* Technical Skills */}
                 <div>
-                  <Label>Texnik ko'nikmalar</Label>
+                  <Label>{t("aiResumeBuilder.technicalSkills")}</Label>
                   {activeSkillProfile && (
                     <p className="mt-1 text-xs text-emerald-700">
-                      Kasbga mos tavsiyalar: {activeSkillProfile.label}
+                      {t("aiResumeBuilder.roleMatchedSuggestions")}: {activeSkillProfile.label}
                     </p>
                   )}
                   <div className="mt-2 flex gap-2">
                     <Input
-                      placeholder="Ko'nikma qo'shing..."
+                      placeholder={t("aiResumeBuilder.addSkillPlaceholder")}
                       value={skillInput.technical}
                       onChange={(e) =>
                         setSkillInput((prev) => ({ ...prev, technical: e.target.value }))
@@ -839,7 +842,7 @@ export default function AIResumeBuilderPage() {
                     ))}
                   </div>
                   <div className="mt-2">
-                    <p className="text-xs text-surface-500 mb-2">Tavsiya etilgan ko'nikmalar:</p>
+                    <p className="text-xs text-surface-500 mb-2">{t("aiResumeBuilder.suggestedSkills")}</p>
                     <div className="flex flex-wrap gap-1">
                       {technicalSkillSuggestions.map((skill) => (
                           <button
@@ -862,10 +865,10 @@ export default function AIResumeBuilderPage() {
 
                 {/* Soft Skills */}
                 <div>
-                  <Label>Ijtimoiy ko'nikmalar</Label>
+                  <Label>{t("aiResumeBuilder.softSkills")}</Label>
                   <div className="mt-2 flex gap-2">
                     <Input
-                      placeholder="Ko'nikma qo'shing..."
+                      placeholder={t("aiResumeBuilder.addSkillPlaceholder")}
                       value={skillInput.soft}
                       onChange={(e) =>
                         setSkillInput((prev) => ({ ...prev, soft: e.target.value }))
@@ -893,7 +896,7 @@ export default function AIResumeBuilderPage() {
                     ))}
                   </div>
                   <div className="mt-2">
-                    <p className="text-xs text-surface-500 mb-2">Tavsiya etilgan ko'nikmalar:</p>
+                    <p className="text-xs text-surface-500 mb-2">{t("aiResumeBuilder.suggestedSkills")}</p>
                     <div className="flex flex-wrap gap-1">
                       {softSkillSuggestions.map((skill) => (
                           <button
@@ -916,12 +919,12 @@ export default function AIResumeBuilderPage() {
 
                 {/* Languages */}
                 <div>
-                  <Label>Tillar</Label>
+                  <Label>{t("aiResumeBuilder.languages")}</Label>
                   <div className="mt-2 space-y-2">
                     {languageFields.map((field, index) => (
                       <div key={field.id} className="flex gap-2">
                         <Input
-                          placeholder="Til (masalan: O'zbek)"
+                          placeholder={t("aiResumeBuilder.language")}
                           {...register(`languages.${index}.name`)}
                         />
                         <Select
@@ -931,14 +934,14 @@ export default function AIResumeBuilderPage() {
                           }
                         >
                           <SelectTrigger className="w-44">
-                            <SelectValue placeholder="Daraja" />
+                            <SelectValue placeholder={t("aiResumeBuilder.level")} />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="native">Ona tili</SelectItem>
-                            <SelectItem value="fluent">Ravon</SelectItem>
-                            <SelectItem value="advanced">Yuqori daraja</SelectItem>
-                            <SelectItem value="intermediate">O'rta daraja</SelectItem>
-                            <SelectItem value="basic">Boshlang'ich</SelectItem>
+                            <SelectItem value="native">{t("aiResumeBuilder.native")}</SelectItem>
+                            <SelectItem value="fluent">{t("aiResumeBuilder.fluent")}</SelectItem>
+                            <SelectItem value="advanced">{t("aiResumeBuilder.advanced")}</SelectItem>
+                            <SelectItem value="intermediate">{t("aiResumeBuilder.intermediate")}</SelectItem>
+                            <SelectItem value="basic">{t("aiResumeBuilder.basic")}</SelectItem>
                           </SelectContent>
                         </Select>
                         {languageFields.length > 1 && (
@@ -960,7 +963,7 @@ export default function AIResumeBuilderPage() {
                       onClick={() => appendLanguage({ name: "", proficiency: "" })}
                     >
                       <Plus className="mr-2 h-4 w-4" />
-                      Til qo'shish
+                      {t("aiResumeBuilder.addLanguage")}
                     </Button>
                   </div>
                 </div>
@@ -980,7 +983,7 @@ export default function AIResumeBuilderPage() {
                 <div>
                   <Label className="flex items-center gap-2">
                     <Palette className="h-4 w-4" />
-                    Resume shabloni
+                    {t("aiResumeBuilder.resumeTemplate")}
                   </Label>
                   <div className="mt-2 grid grid-cols-2 gap-2">
                     {templates.map((template) => (
@@ -995,8 +998,8 @@ export default function AIResumeBuilderPage() {
                             : "border-surface-200 hover:border-surface-300"
                         )}
                       >
-                        <p className="font-medium text-surface-900">{template.name}</p>
-                        <p className="text-xs text-surface-500">{template.description}</p>
+                        <p className="font-medium text-surface-900">{t(template.nameKey)}</p>
+                        <p className="text-xs text-surface-500">{t(template.descriptionKey)}</p>
                       </button>
                     ))}
                   </div>
@@ -1006,7 +1009,7 @@ export default function AIResumeBuilderPage() {
                 <div>
                   <Label className="flex items-center gap-2">
                     <Type className="h-4 w-4" />
-                    Yozish uslubi
+                    {t("aiResumeBuilder.writingTone")}
                   </Label>
                   <div className="mt-2 grid grid-cols-2 gap-2">
                     {tones.map((tone) => (
@@ -1021,8 +1024,8 @@ export default function AIResumeBuilderPage() {
                             : "border-surface-200 hover:border-surface-300"
                         )}
                       >
-                        <p className="font-medium text-surface-900">{tone.name}</p>
-                        <p className="text-xs text-surface-500">{tone.description}</p>
+                        <p className="font-medium text-surface-900">{t(tone.nameKey)}</p>
+                        <p className="text-xs text-surface-500">{t(tone.descriptionKey)}</p>
                       </button>
                     ))}
                   </div>
@@ -1030,21 +1033,21 @@ export default function AIResumeBuilderPage() {
 
                 {/* Certifications */}
                 <div>
-                  <Label>Sertifikatlar (ixtiyoriy)</Label>
+                  <Label>{t("aiResumeBuilder.certifications")}</Label>
                   <div className="mt-2 space-y-2">
                     {certificationFields.map((field, index) => (
                       <div key={field.id} className="flex gap-2">
                         <Input
-                          placeholder="Sertifikat nomi"
+                          placeholder={t("aiResumeBuilder.certName")}
                           {...register(`certifications.${index}.name`)}
                         />
                         <Input
-                          placeholder="Berilgan tashkilot"
+                          placeholder={t("aiResumeBuilder.issuer")}
                           className="w-32"
                           {...register(`certifications.${index}.issuer`)}
                         />
                         <Input
-                          placeholder="Yil"
+                          placeholder={t("aiResumeBuilder.year")}
                           className="w-20"
                           {...register(`certifications.${index}.year`)}
                         />
@@ -1067,7 +1070,7 @@ export default function AIResumeBuilderPage() {
                       }
                     >
                       <Plus className="mr-2 h-4 w-4" />
-                      Sertifikat qo'shish
+                      {t("aiResumeBuilder.addCertification")}
                     </Button>
                   </div>
                 </div>
@@ -1082,7 +1085,7 @@ export default function AIResumeBuilderPage() {
             {currentStep > 1 && (
               <Button variant="outline" onClick={prevStep} className="flex-1">
                 <ArrowLeft className="mr-2 h-4 w-4" />
-                Orqaga
+                {t("aiResumeBuilder.previous")}
               </Button>
             )}
 
@@ -1091,7 +1094,7 @@ export default function AIResumeBuilderPage() {
                 onClick={nextStep}
                 className="flex-1 bg-gradient-to-r from-purple-500 to-indigo-600"
               >
-                Keyingi
+                {t("aiResumeBuilder.next")}
                 <ArrowRight className="ml-2 h-4 w-4" />
               </Button>
             ) : (
@@ -1103,12 +1106,12 @@ export default function AIResumeBuilderPage() {
                 {isGenerating ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Yaratilmoqda...
+                    {t("aiResumeBuilder.generating")}
                   </>
                 ) : (
                   <>
                     <Wand2 className="mr-2 h-4 w-4" />
-                    AI bilan yaratish
+                    {t("aiResumeBuilder.generateWithAI")}
                   </>
                 )}
               </Button>
@@ -1123,7 +1126,7 @@ export default function AIResumeBuilderPage() {
         <div className="flex items-center justify-between border-b border-surface-200 bg-white p-4 dark:border-surface-700 dark:bg-surface-900">
           <div className="flex items-center gap-2">
             <Eye className="h-5 w-5 text-surface-500" />
-            <span className="font-medium text-surface-900 dark:text-white">Jonli ko'rinish</span>
+            <span className="font-medium text-surface-900 dark:text-white">{t("aiResumeBuilder.livePreview")}</span>
           </div>
           <div className="flex items-center gap-2">
             {/* Zoom controls */}
@@ -1154,7 +1157,7 @@ export default function AIResumeBuilderPage() {
               ) : (
                 <Download className="mr-2 h-4 w-4" />
               )}
-              PDF yuklash
+              {t("aiResumeBuilder.downloadPDF")}
             </Button>
           </div>
         </div>
@@ -1162,7 +1165,7 @@ export default function AIResumeBuilderPage() {
         {/* Preview Content */}
         <div className="flex-1 overflow-auto p-8">
           <div
-            className="mx-auto bg-white shadow-2xl transition-transform"
+            className="mx-auto bg-white shadow-2xl transition-transform dark:bg-surface-800"
             style={{
               transform: `scale(${previewZoom / 100})`,
               transformOrigin: "top center",
@@ -1172,7 +1175,8 @@ export default function AIResumeBuilderPage() {
           >
             <ResumePreview
               content={previewContent}
-              title={formData.fullName || "SmartCareer Resume"}
+              title={formData.fullName || t("aiResumeBuilder.title")}
+              locale={locale}
               isPlaceholder={!formData.fullName}
             />
           </div>
@@ -1190,7 +1194,7 @@ export default function AIResumeBuilderPage() {
               <motion.div
                 initial={{ scale: 0.9, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
-                className="rounded-2xl bg-white p-8 text-center shadow-2xl"
+                className="rounded-2xl bg-white p-8 text-center shadow-2xl dark:bg-surface-800"
               >
                 <motion.div
                   initial={{ scale: 0 }}
@@ -1201,14 +1205,14 @@ export default function AIResumeBuilderPage() {
                   <CheckCircle className="h-10 w-10 text-green-600" />
                 </motion.div>
                 <h2 className="font-display text-2xl font-bold text-surface-900">
-                  Resume yaratildi!
+                  {t("aiResumeBuilder.resumeGenerated")}
                 </h2>
                 <p className="mt-2 text-surface-500">
-                  AI yordamida resume tayyor
+                  {t("aiResumeBuilder.aiResumeReady")}
                 </p>
                 <div className="mt-6 flex gap-3">
                   <Button variant="outline" onClick={() => setIsGenerated(false)}>
-                    Tahrirlash
+                    {t("aiResumeBuilder.editResume")}
                   </Button>
                   <Button
                     variant="outline"
@@ -1227,7 +1231,7 @@ export default function AIResumeBuilderPage() {
                     ) : (
                       <Download className="mr-2 h-4 w-4" />
                     )}
-                    PDF yuklash
+                    {t("aiResumeBuilder.downloadPDF")}
                   </Button>
                 </div>
               </motion.div>

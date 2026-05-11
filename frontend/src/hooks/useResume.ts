@@ -13,6 +13,7 @@ import axios from "axios";
 import type { Resume } from "@/types/api";
 import { resumeApi, getErrorMessage } from "@/lib/api";
 import { toast } from "sonner";
+import { getPreferredLocale } from "@/lib/i18n";
 
 // =============================================================================
 // TYPES
@@ -103,6 +104,34 @@ function isTransientAIOverloadError(error: unknown): boolean {
 
 const TRANSIENT_AI_RETRY_MESSAGE =
   "AI xizmati vaqtincha band. 20-60 soniyadan keyin qayta urinib ko'ring. Сервис временно перегружен, попробуйте снова через 20-60 секунд.";
+
+const resumeMessages = {
+  uz: {
+    created: "Rezyume yaratildi",
+    generated: "AI rezyume muvaffaqiyatli yaratildi",
+    updated: "Rezyume yangilandi",
+    deleted: "Rezyume o'chirildi",
+    published: "Rezyume e'lon qilindi",
+    archived: "Rezyume arxivlandi",
+    downloadStarted: "Rezyume PDF yuklab olish boshlandi",
+    generateFailed: "AI orqali rezyume yaratib bo'lmadi",
+  },
+  ru: {
+    created: "Резюме создано",
+    generated: "AI-резюме успешно создано",
+    updated: "Резюме обновлено",
+    deleted: "Резюме удалено",
+    published: "Резюме опубликовано",
+    archived: "Резюме архивировано",
+    downloadStarted: "Загрузка PDF резюме началась",
+    generateFailed: "Не удалось создать резюме через AI",
+  },
+} as const;
+
+function resumeMessage(key: keyof (typeof resumeMessages)["uz"]): string {
+  const locale = getPreferredLocale();
+  return resumeMessages[locale][key];
+}
 
 function unwrapApiData<T>(payload: unknown): T {
   if (payload && typeof payload === "object" && !Array.isArray(payload)) {
@@ -255,7 +284,7 @@ export function useResume() {
         isLoading: false,
       }));
 
-      toast.success("Resume created successfully");
+      toast.success(resumeMessage("created"));
       return newResume;
     } catch (error) {
       const message = getErrorMessage(error);
@@ -282,7 +311,7 @@ export function useResume() {
       }>(response.data);
 
       if (result.success === false) {
-        throw new Error(result.message || "Failed to generate resume with AI");
+        throw new Error(result.message || resumeMessage("generateFailed"));
       }
 
       const newResume = extractResume(result);
@@ -294,7 +323,7 @@ export function useResume() {
         isGenerating: false,
       }));
 
-      toast.success("AI resume generated successfully");
+      toast.success(resumeMessage("generated"));
       return newResume;
     } catch (error) {
       const message = isTransientAIOverloadError(error)
@@ -329,7 +358,7 @@ export function useResume() {
             : prev.currentResume,
         isLoading: false,
       }));
-      toast.success("Resume updated");
+      toast.success(resumeMessage("updated"));
       return updated;
     } catch (error) {
       const message = getErrorMessage(error);
@@ -356,7 +385,7 @@ export function useResume() {
         currentResume: prev.currentResume?.id === id ? null : prev.currentResume,
         isLoading: false,
       }));
-      toast.success("Resume deleted");
+      toast.success(resumeMessage("deleted"));
     } catch (error) {
       const message = getErrorMessage(error);
       setState((prev) => ({
@@ -384,7 +413,7 @@ export function useResume() {
         isLoading: false,
       }));
 
-      toast.success("Resume published");
+      toast.success(resumeMessage("published"));
       return updated;
     } catch (error) {
       const message = getErrorMessage(error);
@@ -413,7 +442,7 @@ export function useResume() {
         isLoading: false,
       }));
 
-      toast.success("Resume archived");
+      toast.success(resumeMessage("archived"));
       return updated;
     } catch (error) {
       const message = getErrorMessage(error);
@@ -445,7 +474,7 @@ export function useResume() {
         ...prev,
         isLoading: false,
       }));
-      toast.success("Resume PDF download started");
+      toast.success(resumeMessage("downloadStarted"));
     } catch (error) {
       const message = getErrorMessage(error);
       setState((prev) => ({

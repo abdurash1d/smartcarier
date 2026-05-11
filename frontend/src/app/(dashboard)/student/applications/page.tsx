@@ -500,7 +500,7 @@ export default function ApplicationsPage() {
                                   initial={{ opacity: 0, scale: 0.95 }}
                                   animate={{ opacity: 1, scale: 1 }}
                                   exit={{ opacity: 0, scale: 0.95 }}
-                                  className="absolute right-0 top-full z-50 mt-1 w-48 rounded-xl border border-surface-200 bg-white p-1 shadow-lg"
+                                  className="absolute right-0 top-full z-50 mt-1 w-48 rounded-xl border border-surface-200 bg-white p-1 shadow-lg dark:border-surface-700 dark:bg-surface-800"
                                 >
                                   <Link
                                     href={`/student/jobs/${application.job_id}`}

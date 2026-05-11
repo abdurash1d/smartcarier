@@ -284,6 +284,9 @@ export const jobApi = {
   match: (resumeId: string) =>
     api.post("/jobs/match", { resume_id: resumeId }),
 
+  recommended: (params?: { limit?: number; remote_only?: boolean }) =>
+    api.get("/jobs/recommended", { params }),
+
   applications: (id: string) => api.get(`/jobs/${id}/applications`),
 
   saveJob: (id: string) => api.post(`/jobs/${id}/save`),
@@ -314,6 +317,9 @@ export const applicationApi = {
   
   autoApply: (data: AutoApplyRequest) =>
     api.post("/applications/auto-apply", data),
+
+  hiringFunnel: (params?: { days?: number }) =>
+    api.get("/applications/analytics/funnel", { params }),
 };
 
 // Admin endpoints
@@ -339,6 +345,21 @@ export const adminApi = {
   adminUsers: () => api.get<AdminAccessUsersResponse>("/admin/access/admin-users"),
   updateAdminRole: (userId: string, data: AdminUpdateAdminRoleRequest) =>
     api.patch<AdminUpdateAdminRoleResponse>(`/admin/access/admin-users/${userId}/role`, data),
+
+  // Platform moderation
+  listJobs: (params?: { search?: string; status?: string; offset?: number; limit?: number }) =>
+    api.get("/admin/jobs", { params }),
+  updateJobStatus: (jobId: string, status: string) =>
+    api.patch(`/admin/jobs/${jobId}/status`, { status }),
+  deleteJob: (jobId: string) => api.delete(`/admin/jobs/${jobId}`),
+
+  listCompanies: (params?: { search?: string; is_verified?: boolean; offset?: number; limit?: number }) =>
+    api.get("/admin/companies", { params }),
+  verifyCompany: (companyId: string, is_verified: boolean) =>
+    api.patch(`/admin/companies/${companyId}/verify`, { is_verified }),
+
+  listApplications: (params?: { status?: string; search?: string; offset?: number; limit?: number }) =>
+    api.get("/admin/applications", { params }),
 };
 
 // User endpoints

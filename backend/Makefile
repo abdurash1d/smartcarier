@@ -1,5 +1,5 @@
 # =============================================================================
-# SmartCareer AI - Makefile
+# CareerUZ - Makefile
 # =============================================================================
 # Common development commands
 
@@ -7,7 +7,7 @@
 
 # Default target
 help:
-	@echo "SmartCareer AI - Available Commands"
+	@echo "CareerUZ - Available Commands"
 	@echo "===================================="
 	@echo ""
 	@echo "Setup:"

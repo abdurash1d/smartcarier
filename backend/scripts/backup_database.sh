@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # =============================================================================
-# SmartCareer AI - Database Backup Script
+# CareerUZ - Database Backup Script
 # =============================================================================
 #
 # This script creates automatic backups of your database
@@ -11,15 +11,15 @@
 #
 # Setup cron job (daily at 2 AM):
 #   crontab -e
-#   0 2 * * * /path/to/smartcareer/backend/scripts/backup_database.sh
+#   0 2 * * * /path/to/careeruz/backend/scripts/backup_database.sh
 #
 # =============================================================================
 
 # Configuration
 BACKUP_DIR="./backups"
-DB_FILE="./smartcareer.db"
+DB_FILE="./careeruz.db"
 DATE=$(date +%Y%m%d_%H%M%S)
-BACKUP_FILE="$BACKUP_DIR/smartcareer_backup_$DATE.db"
+BACKUP_FILE="$BACKUP_DIR/careeruz_backup_$DATE.db"
 MAX_BACKUPS=30  # Keep last 30 backups
 
 # Colors for output
@@ -29,7 +29,7 @@ RED='\033[0;31m'
 NC='\033[0m' # No Color
 
 echo -e "${GREEN}==================================${NC}"
-echo -e "${GREEN}SmartCareer AI - Database Backup${NC}"
+echo -e "${GREEN}CareerUZ - Database Backup${NC}"
 echo -e "${GREEN}==================================${NC}"
 echo ""
 

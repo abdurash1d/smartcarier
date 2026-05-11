@@ -1,6 +1,6 @@
 """
 =============================================================================
-Configuration Settings for SmartCareer AI
+Configuration Settings for CareerUZ
 =============================================================================
 
 This file manages all application settings using Pydantic.
@@ -131,7 +131,7 @@ class Settings(BaseSettings):
     # Database connection string
     # Development: SQLite
     # Production: postgresql://user:password@host:port/database
-    DATABASE_URL: str = "sqlite:///./smartcareer.db"
+    DATABASE_URL: str = "sqlite:///./careeruz.db"
 
     # =========================================================================
     # 🧠 REDIS (Rate limiting, token blacklist, OAuth state)
@@ -177,7 +177,7 @@ class Settings(BaseSettings):
     # =========================================================================
     
     # Application name (shown in API docs and responses)
-    APP_NAME: str = "SmartCareer AI"
+    APP_NAME: str = "CareerUZ"
     
     # Version number
     APP_VERSION: str = "1.0.0"
@@ -212,8 +212,8 @@ class Settings(BaseSettings):
     SMTP_PORT: int = 587
     SMTP_USER: str = ""
     SMTP_PASSWORD: str = ""
-    SMTP_FROM_EMAIL: str = "noreply@smartcareer.uz"
-    SMTP_FROM_NAME: str = "SmartCareer AI"
+    SMTP_FROM_EMAIL: str = "noreply@careeruz.uz"
+    SMTP_FROM_NAME: str = "CareerUZ"
     SMTP_USE_TLS: bool = True
     
     # SendGrid (optional - for production)
@@ -233,7 +233,7 @@ class Settings(BaseSettings):
     FRONTEND_URL: str = "http://localhost:3000"
     
     # Support email
-    SUPPORT_EMAIL: str = "support@smartcareer.uz"
+    SUPPORT_EMAIL: str = "support@careeruz.uz"
     
     # =========================================================================
     # 🔐 OAUTH2 SETTINGS (Google, LinkedIn)

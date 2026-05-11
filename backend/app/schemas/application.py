@@ -6,7 +6,7 @@ APPLICATION SCHEMAS
 Pydantic models for job application endpoints.
 """
 
-from typing import Optional, List
+from typing import Optional, List, Dict, Any
 from datetime import datetime
 from pydantic import BaseModel, Field, ConfigDict
 from enum import Enum
@@ -162,6 +162,7 @@ class ApplicationResponse(BaseModel):
     status: str
     cover_letter: Optional[str] = None
     match_score: Optional[str] = None
+    match_breakdown: Optional[Dict[str, Any]] = None
     
     # Timestamps
     applied_at: datetime

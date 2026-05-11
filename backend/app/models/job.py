@@ -49,7 +49,7 @@ TRADE-OFFS:
     - Rule of thumb: Index columns queried > 10% of the time
 
 =============================================================================
-AUTHOR: SmartCareer AI Team
+AUTHOR: CareerUZ Team
 VERSION: 1.0.0
 =============================================================================
 """
@@ -513,6 +513,15 @@ class Job(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin):
     # HELPER PROPERTIES
     # =========================================================================
     
+    def _expires_at_aware(self):
+        """Coerce expires_at to a UTC-aware datetime (SQLite returns naive)."""
+        if not self.expires_at:
+            return None
+        if self.expires_at.tzinfo is None:
+            from datetime import timezone
+            return self.expires_at.replace(tzinfo=timezone.utc)
+        return self.expires_at
+
     @property
     def is_active(self) -> bool:
         """Is this job currently accepting applications?"""
@@ -520,16 +529,18 @@ class Job(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin):
             return False
         if self.is_deleted:
             return False
-        if self.expires_at and self.expires_at < utc_now():
+        expires = self._expires_at_aware()
+        if expires and expires < utc_now():
             return False
         return True
-    
+
     @property
     def is_expired(self) -> bool:
         """Has this job posting expired?"""
-        if not self.expires_at:
+        expires = self._expires_at_aware()
+        if not expires:
             return False
-        return self.expires_at < utc_now()
+        return expires < utc_now()
     
     @property
     def salary_range_display(self) -> Optional[str]:

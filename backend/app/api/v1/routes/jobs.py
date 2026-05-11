@@ -18,7 +18,7 @@ ENDPOINTS:
     POST   /{job_id}/close        - Close job
 
 =============================================================================
-AUTHOR: SmartCareer AI Team
+AUTHOR: CareerUZ Team
 VERSION: 1.0.0
 =============================================================================
 """
@@ -35,7 +35,7 @@ from uuid import UUID
 from enum import Enum
 
 from fastapi import APIRouter, Depends, HTTPException, status, Query
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import func, or_, and_, desc, asc
 from pydantic import BaseModel, Field
 
@@ -63,6 +63,7 @@ from app.schemas.application import (
 )
 from app.schemas.auth import MessageResponse
 from app.config import settings
+from app.services import job_matching
 
 # =============================================================================
 # LOGGING
@@ -450,7 +451,7 @@ async def search_jobs(
     # APPLY PAGINATION
     # =========================================================================
     
-    jobs = q.offset(pagination.skip).limit(pagination.limit).all()
+    jobs = q.options(joinedload(Job.company)).offset(pagination.skip).limit(pagination.limit).all()
     
     total_pages = (total + pagination.page_size - 1) // pagination.page_size
     
@@ -606,12 +607,136 @@ async def get_saved_jobs(
 
 
 @router.get(
+    "/recommended",
+    response_model=JobMatchResponse,
+    summary="Personalized job recommendations for current user",
+    description="""
+    Returns jobs ranked by match score against the user's most recent published resume.
+
+    - Auto-picks the latest published resume (falls back to the most recent draft).
+    - Reuses the same skill/experience/title scoring as POST /jobs/match.
+    - Returns 200 with an empty `matches` list and an explanatory message when the
+      user has no resume yet, so the client can render a CTA instead of an error.
+    """,
+)
+async def recommended_jobs(
+    limit: int = Query(10, ge=1, le=50, description="Maximum number of recommendations"),
+    remote_only: bool = Query(False, description="Only include remote-friendly roles"),
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db),
+):
+    """Personalized recommendations driven by the user's resume content."""
+    start_time = time.time()
+
+    # =========================================================================
+    # STEP 1: Pick the user's most relevant resume
+    # =========================================================================
+    resume = (
+        db.query(Resume)
+        .filter(
+            Resume.user_id == current_user.id,
+            Resume.is_deleted == False,
+            Resume.status == "published",
+        )
+        .order_by(Resume.updated_at.desc())
+        .first()
+    )
+
+    if not resume:
+        resume = (
+            db.query(Resume)
+            .filter(Resume.user_id == current_user.id, Resume.is_deleted == False)
+            .order_by(Resume.updated_at.desc())
+            .first()
+        )
+
+    if not resume:
+        return JobMatchResponse(
+            success=True,
+            message="No resume found yet. Create one to unlock personalized recommendations.",
+            total_jobs_analyzed=0,
+            matches=[],
+            resume_skills=[],
+            processing_time_seconds=round(time.time() - start_time, 2),
+        )
+
+    # =========================================================================
+    # STEP 2: Extract resume signals (reuse the same helpers as /match)
+    # =========================================================================
+    resume_skills = job_matching.extract_skills_from_resume(resume.content)
+    resume_experience = job_matching.extract_experience_level(resume.content)
+    resume_keywords = job_matching.extract_keywords(resume.content)
+
+    # =========================================================================
+    # STEP 3: Candidate jobs (active only; cheap pre-filter for remote_only)
+    # =========================================================================
+    q = db.query(Job).filter(
+        Job.is_deleted == False,
+        Job.status == JobStatus.ACTIVE.value,
+    )
+    if remote_only:
+        q = q.filter(or_(Job.is_remote_allowed == True, Job.job_type == "remote"))
+
+    jobs = q.all()
+
+    # =========================================================================
+    # STEP 4: Score & rank
+    # =========================================================================
+    scored: List[Dict[str, Any]] = []
+    for job in jobs:
+        score, skill_matches, missing_skills, reasons = job_matching.calculate_match_score(
+            resume_skills=resume_skills,
+            resume_experience=resume_experience,
+            resume_keywords=resume_keywords,
+            job=job,
+        )
+        scored.append(
+            {
+                "job": job,
+                "score": score,
+                "skill_matches": skill_matches,
+                "missing_skills": missing_skills,
+                "reasons": reasons,
+            }
+        )
+
+    scored.sort(key=lambda x: x["score"], reverse=True)
+    scored = scored[:limit]
+
+    match_results = [
+        JobMatchScore(
+            job=job_to_response(item["job"]),
+            match_score=round(item["score"], 1),
+            match_reasons=item["reasons"],
+            skill_matches=item["skill_matches"],
+            missing_skills=item["missing_skills"][:5],
+        )
+        for item in scored
+    ]
+
+    processing_time = time.time() - start_time
+    logger.info(
+        f"🎯 Recommendations for user {current_user.id}: "
+        f"{len(match_results)}/{len(jobs)} jobs in {processing_time:.2f}s"
+    )
+
+    return JobMatchResponse(
+        success=True,
+        message=f"Found {len(match_results)} recommended jobs",
+        total_jobs_analyzed=len(jobs),
+        matches=match_results,
+        resume_skills=resume_skills[:20],
+        processing_time_seconds=round(processing_time, 2),
+    )
+
+
+@router.get(
     "/{job_id}",
     response_model=JobResponse,
     summary="Get job details",
     description="""
     Get detailed information about a job posting.
-    
+
     **Note:** This endpoint increments the view count (unless you're the owner).
     """
 )
@@ -994,9 +1119,9 @@ async def match_jobs(
     # STEP 2: Extract skills from resume
     # =========================================================================
     
-    resume_skills = _extract_skills_from_resume(resume.content)
-    resume_experience = _extract_experience_level(resume.content)
-    resume_keywords = _extract_keywords(resume.content)
+    resume_skills = job_matching.extract_skills_from_resume(resume.content)
+    resume_experience = job_matching.extract_experience_level(resume.content)
+    resume_keywords = job_matching.extract_keywords(resume.content)
     
     logger.info(f"   Extracted {len(resume_skills)} skills from resume")
     
@@ -1048,11 +1173,11 @@ async def match_jobs(
     matches = []
     
     for job in jobs:
-        score, skill_matches, missing_skills, reasons = _calculate_match_score(
+        score, skill_matches, missing_skills, reasons = job_matching.calculate_match_score(
             resume_skills=resume_skills,
             resume_experience=resume_experience,
             resume_keywords=resume_keywords,
-            job=job
+            job=job,
         )
         
         matches.append({
@@ -1173,281 +1298,4 @@ async def close_job(
     
     return job_to_response(job)
 
-
-# =============================================================================
-# HELPER FUNCTIONS FOR JOB MATCHING
-# =============================================================================
-
-def _normalize_text(value: Any) -> str:
-    """Normalize text for matching."""
-    if value is None:
-        return ""
-    return re.sub(r"\s+", " ", str(value)).strip().lower()
-
-
-def _tokenize_text(value: Any) -> List[str]:
-    """Tokenize text to searchable tokens."""
-    normalized = _normalize_text(value)
-    if not normalized:
-        return []
-    return [token for token in re.split(r"[^\w+#./-]+", normalized) if len(token) > 1]
-
-
-def _flatten_to_strings(value: Any) -> List[str]:
-    """Recursively flatten nested JSON data to text fragments."""
-    fragments: List[str] = []
-    if value is None:
-        return fragments
-
-    if isinstance(value, str):
-        cleaned = _normalize_text(value)
-        if cleaned:
-            fragments.append(cleaned)
-        return fragments
-
-    if isinstance(value, (int, float, bool)):
-        fragments.append(_normalize_text(value))
-        return fragments
-
-    if isinstance(value, list):
-        for item in value:
-            fragments.extend(_flatten_to_strings(item))
-        return fragments
-
-    if isinstance(value, dict):
-        for item in value.values():
-            fragments.extend(_flatten_to_strings(item))
-        return fragments
-
-    return fragments
-
-
-def _normalize_terms(values: List[str]) -> List[str]:
-    """Normalize and deduplicate phrases + tokens."""
-    terms: set[str] = set()
-    for value in values:
-        cleaned = _normalize_text(value)
-        if not cleaned:
-            continue
-        terms.add(cleaned)
-        for token in _tokenize_text(cleaned):
-            terms.add(token)
-    return sorted(terms)
-
-
-def _extract_job_requirement_terms(requirements: Any) -> List[str]:
-    """Extract comparable requirement terms from job requirements JSON."""
-    requirement_values: List[str] = []
-    if isinstance(requirements, dict):
-        for key in (
-            "skills",
-            "required_skills",
-            "must_have",
-            "nice_to_have",
-            "technologies",
-            "tools",
-            "experience",
-            "education",
-            "certifications",
-            "keywords",
-            "requirements",
-            "responsibilities",
-            "domain",
-            "industry",
-        ):
-            requirement_values.extend(_flatten_to_strings(requirements.get(key)))
-        # Include any remaining nested data for robustness.
-        requirement_values.extend(_flatten_to_strings(requirements))
-    else:
-        requirement_values.extend(_flatten_to_strings(requirements))
-    return _normalize_terms(requirement_values)
-
-
-def _extract_skills_from_resume(content: Dict[str, Any]) -> List[str]:
-    """Extract resume terms from current and legacy resume schemas."""
-    collected: List[str] = []
-
-    # Current/legacy skills section.
-    collected.extend(_flatten_to_strings(content.get("skills")))
-
-    # Experience sections (current schema + legacy schema).
-    collected.extend(_flatten_to_strings(content.get("experience")))
-    collected.extend(_flatten_to_strings(content.get("work_experience")))
-
-    # Education and optional sections.
-    for key in ("education", "certifications", "projects", "summary", "professional_summary"):
-        collected.extend(_flatten_to_strings(content.get(key)))
-
-    return _normalize_terms(collected)
-
-
-def _extract_experience_level(content: Dict[str, Any]) -> str:
-    """Determine experience level from resume content."""
-    work_exp = content.get("experience") or content.get("work_experience") or []
-    
-    if not work_exp:
-        return "junior"
-    
-    # Simple heuristic based on number of positions
-    num_positions = len(work_exp)
-    
-    if num_positions >= 5:
-        return "senior"
-    elif num_positions >= 3:
-        return "mid"
-    elif num_positions >= 1:
-        return "junior"
-    else:
-        return "intern"
-
-
-def _extract_keywords(content: Dict[str, Any]) -> List[str]:
-    """Extract important keywords from resume content."""
-    keywords: List[str] = []
-
-    summary = content.get("professional_summary")
-    keywords.extend(_flatten_to_strings(summary))
-    keywords.extend(_flatten_to_strings(content.get("summary")))
-    keywords.extend(_flatten_to_strings(content.get("target_position")))
-    keywords.extend(_flatten_to_strings(content.get("job_title")))
-    keywords.extend(_flatten_to_strings(content.get("specialization")))
-
-    experience_blocks = content.get("experience") or content.get("work_experience") or []
-    for exp in experience_blocks:
-        if isinstance(exp, dict):
-            keywords.extend(
-                _flatten_to_strings(
-                    [
-                        exp.get("position"),
-                        exp.get("job_title"),
-                        exp.get("role"),
-                        exp.get("title"),
-                    ]
-                )
-            )
-
-    education_blocks = content.get("education") or []
-    for edu in education_blocks:
-        if isinstance(edu, dict):
-            keywords.extend(
-                _flatten_to_strings(
-                    [
-                        edu.get("field_of_study"),
-                        edu.get("specialization"),
-                        edu.get("degree"),
-                    ]
-                )
-            )
-
-    return _normalize_terms(keywords)
-
-
-def _calculate_match_score(
-    resume_skills: List[str],
-    resume_experience: str,
-    resume_keywords: List[str],
-    job: Job
-) -> tuple:
-    """
-    Calculate match score between resume and job.
-    
-    Returns: (score, skill_matches, missing_skills, reasons)
-    """
-    score = 0.0
-    reasons: List[str] = []
-
-    resume_terms = set(_normalize_terms(resume_skills + resume_keywords))
-    job_requirements = _extract_job_requirement_terms(job.requirements)
-    job_requirement_set = set(job_requirements)
-
-    skill_matches = sorted(
-        {
-            req
-            for req in job_requirement_set
-            if any(
-                req == resume_term
-                or req in resume_term
-                or resume_term in req
-                for resume_term in resume_terms
-            )
-        }
-    )
-    missing_skills = sorted(job_requirement_set - set(skill_matches))
-
-    # =========================================================================
-    # REQUIREMENT COVERAGE (60 points max)
-    # =========================================================================
-    if job_requirement_set:
-        coverage = len(skill_matches) / len(job_requirement_set)
-        skill_score = coverage * 60
-        score += skill_score
-        reasons.append(
-            f"Matched {len(skill_matches)}/{len(job_requirement_set)} requirement terms"
-        )
-    else:
-        score += 30
-        reasons.append("Job requirements are broad, using title/experience matching")
-    
-    # =========================================================================
-    # EXPERIENCE LEVEL MATCHING (20 points)
-    # =========================================================================
-    
-    experience_levels = {
-        "intern": 0,
-        "junior": 1,
-        "mid": 2,
-        "senior": 3,
-        "lead": 4,
-        "executive": 5
-    }
-    
-    resume_level = experience_levels.get(resume_experience, 1)
-    job_level = experience_levels.get(job.experience_level, 2)
-    
-    # Exact match or slightly over-qualified is good
-    level_diff = resume_level - job_level
-    
-    if level_diff == 0:
-        score += 20
-        reasons.append("Experience level matches perfectly")
-    elif level_diff == 1:
-        score += 15
-        reasons.append("Slightly over-qualified (good!)")
-    elif level_diff == -1:
-        score += 10
-        reasons.append("Slightly under-qualified, but close")
-    elif level_diff > 1:
-        score += 5
-        reasons.append("May be over-qualified for this role")
-    
-    # =========================================================================
-    # TITLE / DOMAIN ALIGNMENT (15 points)
-    # =========================================================================
-    title_tokens = set(_tokenize_text(job.title))
-    keyword_tokens = set()
-    for keyword in resume_keywords:
-        keyword_tokens.update(_tokenize_text(keyword))
-
-    overlap = title_tokens & keyword_tokens
-    if overlap:
-        score += 15
-        reasons.append(
-            f"Title/domain overlap detected: {', '.join(sorted(list(overlap))[:3])}"
-        )
-
-    # =========================================================================
-    # LOCATION / REMOTE BONUS (5 points)
-    # =========================================================================
-    if job.is_remote_allowed or job.job_type == "remote":
-        score += 5
-        reasons.append("Remote/hybrid flexibility is available")
-    
-    # =========================================================================
-    # NORMALIZE SCORE TO 0-100
-    # =========================================================================
-    
-    # Max theoretical score: 50 (skills) + 20 (exp) + 20 (keywords) + 10 (bonus) = 100
-    score = min(score, 100)
-    
-    return score, skill_matches, missing_skills, reasons
 

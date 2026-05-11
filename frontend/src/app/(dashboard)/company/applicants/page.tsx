@@ -41,8 +41,11 @@ import { formatRelativeTime, cn } from "@/lib/utils";
 import { jobApi, applicationApi, getErrorMessage } from "@/lib/api";
 import { toast } from "sonner";
 import type { KnownApplicationStatus } from "@/types/api";
+import { useTranslation } from "@/hooks/useTranslation";
 
 export default function CompanyApplicantsPage() {
+  const { locale } = useTranslation();
+  const isRu = locale === "ru";
   const router = useRouter();
   const { jobs, fetchMyJobs } = useJobs();
   const [isLoading, setIsLoading] = useState(false);
@@ -94,7 +97,7 @@ export default function CompanyApplicantsPage() {
 
   const handleStatusChange = async (applicationId: string, newStatus: KnownApplicationStatus) => {
     if (newStatus === "interview") {
-      toast.info("Intervyu sana va vaqtini belgilash uchun candidate detail sahifasi ochildi.");
+      toast.info(isRu ? "Открыта карточка кандидата для назначения интервью." : "Intervyu sana-vaqtini belgilash uchun nomzod sahifasi ochildi.");
       router.push(`/company/applicants/${applicationId}`);
       return;
     }
@@ -105,7 +108,7 @@ export default function CompanyApplicantsPage() {
       setApplications((prev) =>
         prev.map((a) => (a.id === applicationId ? { ...a, ...updatedApplication, status: newStatus } : a))
       );
-      toast.success("Holat yangilandi");
+      toast.success(isRu ? "Статус обновлен" : "Holat yangilandi");
     } catch (error) {
       toast.error(getErrorMessage(error));
     }
@@ -116,10 +119,10 @@ export default function CompanyApplicantsPage() {
       {/* Header */}
       <div>
         <h1 className="font-display text-2xl font-bold text-surface-900 dark:text-white">
-          Applicants
+          {isRu ? "Кандидаты" : "Nomzodlar"}
         </h1>
         <p className="mt-1 text-surface-500">
-          Review and manage candidates for your job postings
+          {isRu ? "Просматривайте и управляйте кандидатами по вашим вакансиям" : "Vakansiyalaringiz bo'yicha nomzodlarni ko'ring va boshqaring"}
         </p>
       </div>
 
@@ -131,7 +134,7 @@ export default function CompanyApplicantsPage() {
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-surface-400" />
               <Input
-                placeholder="Search by name or email..."
+                placeholder={isRu ? "Поиск по имени или email..." : "Ism yoki email bo'yicha qidirish..."}
                 className="pl-10"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
@@ -141,10 +144,10 @@ export default function CompanyApplicantsPage() {
             {/* Job filter */}
             <Select value={selectedJob} onValueChange={setSelectedJob}>
               <SelectTrigger className="w-full sm:w-64">
-                <SelectValue placeholder="All Jobs" />
+                <SelectValue placeholder={isRu ? "Все вакансии" : "Barcha ishlar"} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Jobs</SelectItem>
+                <SelectItem value="all">{isRu ? "Все вакансии" : "Barcha ishlar"}</SelectItem>
                 {jobs.map((job) => (
                   <SelectItem key={job.id} value={job.id}>
                     {job.title}
@@ -156,17 +159,17 @@ export default function CompanyApplicantsPage() {
             {/* Status filter */}
             <Select value={statusFilter} onValueChange={(value) => setStatusFilter(value as KnownApplicationStatus | "all")}>
               <SelectTrigger className="w-full sm:w-48">
-                <SelectValue placeholder="All Statuses" />
+                <SelectValue placeholder={isRu ? "Все статусы" : "Barcha holatlar"} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Statuses</SelectItem>
-                <SelectItem value="pending">Pending</SelectItem>
-                <SelectItem value="reviewing">Reviewing</SelectItem>
-                <SelectItem value="shortlisted">Shortlisted</SelectItem>
-                <SelectItem value="interview">Interview</SelectItem>
-                <SelectItem value="accepted">Accepted</SelectItem>
-                <SelectItem value="rejected">Rejected</SelectItem>
-                <SelectItem value="withdrawn">Withdrawn</SelectItem>
+                <SelectItem value="all">{isRu ? "Все статусы" : "Barcha holatlar"}</SelectItem>
+                <SelectItem value="pending">{isRu ? "Ожидание" : "Kutilmoqda"}</SelectItem>
+                <SelectItem value="reviewing">{isRu ? "Проверка" : "Ko'rib chiqilmoqda"}</SelectItem>
+                <SelectItem value="shortlisted">{isRu ? "Шорт-лист" : "Saralangan"}</SelectItem>
+                <SelectItem value="interview">{isRu ? "Интервью" : "Intervyu"}</SelectItem>
+                <SelectItem value="accepted">{isRu ? "Принят" : "Qabul qilindi"}</SelectItem>
+                <SelectItem value="rejected">{isRu ? "Отклонен" : "Rad etildi"}</SelectItem>
+                <SelectItem value="withdrawn">{isRu ? "Отозвано" : "Qaytarib olindi"}</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -186,12 +189,12 @@ export default function CompanyApplicantsPage() {
                 <Users className="h-8 w-8 text-surface-400" />
               </div>
               <h3 className="font-display text-lg font-semibold text-surface-900 dark:text-white">
-                No applicants found
+                {isRu ? "Кандидаты не найдены" : "Nomzodlar topilmadi"}
               </h3>
               <p className="mt-2 max-w-sm text-surface-500">
                 {selectedJob === "all"
-                  ? "You haven't received any applications yet."
-                  : "No applicants match your current filters."}
+                  ? (isRu ? "Пока нет заявок на ваши вакансии." : "Hali sizning vakansiyalaringizga ariza kelmagan.")
+                  : (isRu ? "По текущим фильтрам кандидатов нет." : "Joriy filtrlarga mos nomzodlar yo'q.")}
               </p>
             </div>
           ) : (
@@ -204,13 +207,13 @@ export default function CompanyApplicantsPage() {
                   {/* Applicant info */}
                   <div className="flex items-center gap-4 flex-1">
                     <UserAvatar
-                      name={application.applicant?.full_name || "Applicant"}
+                      name={application.applicant?.full_name || (isRu ? "Кандидат" : "Nomzod")}
                       imageUrl={application.applicant?.avatar_url}
                       size="lg"
                     />
                     <div className="min-w-0 flex-1">
                       <h3 className="font-medium text-surface-900 dark:text-white">
-                        {application.applicant?.full_name || "Unknown"}
+                        {application.applicant?.full_name || (isRu ? "Неизвестно" : "Noma'lum")}
                       </h3>
                       <div className="flex flex-wrap items-center gap-3 text-sm text-surface-500">
                         <span className="flex items-center gap-1">
@@ -225,8 +228,8 @@ export default function CompanyApplicantsPage() {
                         )}
                       </div>
                       <p className="mt-1 text-sm text-surface-500">
-                        Applied for <strong>{application.job?.title}</strong>{" "}
-                        {formatRelativeTime(application.applied_at)}
+                        {isRu ? "Подал заявку:" : "Ariza yubordi:"} <strong>{application.job?.title}</strong>{" "}
+                        {formatRelativeTime(application.applied_at, locale)}
                       </p>
                     </div>
                   </div>
@@ -237,7 +240,7 @@ export default function CompanyApplicantsPage() {
                       <p className="text-2xl font-bold text-brand-600">
                         {application.match_score}
                       </p>
-                      <p className="text-xs text-surface-500">Match Score</p>
+                      <p className="text-xs text-surface-500">{isRu ? "Совпадение" : "Moslik"}</p>
                     </div>
                   )}
 
@@ -253,20 +256,20 @@ export default function CompanyApplicantsPage() {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="pending">Pending</SelectItem>
-                        <SelectItem value="reviewing">Reviewing</SelectItem>
-                        <SelectItem value="shortlisted">Shortlisted</SelectItem>
-                        <SelectItem value="interview">Interview - detailda belgilang</SelectItem>
-                        <SelectItem value="accepted">Accepted</SelectItem>
-                        <SelectItem value="rejected">Rejected</SelectItem>
-                        <SelectItem value="withdrawn">Withdrawn</SelectItem>
+                        <SelectItem value="pending">{isRu ? "Ожидание" : "Kutilmoqda"}</SelectItem>
+                        <SelectItem value="reviewing">{isRu ? "Проверка" : "Ko'rib chiqilmoqda"}</SelectItem>
+                        <SelectItem value="shortlisted">{isRu ? "Шорт-лист" : "Saralangan"}</SelectItem>
+                        <SelectItem value="interview">{isRu ? "Интервью — в деталях" : "Intervyu — tafsilotlarda belgilang"}</SelectItem>
+                        <SelectItem value="accepted">{isRu ? "Принят" : "Qabul qilindi"}</SelectItem>
+                        <SelectItem value="rejected">{isRu ? "Отклонен" : "Rad etildi"}</SelectItem>
+                        <SelectItem value="withdrawn">{isRu ? "Отозвано" : "Qaytarib olindi"}</SelectItem>
                       </SelectContent>
                     </Select>
 
                     <Link href={`/company/applicants/${application.id}`}>
                       <Button variant="outline" size="sm">
                         <FileText className="mr-2 h-4 w-4" />
-                        View
+                        {isRu ? "Открыть" : "Ko'rish"}
                       </Button>
                     </Link>
                   </div>

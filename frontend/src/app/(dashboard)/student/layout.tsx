@@ -229,7 +229,7 @@ export default function StudentDashboardLayout({
               <Sparkles className="h-5 w-5 text-white" />
             </div>
             <span className="font-display text-lg font-bold text-surface-900 dark:text-white">
-              SmartCareer
+              CareerUZ
             </span>
           </Link>
           <button

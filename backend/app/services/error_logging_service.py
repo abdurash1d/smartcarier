@@ -17,7 +17,7 @@ Xususiyatlari:
 - Email bildirishnomalar (kritik xatolar)
 - Statistika va analytics
 
-AUTHOR: SmartCareer AI Team
+AUTHOR: CareerUZ Team
 VERSION: 1.0.0
 =============================================================================
 """

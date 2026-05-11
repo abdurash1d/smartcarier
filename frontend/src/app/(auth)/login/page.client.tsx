@@ -21,11 +21,10 @@ import {
   EyeOff,
   Mail,
   Lock,
-  AlertCircle,
   Loader2,
-  CheckCircle,
   ArrowRight,
 } from "lucide-react";
+import { Alert } from "@/components/ui/alert";
 import { useAuth } from "@/hooks/useAuth";
 import { useTranslation } from "@/hooks/useTranslation";
 import { getBackendOrigin } from "@/lib/runtime-config";
@@ -114,10 +113,10 @@ export default function LoginPageClient() {
       : error;
 
   return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="mx-auto w-full max-w-md">
+    <motion.div initial={false} animate={{ opacity: 1 }} className="mx-auto w-full max-w-md">
       {/* Header */}
       <motion.div
-        initial={{ opacity: 0, y: 20 }}
+        initial={false}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.1 }}
         className="mb-8 text-center"
@@ -129,53 +128,30 @@ export default function LoginPageClient() {
       {/* Alerts */}
       <AnimatePresence mode="wait">
         {sessionExpired && (
-          <motion.div
-            key="session-expired"
-            {...fadeIn}
-            className="mb-6 flex items-center gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800"
-          >
-            <AlertCircle className="h-5 w-5 flex-shrink-0" />
-            <p>{t("auth.login.sessionExpired")}</p>
+          <motion.div key="session-expired" {...fadeIn} className="mb-6">
+            <Alert variant="warning">{t("auth.login.sessionExpired")}</Alert>
           </motion.div>
         )}
-
         {registered && (
-          <motion.div
-            key="registered"
-            {...fadeIn}
-            className="mb-6 flex items-center gap-3 rounded-xl border border-green-200 bg-green-50 p-4 text-sm text-green-800"
-          >
-            <CheckCircle className="h-5 w-5 flex-shrink-0" />
-            <p>{t("auth.login.registered")}</p>
+          <motion.div key="registered" {...fadeIn} className="mb-6">
+            <Alert variant="success">{t("auth.login.registered")}</Alert>
           </motion.div>
         )}
-
         {passwordReset && (
-          <motion.div
-            key="password-reset"
-            {...fadeIn}
-            className="mb-6 flex items-center gap-3 rounded-xl border border-green-200 bg-green-50 p-4 text-sm text-green-800"
-          >
-            <CheckCircle className="h-5 w-5 flex-shrink-0" />
-            <p>{t("auth.login.passwordReset")}</p>
+          <motion.div key="password-reset" {...fadeIn} className="mb-6">
+            <Alert variant="success">{t("auth.login.passwordReset")}</Alert>
           </motion.div>
         )}
-
         {error && (
-          <motion.div
-            key="error"
-            {...fadeIn}
-            className="mb-6 flex items-center gap-3 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800"
-          >
-            <AlertCircle className="h-5 w-5 flex-shrink-0" />
-            <p>{localizedError}</p>
+          <motion.div key="error" {...fadeIn} className="mb-6">
+            <Alert variant="error">{localizedError}</Alert>
           </motion.div>
         )}
       </AnimatePresence>
 
       {/* Form */}
       <motion.form
-        initial={{ opacity: 0, y: 20 }}
+        initial={false}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.2 }}
         onSubmit={handleSubmit(onSubmit)}

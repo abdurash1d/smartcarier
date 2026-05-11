@@ -10,7 +10,9 @@ import { Bell, Check, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { api } from '@/lib/api';
 import { formatDistanceToNow } from 'date-fns';
+import { ru, uz } from 'date-fns/locale';
 import Link from 'next/link';
+import { useTranslation } from '@/hooks/useTranslation';
 
 interface Notification {
   id: string;
@@ -23,6 +25,9 @@ interface Notification {
 }
 
 export function NotificationBell() {
+  const { locale } = useTranslation();
+  const isRu = locale === "ru";
+  const dateLocale = isRu ? ru : uz;
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [isOpen, setIsOpen] = useState(false);
@@ -119,7 +124,7 @@ export function NotificationBell() {
           <div className="absolute right-0 mt-2 w-96 bg-white dark:bg-surface-800 rounded-lg shadow-xl border border-surface-200 dark:border-surface-700 z-20">
             {/* Header */}
             <div className="p-4 border-b border-surface-200 dark:border-surface-700 flex items-center justify-between">
-              <h3 className="font-semibold">Notifications</h3>
+              <h3 className="font-semibold">{isRu ? "Уведомления" : "Bildirishnomalar"}</h3>
               {unreadCount > 0 && (
                 <Button
                   variant="ghost"
@@ -128,7 +133,7 @@ export function NotificationBell() {
                   disabled={loading}
                 >
                   <Check className="h-4 w-4 mr-1" />
-                  Mark all read
+                  {isRu ? "Отметить все" : "Barchasini o'qilgan qilish"}
                 </Button>
               )}
             </div>
@@ -138,7 +143,7 @@ export function NotificationBell() {
               {notifications.length === 0 ? (
                 <div className="p-8 text-center text-surface-500">
                   <Bell className="h-12 w-12 mx-auto mb-2 opacity-50" />
-                  <p>No notifications yet</p>
+                  <p>{isRu ? "Уведомлений пока нет" : "Hozircha bildirishnoma yo'q"}</p>
                 </div>
               ) : (
                 notifications.map(notification => (
@@ -159,7 +164,7 @@ export function NotificationBell() {
                           {notification.message}
                         </p>
                         <p className="text-xs text-surface-500 mt-2">
-                          {formatDistanceToNow(new Date(notification.created_at), { addSuffix: true })}
+                          {formatDistanceToNow(new Date(notification.created_at), { addSuffix: true, locale: dateLocale })}
                         </p>
                         
                         {notification.link && (
@@ -171,7 +176,7 @@ export function NotificationBell() {
                               setIsOpen(false);
                             }}
                           >
-                            View details →
+                            {isRu ? "Подробнее →" : "Batafsil →"}
                           </Link>
                         )}
                       </div>
@@ -184,7 +189,7 @@ export function NotificationBell() {
                             size="icon"
                             className="h-8 w-8"
                             onClick={() => markAsRead(notification.id)}
-                            title="Mark as read"
+                            title={isRu ? "Прочитано" : "O'qildi deb belgilash"}
                           >
                             <Check className="h-4 w-4" />
                           </Button>
@@ -194,7 +199,7 @@ export function NotificationBell() {
                           size="icon"
                           className="h-8 w-8 text-red-600 hover:text-red-700"
                           onClick={() => deleteNotification(notification.id)}
-                          title="Delete"
+                          title={isRu ? "Удалить" : "O'chirish"}
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
@@ -209,11 +214,11 @@ export function NotificationBell() {
             {notifications.length > 0 && (
               <div className="p-3 border-t border-surface-200 dark:border-surface-700 text-center">
                 <Link
-                  href="/notifications"
+                  href="/student/notifications"
                   className="text-sm text-brand-600 hover:text-brand-700"
                   onClick={() => setIsOpen(false)}
                 >
-                  View all notifications →
+                  {isRu ? "Все уведомления →" : "Barcha bildirishnomalar →"}
                 </Link>
               </div>
             )}

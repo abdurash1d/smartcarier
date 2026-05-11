@@ -184,11 +184,11 @@ export const uz = {
     testimonials: {
       badge: "FIKRLAR",
       title: "Foydalanuvchilar fikrlari",
-      subtitle: "Minglab mutaxassislar allaqachon SmartCareer AI bilan orzularidagi ishni topdi",
+      subtitle: "Minglab mutaxassislar allaqachon CareerUZ bilan orzularidagi ishni topdi",
     },
     cta: {
       title: "Karyerangizni oshirishga tayyormisiz?",
-      subtitle: "SmartCareer AI bilan orzuingizdagi ishni topgan minglab mutaxassislarga qo'shiling. Sayohatingizni bugun boshlang!",
+      subtitle: "CareerUZ bilan orzuingizdagi ishni topgan minglab mutaxassislarga qo'shiling. Sayohatingizni bugun boshlang!",
       button: "Bepul boshlash",
     },
     footer: {
@@ -216,7 +216,7 @@ export const uz = {
     sidebar: {
       title: "AI vositalar bilan orzuingizdagi karyerani",
       titleHighlight: "quring",
-      subtitle: "O'zbekistondagi 10,000+ mutaxassis SmartCareer AI bilan karyerasini tezlashtirdi.",
+      subtitle: "O'zbekistondagi 10,000+ mutaxassis CareerUZ bilan karyerasini tezlashtirdi.",
       features: [
         "AI-quvvatli rezyume yaratish",
         "Aqlli ish mosligi",
@@ -230,7 +230,7 @@ export const uz = {
         success: "Muvaffaqiyat darajasi",
       },
       testimonial: {
-        quote: "SmartCareer AI menga top texnologiya kompaniyasida orzuimdagi ishni topishga yordam berdi!",
+        quote: "CareerUZ menga top texnologiya kompaniyasida orzuimdagi ishni topishga yordam berdi!",
         author: "Aziz K.",
         role: "Dasturchi",
       },
@@ -251,6 +251,12 @@ export const uz = {
       registered: "Hisob muvaffaqiyatli yaratildi! Iltimos, kiring.",
       passwordReset: "Parol muvaffaqiyatli yangilandi. Endi yangi parol bilan kiring.",
       invalidCredentials: "Email yoki parol noto'g'ri",
+      validation: {
+        emailRequired: "Email majburiy",
+        emailInvalid: "Iltimos, to'g'ri email manzilini kiriting",
+        passwordRequired: "Parol majburiy",
+        passwordMin: "Parol kamida 6 ta belgidan iborat bo'lishi kerak",
+      },
       demo: "Demo hisob",
     },
     register: {
@@ -263,6 +269,33 @@ export const uz = {
       confirmPassword: "Parolni tasdiqlang",
       continue: "Davom etish",
       createButton: "Hisob yaratish",
+      creating: "Hisob yaratilmoqda...",
+      companyNameOptional: "Kompaniya nomi (ixtiyoriy)",
+      placeholders: {
+        email: "you@example.com",
+        password: "Kuchli parol yarating",
+        confirmPassword: "Parolni qayta kiriting",
+        fullName: "Ism Familiya",
+        phone: "+998 90 123 45 67",
+        companyName: "Masalan, Acme MChJ",
+      },
+      oauth: {
+        divider: "Yoki davom eting",
+        quickAccess: "Yoki tezkor kirish",
+        google: "Google bilan ro'yxatdan o'tish",
+      },
+      badges: {
+        student: {
+          resume: "AI Rezyume",
+          matching: "Ish mosligi",
+          autoApply: "Avto ariza",
+        },
+        company: {
+          postJobs: "Ish e'loni",
+          aiMatching: "AI moslash",
+          analytics: "Analitika",
+        },
+      },
       steps: {
         step1: {
           title: "Hisob yaratish",
@@ -274,11 +307,11 @@ export const uz = {
         },
         step3: {
           title: "Rolni tanlash",
-          description: "SmartCareer'ni qanday ishlatmoqchisiz?",
+          description: "CareerUZ'ni qanday ishlatmoqchisiz?",
         },
       },
       phoneHelper: "Buni hisob tiklash va ish haqidagi xabarlar uchun ishlatamiz",
-      howWillYouUse: "SmartCareer'ni qanday ishlatmoqchisiz?",
+      howWillYouUse: "CareerUZ'ni qanday ishlatmoqchisiz?",
       studentRole: "Men ish izlovchiman",
       companyRole: "Men ish beruvchiman",
       studentDescription: "Ish qidirish, rezyume yaratish va karyeramni rivojlantirish",
@@ -297,6 +330,25 @@ export const uz = {
         uppercase: "Katta harf",
         number: "Raqam",
       },
+      validation: {
+        emailRequired: "Email majburiy",
+        emailInvalid: "Iltimos, to'g'ri email manzilini kiriting",
+        passwordRequired: "Parol majburiy",
+        passwordMin: "Parol kamida 8 ta belgidan iborat bo'lishi kerak",
+        passwordMax: "Parol 72 ta belgidan oshmasligi kerak",
+        passwordLowercase: "Parol kamida bitta kichik harfni o'z ichiga olishi kerak",
+        passwordUppercase: "Parol kamida bitta katta harfni o'z ichiga olishi kerak",
+        passwordNumber: "Parol kamida bitta raqamni o'z ichiga olishi kerak",
+        confirmPasswordRequired: "Iltimos, parolni tasdiqlang",
+        passwordMismatch: "Parollar mos kelmadi",
+        fullNameRequired: "To'liq ism majburiy",
+        fullNameMin: "Ism kamida 2 ta belgidan iborat bo'lishi kerak",
+        fullNameMax: "Ism 100 ta belgidan oshmasligi kerak",
+        fullNameLetters: "Ism faqat harflardan iborat bo'lishi kerak",
+        phoneRequired: "Telefon raqam majburiy",
+        phoneInvalid: "Iltimos, to'g'ri telefon raqamini kiriting",
+        roleRequired: "Iltimos, rolni tanlang",
+      },
       terms: {
         text: "Hisob yaratish orqali siz bizning",
         termsLink: "Foydalanish shartlariga",
@@ -304,7 +356,7 @@ export const uz = {
         privacyLink: "Maxfiylik siyosatiga",
       },
       success: {
-        title: "SmartCareer'ga xush kelibsiz! 🎉",
+        title: "CareerUZ'ga xush kelibsiz! 🎉",
         message: "Hisobingiz muvaffaqiyatli yaratildi.",
         redirecting: "Tizimga kirishga yo'naltirilmoqda...",
       },
@@ -370,6 +422,9 @@ export const uz = {
       notifications: "Bildirishnomalar",
       profileSettings: "Profil sozlamalari",
       accountSettings: "Akkaunt sozlamalari",
+      companies: "Kompaniyalar",
+      jobs: "Vakansiyalar",
+      applications: "Arizalar",
     },
     
     // Profile completion
@@ -433,6 +488,10 @@ export const uz = {
       browseAll: "Hammasini ko'rish",
       match: "mos",
       empty: "Hozircha ish imkoniyatlari mavjud emas",
+      matchedSkills: "Mos ko'nikmalar",
+      noResume: "Tavsiyalar uchun avval rezyume yarating",
+      createResumeCTA: "Rezyume yaratish",
+      matchLabel: "Moslik",
     },
     
     // Upcoming interview
@@ -740,6 +799,10 @@ export const uz = {
     resumeGenerated: "Rezyume yaratildi! 🎉",
     aiResumeReady: "AI quvvatli rezyumengiz tayyor",
     editResume: "Rezyumeni tahrirlash",
+    generateFirst: "Avval rezyumeni AI orqali yarating.",
+    pdfDownloaded: "Rezyume PDF yuklab olindi.",
+    pdfDownloadError: "PDF yuklab olishda xatolik yuz berdi.",
+    roleMatchedSuggestions: "Kasbga mos tavsiyalar",
   },
 
   // Jobs Page

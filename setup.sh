@@ -1,6 +1,6 @@
 #!/bin/bash
 # =============================================================================
-# SmartCareer AI - Automated Setup Script
+# CareerUZ - Automated Setup Script
 # =============================================================================
 # This script sets up the entire development environment
 
@@ -8,7 +8,7 @@ set -e  # Exit on error
 
 echo ""
 echo "================================================================================"
-echo "🚀 SmartCareer AI - Setup Script"
+echo "🚀 CareerUZ - Setup Script"
 echo "================================================================================"
 echo ""
 
@@ -90,7 +90,7 @@ else
 fi
 
 # Check database
-if [ ! -f "smartcareer.db" ]; then
+if [ ! -f "careeruz.db" ]; then
     print_step "Running database migrations..."
     alembic upgrade head
     print_success "Database migrations completed"
@@ -154,7 +154,7 @@ echo "    Backend:  http://localhost:8000"
 echo "    API Docs: http://localhost:8000/docs"
 echo ""
 echo "🔑 Test Accounts:"
-echo "    Admin:    admin@smartcareer.uz / Admin123!"
+echo "    Admin:    admin@careeruz.uz / Admin123!"
 echo "    Company:  hr@epam.com / Company123!"
 echo "    Student:  john@example.com / Student123!"
 echo ""

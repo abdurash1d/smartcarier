@@ -26,6 +26,7 @@ import {
   AlertTriangle,
   Server,
   KeyRound,
+  Building2,
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { UserAvatar } from "@/components/ui/avatar";
@@ -64,9 +65,12 @@ const companyNavItems: NavItem[] = [
 ];
 
 const adminNavItems: NavItem[] = [
-  { labelKey: "dashboard.sidebar.overview", href: "/admin#overview", icon: Activity },
-  { labelKey: "dashboard.sidebar.systemHealth", href: "/admin#health", icon: Server },
+  { labelKey: "dashboard.sidebar.overview", href: "/admin", icon: LayoutDashboard },
   { labelKey: "dashboard.sidebar.users", href: "/admin/users", icon: Users },
+  { labelKey: "dashboard.sidebar.companies", href: "/admin/companies", icon: Building2 },
+  { labelKey: "dashboard.sidebar.jobs", href: "/admin/jobs", icon: Briefcase },
+  { labelKey: "dashboard.sidebar.applications", href: "/admin/applications", icon: ClipboardList },
+  { labelKey: "dashboard.sidebar.systemHealth", href: "/admin#health", icon: Server },
   { labelKey: "dashboard.sidebar.errors", href: "/admin#errors", icon: AlertTriangle },
   { labelKey: "dashboard.sidebar.access", href: "/admin/access", icon: KeyRound },
 ];
@@ -163,7 +167,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                 <Sparkles className="h-5 w-5 text-white" />
               </div>
               <span className="font-display text-xl font-bold text-surface-900 dark:text-white">
-                SmartCareer
+                CareerUZ
               </span>
             </Link>
             <button

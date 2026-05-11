@@ -26,6 +26,9 @@ import {
   Code,
   Award,
   ChevronRight,
+  Target,
+  Check,
+  Minus,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -36,6 +39,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { applicationApi } from "@/lib/api";
 import { formatDate, formatRelativeTime, cn } from "@/lib/utils";
 import type { Application, KnownApplicationStatus } from "@/types/api";
+import { useTranslation } from "@/hooks/useTranslation";
 import { toast } from "sonner";
 
 type InterviewFormat = "video" | "phone" | "in-person";
@@ -94,6 +98,8 @@ export default function ApplicantDetailPage() {
   const router = useRouter();
   const params = useParams();
   const appId = params!.id as string;
+  const { locale } = useTranslation();
+  const isRu = locale === "ru";
 
   const [application, setApplication] = useState<Application | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -248,7 +254,7 @@ export default function ApplicantDetailPage() {
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="rounded-2xl border border-surface-200 bg-white p-6 shadow-sm text-center"
+            className="rounded-2xl border border-surface-200 bg-white p-6 shadow-sm text-center dark:border-surface-700 dark:bg-surface-800"
           >
             <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-gradient-to-br from-purple-500 to-indigo-600 text-3xl font-bold text-white">
               {(applicant?.full_name || "A")[0].toUpperCase()}
@@ -284,7 +290,7 @@ export default function ApplicantDetailPage() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.1 }}
-            className="rounded-2xl border border-surface-200 bg-white p-5 shadow-sm"
+            className="rounded-2xl border border-surface-200 bg-white p-5 shadow-sm dark:border-surface-700 dark:bg-surface-800"
           >
             <h3 className="mb-3 font-semibold text-surface-900">Holat o'zgartirish</h3>
             <div className="space-y-2">
@@ -322,7 +328,7 @@ export default function ApplicantDetailPage() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.05 }}
-            className="rounded-2xl border border-surface-200 bg-white p-5 shadow-sm"
+            className="rounded-2xl border border-surface-200 bg-white p-5 shadow-sm dark:border-surface-700 dark:bg-surface-800"
           >
             <div className="flex items-start justify-between gap-3">
               <div>
@@ -340,7 +346,7 @@ export default function ApplicantDetailPage() {
             </div>
 
             {application.interview_at && (
-              <div className="mt-4 rounded-xl border border-purple-100 bg-purple-50 p-3 text-sm text-surface-700">
+              <div className="mt-4 rounded-xl border border-purple-100 bg-purple-50 p-3 text-sm text-surface-700 dark:border-purple-500/30 dark:bg-purple-500/10 dark:text-surface-200">
                 <p className="font-medium text-surface-900">Joriy intervyu vaqti</p>
                 <p className="mt-1">{formatDate(application.interview_at)}</p>
                 <p className="mt-1">
@@ -389,7 +395,7 @@ export default function ApplicantDetailPage() {
                   }}
                   disabled={isUpdating}
                   className={cn(
-                    "flex h-10 w-full rounded-lg border border-surface-200 bg-white px-3 py-2 text-sm",
+                    "flex h-10 w-full rounded-lg border border-surface-200 bg-white px-3 py-2 text-sm dark:border-surface-600 dark:bg-surface-800 dark:text-surface-100",
                     "focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-500/20"
                   )}
                 >
@@ -458,7 +464,7 @@ export default function ApplicantDetailPage() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.1 }}
-              className="rounded-2xl border border-surface-200 bg-white p-5 shadow-sm"
+              className="rounded-2xl border border-surface-200 bg-white p-5 shadow-sm dark:border-surface-700 dark:bg-surface-800"
             >
               <h3 className="mb-3 font-semibold text-surface-900">Ish e'loni</h3>
               <div className="flex items-center justify-between">
@@ -466,7 +472,7 @@ export default function ApplicantDetailPage() {
                   <p className="font-medium text-surface-900">{job.title}</p>
                   <p className="text-sm text-surface-500">{formatDate(application.applied_at)} da ariza berilgan</p>
                 </div>
-                <Link href={`/company/jobs`}>
+                <Link href={job?.id ? `/company/jobs/${job.id}/edit` : "/company/jobs"}>
                   <Button variant="outline" size="sm">
                     <Eye className="mr-2 h-4 w-4" />
                     Ko'rish
@@ -482,15 +488,112 @@ export default function ApplicantDetailPage() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.2 }}
-              className="rounded-2xl border border-surface-200 bg-white p-5 shadow-sm"
+              className="rounded-2xl border border-surface-200 bg-white p-5 shadow-sm dark:border-surface-700 dark:bg-surface-800"
             >
-              <h3 className="mb-3 flex items-center gap-2 font-semibold text-surface-900">
+              <h3 className="mb-3 flex items-center gap-2 font-semibold text-surface-900 dark:text-white">
                 <MessageSquare className="h-5 w-5 text-purple-500" />
                 Cover Letter
               </h3>
-              <p className="text-sm text-surface-600 leading-relaxed whitespace-pre-wrap">
+              <p className="text-sm text-surface-600 leading-relaxed whitespace-pre-wrap dark:text-surface-300">
                 {application.cover_letter}
               </p>
+            </motion.div>
+          )}
+
+          {/* Match Breakdown — transparency for HR on how the score was computed */}
+          {application.match_breakdown && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.25 }}
+              className="rounded-2xl border border-surface-200 bg-white p-5 shadow-sm dark:border-surface-700 dark:bg-surface-800"
+            >
+              <div className="mb-4 flex items-start justify-between gap-3">
+                <h3 className="flex items-center gap-2 font-semibold text-surface-900 dark:text-white">
+                  <Target className="h-5 w-5 text-purple-500" />
+                  {isRu ? "Анализ совпадения" : "Moslik tahlili"}
+                </h3>
+                {(() => {
+                  const score = Math.round(application.match_breakdown.score);
+                  const tone =
+                    score >= 80
+                      ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300"
+                      : score >= 60
+                      ? "bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300"
+                      : "bg-surface-100 text-surface-600 dark:bg-surface-700 dark:text-surface-300";
+                  return (
+                    <div className={`flex flex-col items-end rounded-xl px-3 py-2 ${tone}`}>
+                      <span className="text-2xl font-bold leading-none">{score}%</span>
+                      <span className="mt-0.5 text-[10px] font-semibold uppercase tracking-wider opacity-80">
+                        {isRu ? "Совпадение" : "Moslik"}
+                      </span>
+                    </div>
+                  );
+                })()}
+              </div>
+
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div>
+                  <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
+                    {isRu ? "Совпавшие навыки" : "Mos ko'nikmalar"} ({application.match_breakdown.matched_skills.length})
+                  </p>
+                  {application.match_breakdown.matched_skills.length > 0 ? (
+                    <ul className="space-y-1">
+                      {application.match_breakdown.matched_skills.slice(0, 10).map((skill) => (
+                        <li key={skill} className="flex items-start gap-2 text-sm text-surface-700 dark:text-surface-300">
+                          <Check className="mt-0.5 h-3.5 w-3.5 flex-shrink-0 text-emerald-600" />
+                          <span>{skill}</span>
+                        </li>
+                      ))}
+                      {application.match_breakdown.matched_skills.length > 10 && (
+                        <li className="text-xs text-surface-500">
+                          +{application.match_breakdown.matched_skills.length - 10}
+                        </li>
+                      )}
+                    </ul>
+                  ) : (
+                    <p className="text-sm text-surface-500">—</p>
+                  )}
+                </div>
+                <div>
+                  <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-amber-600 dark:text-amber-400">
+                    {isRu ? "Недостающие навыки" : "Yetishmayotgan ko'nikmalar"} ({application.match_breakdown.missing_skills.length})
+                  </p>
+                  {application.match_breakdown.missing_skills.length > 0 ? (
+                    <ul className="space-y-1">
+                      {application.match_breakdown.missing_skills.slice(0, 10).map((skill) => (
+                        <li key={skill} className="flex items-start gap-2 text-sm text-surface-700 dark:text-surface-300">
+                          <Minus className="mt-0.5 h-3.5 w-3.5 flex-shrink-0 text-amber-600" />
+                          <span>{skill}</span>
+                        </li>
+                      ))}
+                      {application.match_breakdown.missing_skills.length > 10 && (
+                        <li className="text-xs text-surface-500">
+                          +{application.match_breakdown.missing_skills.length - 10}
+                        </li>
+                      )}
+                    </ul>
+                  ) : (
+                    <p className="text-sm text-surface-500">—</p>
+                  )}
+                </div>
+              </div>
+
+              {application.match_breakdown.reasons.length > 0 && (
+                <div className="mt-4 border-t border-surface-200 pt-4 dark:border-surface-700">
+                  <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-surface-500 dark:text-surface-400">
+                    {isRu ? "Как рассчитан балл" : "Ball qanday hisoblandi"}
+                  </p>
+                  <ul className="space-y-1 text-sm text-surface-600 dark:text-surface-300">
+                    {application.match_breakdown.reasons.map((reason, i) => (
+                      <li key={i} className="flex items-start gap-2">
+                        <span className="mt-1.5 inline-block h-1 w-1 rounded-full bg-surface-400" />
+                        <span>{reason}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
             </motion.div>
           )}
 
@@ -500,7 +603,7 @@ export default function ApplicantDetailPage() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.3 }}
-              className="rounded-2xl border border-surface-200 bg-white p-5 shadow-sm"
+              className="rounded-2xl border border-surface-200 bg-white p-5 shadow-sm dark:border-surface-700 dark:bg-surface-800"
             >
               <h3 className="mb-4 flex items-center gap-2 font-semibold text-surface-900">
                 <FileText className="h-5 w-5 text-purple-500" />

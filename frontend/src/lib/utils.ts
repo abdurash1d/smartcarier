@@ -17,42 +17,32 @@ export function cn(...inputs: ClassValue[]) {
 /**
  * Format relative time (e.g., "2 hours ago")
  */
-export function formatRelativeTime(dateString: string): string {
+export function formatRelativeTime(dateString: string, locale: "uz" | "ru" = "uz"): string {
   const date = new Date(dateString);
   const now = new Date();
   const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
 
-  if (diffInSeconds < 60) {
-    return "just now";
-  }
+  const rtf = new Intl.RelativeTimeFormat(locale === "ru" ? "ru-RU" : "uz-UZ", { numeric: "auto" });
+
+  if (diffInSeconds < 60) return rtf.format(0, "second");
 
   const diffInMinutes = Math.floor(diffInSeconds / 60);
-  if (diffInMinutes < 60) {
-    return `${diffInMinutes} minute${diffInMinutes > 1 ? "s" : ""} ago`;
-  }
+  if (diffInMinutes < 60) return rtf.format(-diffInMinutes, "minute");
 
   const diffInHours = Math.floor(diffInMinutes / 60);
-  if (diffInHours < 24) {
-    return `${diffInHours} hour${diffInHours > 1 ? "s" : ""} ago`;
-  }
+  if (diffInHours < 24) return rtf.format(-diffInHours, "hour");
 
   const diffInDays = Math.floor(diffInHours / 24);
-  if (diffInDays < 7) {
-    return `${diffInDays} day${diffInDays > 1 ? "s" : ""} ago`;
-  }
+  if (diffInDays < 7) return rtf.format(-diffInDays, "day");
 
   const diffInWeeks = Math.floor(diffInDays / 7);
-  if (diffInWeeks < 4) {
-    return `${diffInWeeks} week${diffInWeeks > 1 ? "s" : ""} ago`;
-  }
+  if (diffInWeeks < 4) return rtf.format(-diffInWeeks, "week");
 
   const diffInMonths = Math.floor(diffInDays / 30);
-  if (diffInMonths < 12) {
-    return `${diffInMonths} month${diffInMonths > 1 ? "s" : ""} ago`;
-  }
+  if (diffInMonths < 12) return rtf.format(-diffInMonths, "month");
 
   const diffInYears = Math.floor(diffInDays / 365);
-  return `${diffInYears} year${diffInYears > 1 ? "s" : ""} ago`;
+  return rtf.format(-diffInYears, "year");
 }
 
 /**
@@ -97,14 +87,17 @@ export function formatCurrency(amount: number, currency: string = "USD"): string
 /**
  * Format salary range
  */
-export function formatSalaryRange(min?: number, max?: number): string {
-  if (!min && !max) return "Salary not disclosed";
-  if (min && max) {
-    return `${formatCurrency(min)} - ${formatCurrency(max)}`;
-  }
-  if (min) return `From ${formatCurrency(min)}`;
-  if (max) return `Up to ${formatCurrency(max)}`;
-  return "Salary not disclosed";
+export function formatSalaryRange(min?: number, max?: number, locale: "uz" | "ru" = "uz"): string {
+  const labels =
+    locale === "ru"
+      ? { notDisclosed: "Зарплата не указана", from: "От", upTo: "До" }
+      : { notDisclosed: "Maosh ko'rsatilmagan", from: "Dan boshlab", upTo: "Gacha" };
+
+  if (!min && !max) return labels.notDisclosed;
+  if (min && max) return `${formatCurrency(min)} - ${formatCurrency(max)}`;
+  if (min) return `${labels.from} ${formatCurrency(min)}`;
+  if (max) return `${labels.upTo} ${formatCurrency(max)}`;
+  return labels.notDisclosed;
 }
 
 /**

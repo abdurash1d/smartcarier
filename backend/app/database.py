@@ -21,7 +21,7 @@ USAGE:
     async def get_users(db: Session = Depends(get_db)):
         return db.query(User).all()
 
-AUTHOR: SmartCareer AI Team
+AUTHOR: CareerUZ Team
 VERSION: 1.0.0
 """
 

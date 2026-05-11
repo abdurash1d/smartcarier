@@ -1,5 +1,5 @@
 # =============================================================================
-# SmartCareer AI - Frontend Dockerfile (PRODUCTION)
+# CareerUZ - Frontend Dockerfile (PRODUCTION)
 # =============================================================================
 # Multi-stage build with Next.js standalone output
 
@@ -17,8 +17,8 @@ WORKDIR /app
 # Build-time public envs for Next.js.
 # Railway Docker builds may not inject service vars automatically into `next build`,
 # so we provide sane defaults and allow override via build args.
-ARG NEXT_PUBLIC_API_URL="https://smartcareer-backend-production-fe34.up.railway.app/api/v1"
-ARG NEXT_PUBLIC_FRONTEND_URL="https://smartcareer-frontend-production-f5c1.up.railway.app"
+ARG NEXT_PUBLIC_API_URL="https://careeruz-backend-production-fe34.up.railway.app/api/v1"
+ARG NEXT_PUBLIC_FRONTEND_URL="https://careeruz-frontend-production-f5c1.up.railway.app"
 
 # Copy dependencies
 COPY --from=deps /app/node_modules ./node_modules

@@ -15,7 +15,7 @@ ENDPOINTS:
     GET  /me            - Get current user profile
 
 =============================================================================
-AUTHOR: SmartCareer AI Team
+AUTHOR: CareerUZ Team
 VERSION: 1.0.0
 =============================================================================
 """
@@ -24,9 +24,11 @@ VERSION: 1.0.0
 # IMPORTS
 # =============================================================================
 
+import json
 import logging
 from datetime import datetime, timezone
 from time import time
+from typing import Optional
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks, Request, Query
@@ -70,7 +72,7 @@ from app.config import settings
 
 logger = logging.getLogger(__name__)
 
-_LOCAL_OAUTH_STATES: dict[str, float] = {}
+_LOCAL_OAUTH_STATES: dict[str, tuple[float, Optional[str]]] = {}
 
 # =============================================================================
 # ROUTER
@@ -217,13 +219,44 @@ def _oauth_state_key(provider: str, state: str) -> str:
 
 
 def _cleanup_local_oauth_states(now: float) -> None:
-    expired_keys = [key for key, expires_at in _LOCAL_OAUTH_STATES.items() if expires_at <= now]
+    expired_keys = []
+    for key, value in _LOCAL_OAUTH_STATES.items():
+        # New entries are (expires_at, payload); legacy entries were a bare float.
+        expires_at = value[0] if isinstance(value, tuple) else value
+        if expires_at <= now:
+            expired_keys.append(key)
     for key in expired_keys:
         _LOCAL_OAUTH_STATES.pop(key, None)
 
 
-def _store_oauth_state(provider: str, state: str) -> None:
-    """Persist OAuth state for later callback validation."""
+_VALID_OAUTH_ROLES = {"student", "company"}
+
+
+def _serialize_oauth_state_payload(role: Optional[str]) -> str:
+    """Encode optional metadata next to the state token. Default = student."""
+    chosen = role if role in _VALID_OAUTH_ROLES else "student"
+    return json.dumps({"role": chosen})
+
+
+def _deserialize_oauth_state_payload(raw: Optional[str]) -> dict:
+    """Best-effort parse; treats legacy presence-flag values as default."""
+    if not raw or raw == "1":
+        return {"role": "student"}
+    try:
+        parsed = json.loads(raw)
+        if not isinstance(parsed, dict):
+            return {"role": "student"}
+        role = parsed.get("role")
+        if role not in _VALID_OAUTH_ROLES:
+            parsed["role"] = "student"
+        return parsed
+    except (TypeError, ValueError):
+        return {"role": "student"}
+
+
+def _store_oauth_state(provider: str, state: str, role: Optional[str] = None) -> None:
+    """Persist OAuth state + chosen role for later callback validation."""
+    payload = _serialize_oauth_state_payload(role)
     if _local_oauth_state_enabled():
         from app.core.redis_client import get_redis
 
@@ -231,27 +264,30 @@ def _store_oauth_state(provider: str, state: str) -> None:
         if redis_client is not None:
             redis_client.set(
                 _oauth_state_key(provider, state),
-                "1",
+                payload,
                 ex=settings.OAUTH_STATE_TTL_SECONDS,
             )
             return
 
         now = time()
         _cleanup_local_oauth_states(now)
-        _LOCAL_OAUTH_STATES[_oauth_state_key(provider, state)] = now + settings.OAUTH_STATE_TTL_SECONDS
+        _LOCAL_OAUTH_STATES[_oauth_state_key(provider, state)] = (
+            now + settings.OAUTH_STATE_TTL_SECONDS,
+            payload,
+        )
         logger.info("Using local in-memory OAuth state storage for development")
         return
 
     redis_client = _require_oauth_state_store(provider)
     redis_client.set(
         _oauth_state_key(provider, state),
-        "1",
+        payload,
         ex=settings.OAUTH_STATE_TTL_SECONDS,
     )
 
 
-def _consume_oauth_state(provider: str, state: str) -> None:
-    """Validate and consume a previously stored OAuth state token."""
+def _consume_oauth_state(provider: str, state: str) -> dict:
+    """Validate state token; returns the stored payload (e.g. {'role': 'company'})."""
     state_key = _oauth_state_key(provider, state)
     provider_label = provider.title()
 
@@ -260,30 +296,45 @@ def _consume_oauth_state(provider: str, state: str) -> None:
 
         redis_client = get_redis()
         if redis_client is not None:
-            if not redis_client.exists(state_key):
+            raw = redis_client.get(state_key)
+            if raw is None:
                 raise _oauth_error(
                     status.HTTP_400_BAD_REQUEST,
                     "INVALID_OAUTH_STATE",
                     f"Invalid or expired {provider_label} OAuth state.",
                 )
             redis_client.delete(state_key)
-            return
+            return _deserialize_oauth_state_payload(
+                raw.decode() if isinstance(raw, bytes) else raw
+            )
 
         now = time()
         _cleanup_local_oauth_states(now)
-        expires_at = _LOCAL_OAUTH_STATES.pop(state_key, None)
-        if expires_at is None or expires_at <= now:
+        entry = _LOCAL_OAUTH_STATES.pop(state_key, None)
+        if entry is None:
             raise _oauth_error(
                 status.HTTP_400_BAD_REQUEST,
                 "INVALID_OAUTH_STATE",
                 f"Invalid or expired {provider_label} OAuth state.",
             )
-        return
+        # Backward-compat: old in-memory entries stored just an expiry float.
+        if isinstance(entry, tuple):
+            expires_at, raw_payload = entry
+        else:
+            expires_at, raw_payload = entry, None
+        if expires_at <= now:
+            raise _oauth_error(
+                status.HTTP_400_BAD_REQUEST,
+                "INVALID_OAUTH_STATE",
+                f"Invalid or expired {provider_label} OAuth state.",
+            )
+        return _deserialize_oauth_state_payload(raw_payload)
 
     redis_client = _require_oauth_state_store(provider)
 
     try:
-        if not redis_client.exists(state_key):
+        raw = redis_client.get(state_key)
+        if raw is None:
             raise _oauth_error(
                 status.HTTP_400_BAD_REQUEST,
                 "INVALID_OAUTH_STATE",
@@ -291,6 +342,9 @@ def _consume_oauth_state(provider: str, state: str) -> None:
             )
 
         redis_client.delete(state_key)
+        return _deserialize_oauth_state_payload(
+            raw.decode() if isinstance(raw, bytes) else raw
+        )
     except HTTPException:
         raise
     except Exception as e:
@@ -915,26 +969,32 @@ async def get_current_user_profile(
     summary="Google OAuth - Get authorization URL",
     description="Get Google OAuth authorization URL for frontend redirect"
 )
-async def google_oauth_authorize(redirect: bool = False):
+async def google_oauth_authorize(
+    redirect: bool = False,
+    role: Optional[str] = Query(None, description="Role for new sign-ups: 'student' or 'company'"),
+):
     """
     Get Google OAuth authorization URL.
 
     If redirect=true, this endpoint will directly redirect the browser to Google.
+    The optional `role` query param ('student' | 'company') controls the role
+    assigned to brand-new users created via this flow. It's ignored for users
+    that already exist.
     """
     from app.services.oauth_service import oauth_service
     import secrets
-    
+
     if not oauth_service.is_configured()["google"]:
         raise HTTPException(
             status_code=status.HTTP_501_NOT_IMPLEMENTED,
             detail="Google OAuth not configured. Add GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET to .env"
         )
-    
+
     # Generate CSRF state token
     state = secrets.token_urlsafe(32)
 
-    # Store state for CSRF validation. Fail closed if state storage is missing.
-    _store_oauth_state("google", state)
+    # Store state + chosen role for the callback to read back.
+    _store_oauth_state("google", state, role=role)
     
     # Get authorization URL
     auth_url = oauth_service.get_google_auth_url(state)
@@ -961,31 +1021,36 @@ async def google_oauth_callback(
     from app.services.oauth_service import oauth_service
     
     try:
-        # Validate CSRF state
-        _consume_oauth_state("google", state)
+        # Validate CSRF state and recover the role the user picked at sign-up.
+        state_payload = _consume_oauth_state("google", state)
+        chosen_role_value = state_payload.get("role", "student")
+        chosen_role = (
+            UserRole.COMPANY if chosen_role_value == "company" else UserRole.STUDENT
+        )
 
         # Get user info from Google
         user_info = await oauth_service.get_google_user_info(code)
-        
+
         email = user_info.get("email")
         if not email:
             raise ValueError("No email in Google response")
-        
+
         # Check if user exists
         user = db.query(User).filter(
             User.email == email.lower(),
             User.is_deleted == False
         ).first()
-        
+
         if user:
-            # Existing user - login
-            logger.info(f"Google OAuth login for existing user: {user.id}")
+            # Existing user - login (existing role is preserved; the `role`
+            # query param only affects new signups).
+            logger.info(f"Google OAuth login for existing user: {user.id} (role={user.role})")
         else:
-            # New user - create account
+            # New user - create account with the role selected on the register page.
             user = User(
                 email=email.lower(),
                 full_name=user_info.get("name", "User"),
-                role=UserRole.STUDENT,  # Default role
+                role=chosen_role,
                 is_active_account=True,
                 is_verified=True,  # Email verified by Google
                 avatar_url=user_info.get("picture"),
@@ -1048,7 +1113,10 @@ async def google_oauth_callback(
     summary="LinkedIn OAuth - Get authorization URL",
     description="Get LinkedIn OAuth authorization URL for frontend redirect"
 )
-async def linkedin_oauth_authorize(redirect: bool = False):
+async def linkedin_oauth_authorize(
+    redirect: bool = False,
+    role: Optional[str] = Query(None, description="Role for new sign-ups: 'student' or 'company'"),
+):
     """
     Get LinkedIn OAuth authorization URL.
 
@@ -1056,18 +1124,18 @@ async def linkedin_oauth_authorize(redirect: bool = False):
     """
     from app.services.oauth_service import oauth_service
     import secrets
-    
+
     if not oauth_service.is_configured()["linkedin"]:
         raise HTTPException(
             status_code=status.HTTP_501_NOT_IMPLEMENTED,
             detail="LinkedIn OAuth not configured. Add LINKEDIN_CLIENT_ID and LINKEDIN_CLIENT_SECRET to .env"
         )
-    
+
     # Generate CSRF state token
     state = secrets.token_urlsafe(32)
 
-    # Store state for CSRF validation. Fail closed if state storage is missing.
-    _store_oauth_state("linkedin", state)
+    # Store state + chosen role for the callback.
+    _store_oauth_state("linkedin", state, role=role)
     
     # Get authorization URL
     auth_url = oauth_service.get_linkedin_auth_url(state)
@@ -1094,31 +1162,35 @@ async def linkedin_oauth_callback(
     from app.services.oauth_service import oauth_service
     
     try:
-        # Validate CSRF state
-        _consume_oauth_state("linkedin", state)
+        # Validate CSRF state and recover the role the user picked at sign-up.
+        state_payload = _consume_oauth_state("linkedin", state)
+        chosen_role_value = state_payload.get("role", "student")
+        chosen_role = (
+            UserRole.COMPANY if chosen_role_value == "company" else UserRole.STUDENT
+        )
 
         # Get user info from LinkedIn
         user_info = await oauth_service.get_linkedin_user_info(code)
-        
+
         email = user_info.get("email")
         if not email:
             raise ValueError("No email in LinkedIn response")
-        
+
         # Check if user exists
         user = db.query(User).filter(
             User.email == email.lower(),
             User.is_deleted == False
         ).first()
-        
+
         if user:
-            # Existing user - login
-            logger.info(f"LinkedIn OAuth login for existing user: {user.id}")
+            # Existing user - login (existing role preserved)
+            logger.info(f"LinkedIn OAuth login for existing user: {user.id} (role={user.role})")
         else:
-            # New user - create account
+            # New user - create account with the role selected on the register page.
             user = User(
                 email=email.lower(),
                 full_name=user_info.get("name", "User"),
-                role=UserRole.STUDENT,  # Default role
+                role=chosen_role,
                 is_active_account=True,
                 is_verified=True,  # Email verified by LinkedIn
                 avatar_url=user_info.get("picture"),

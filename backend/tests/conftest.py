@@ -3,9 +3,9 @@
 Pytest Configuration and Fixtures
 =============================================================================
 
-Global test fixtures for SmartCareer AI backend tests.
+Global test fixtures for CareerUZ backend tests.
 
-AUTHOR: SmartCareer AI Team
+AUTHOR: CareerUZ Team
 VERSION: 1.0.0
 =============================================================================
 """

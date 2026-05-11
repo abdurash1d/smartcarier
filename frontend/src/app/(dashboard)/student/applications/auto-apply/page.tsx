@@ -12,24 +12,25 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useAuth } from "@/hooks/useAuth";
 import { useApplications } from "@/hooks/useApplications";
 import { useResume } from "@/hooks/useResume";
+import { useTranslation } from "@/hooks/useTranslation";
 import { getErrorMessage } from "@/lib/api";
 import { formatDate } from "@/lib/utils";
 import type { AutoApplyResponse, ExperienceLevel, JobType, Resume } from "@/types/api";
 
-const jobTypeOptions: Array<{ value: JobType; label: string }> = [
-  { value: "full_time", label: "Full time" },
-  { value: "part_time", label: "Part time" },
-  { value: "remote", label: "Remote" },
-  { value: "hybrid", label: "Hybrid" },
-  { value: "contract", label: "Contract" },
+const jobTypeOptions: Array<{ value: JobType }> = [
+  { value: "full_time" },
+  { value: "part_time" },
+  { value: "remote" },
+  { value: "hybrid" },
+  { value: "contract" },
 ];
 
-const experienceOptions: Array<{ value: ExperienceLevel; label: string }> = [
-  { value: "junior", label: "Junior" },
-  { value: "mid", label: "Mid" },
-  { value: "senior", label: "Senior" },
-  { value: "lead", label: "Lead" },
-  { value: "executive", label: "Executive" },
+const experienceOptions: Array<{ value: ExperienceLevel }> = [
+  { value: "junior" },
+  { value: "mid" },
+  { value: "senior" },
+  { value: "lead" },
+  { value: "executive" },
 ];
 
 function toggleValue<T extends string>(values: T[], value: T) {
@@ -38,8 +39,8 @@ function toggleValue<T extends string>(values: T[], value: T) {
     : [...values, value];
 }
 
-function formatQuotaValue(value: number | "unlimited") {
-  return value === "unlimited" ? "Unlimited" : value.toLocaleString();
+function formatQuotaValue(value: number | "unlimited", isRu: boolean) {
+  return value === "unlimited" ? (isRu ? "Без лимита" : "Cheksiz") : value.toLocaleString();
 }
 
 function normalizeQuotaNumber(value: unknown) {
@@ -127,6 +128,8 @@ function resolveQuotaSummary(result: AutoApplyResponse | null) {
 }
 
 export default function AutoApplyPage() {
+  const { locale } = useTranslation();
+  const isRu = locale === "ru";
   const { user } = useAuth();
   const { resumes, fetchResumes, isLoading: resumesLoading } = useResume();
   const { autoApply, isAutoApplying } = useApplications();
@@ -142,6 +145,42 @@ export default function AutoApplyPage() {
   const [includeCoverLetter, setIncludeCoverLetter] = useState(true);
   const [result, setResult] = useState<AutoApplyResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const getJobTypeLabel = (value: JobType) => {
+    if (isRu) {
+      return {
+        full_time: "Полная занятость",
+        part_time: "Частичная занятость",
+        remote: "Удаленно",
+        hybrid: "Гибрид",
+        contract: "Контракт",
+      }[value];
+    }
+    return {
+      full_time: "To'liq stavka",
+      part_time: "Yarim stavka",
+      remote: "Masofaviy",
+      hybrid: "Gibrid",
+      contract: "Shartnoma",
+    }[value];
+  };
+  const getExperienceLabel = (value: ExperienceLevel) => {
+    if (isRu) {
+      return {
+        junior: "Junior",
+        mid: "Middle",
+        senior: "Senior",
+        lead: "Lead",
+        executive: "Executive",
+      }[value];
+    }
+    return {
+      junior: "Junior",
+      mid: "O'rta",
+      senior: "Senior",
+      lead: "Lead",
+      executive: "Rahbar",
+    }[value];
+  };
 
   useEffect(() => {
     fetchResumes();
@@ -167,7 +206,7 @@ export default function AutoApplyPage() {
 
   const handleStart = async () => {
     if (!selectedResumeId) {
-      setError("Please select a published resume first.");
+      setError(isRu ? "Сначала выберите опубликованное резюме." : "Avval nashr qilingan rezyumeni tanlang.");
       return;
     }
 
@@ -212,11 +251,11 @@ export default function AutoApplyPage() {
           className="inline-flex items-center gap-2 text-sm text-surface-500 hover:text-surface-700"
         >
           <ArrowLeft className="h-4 w-4" />
-          Back to applications
+          {isRu ? "К заявкам" : "Arizalarga qaytish"}
         </Link>
         <Badge variant="secondary" className="gap-1">
           <Sparkles className="h-3 w-3" />
-          Auto-apply
+          {isRu ? "Автоотклик" : "Avto-ariza"}
         </Badge>
       </div>
 
@@ -224,18 +263,20 @@ export default function AutoApplyPage() {
         <CardContent className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h1 className="text-2xl font-bold text-surface-900 dark:text-white">
-              Auto-apply to matching jobs
+              {isRu ? "Автоотклик на подходящие вакансии" : "Mos ish joylariga avto-ariza"}
             </h1>
             <p className="mt-1 text-sm text-surface-500">
-              Pick a published resume, set your filters, and let the backend submit matching applications.
+              {isRu
+                ? "Опубликуйте резюме, настройте фильтры, и система отправит подходящие заявки."
+                : "Nashr qilingan rezyumeni tanlang, filtrlarni sozlang va tizim mos arizalarni yuborsin."}
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
             <Link href="/pricing">
-              <Button variant="outline">Upgrade plan</Button>
+              <Button variant="outline">{isRu ? "Улучшить тариф" : "Tarifni oshirish"}</Button>
             </Link>
             <Badge className="h-10 items-center rounded-md px-3">
-              {user?.subscription_tier || "free"} tier
+              {(user?.subscription_tier || "free")} {isRu ? "тариф" : "tarif"}
             </Badge>
           </div>
         </CardContent>
@@ -244,7 +285,7 @@ export default function AutoApplyPage() {
       <div className="grid gap-6 lg:grid-cols-[1.4fr_0.9fr]">
         <Card>
           <CardHeader>
-            <CardTitle>Select a resume and matching rules</CardTitle>
+            <CardTitle>{isRu ? "Выберите резюме и правила подбора" : "Rezyume va moslash qoidalarini tanlang"}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-6">
             {error && (
@@ -256,7 +297,7 @@ export default function AutoApplyPage() {
                     {showUpgradeLink && (
                       <Link href="/pricing">
                         <Button size="sm" variant="outline">
-                          Upgrade to Premium
+                          {isRu ? "Перейти на Premium" : "Premium tarifiga o'tish"}
                         </Button>
                       </Link>
                     )}
@@ -266,10 +307,10 @@ export default function AutoApplyPage() {
             )}
 
             <div className="space-y-2">
-              <label className="text-sm font-medium text-surface-700">Published resume</label>
+              <label className="text-sm font-medium text-surface-700">{isRu ? "Опубликованное резюме" : "Nashr qilingan rezyume"}</label>
               <Select value={selectedResumeId} onValueChange={setSelectedResumeId}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Choose a published resume" />
+                  <SelectValue placeholder={isRu ? "Выберите опубликованное резюме" : "Nashr qilingan rezyumeni tanlang"} />
                 </SelectTrigger>
                 <SelectContent>
                   {publishedResumes.map((resume: Resume) => (
@@ -281,9 +322,11 @@ export default function AutoApplyPage() {
               </Select>
               {publishedResumes.length === 0 && !resumesLoading && (
                 <p className="text-sm text-amber-700">
-                  You need at least one published resume before using auto-apply.
+                  {isRu
+                    ? "Для автоотклика нужно хотя бы одно опубликованное резюме."
+                    : "Avto-ariza ishlatishdan oldin kamida bitta nashr qilingan rezyume kerak."}
                   <Link href="/student/resumes" className="ml-1 underline">
-                    Manage resumes
+                    {isRu ? "Управлять резюме" : "Rezyumelarni boshqarish"}
                   </Link>
                 </p>
               )}
@@ -291,8 +334,8 @@ export default function AutoApplyPage() {
 
             <div className="space-y-3">
               <div className="flex items-center justify-between">
-                <label className="text-sm font-medium text-surface-700">Job types</label>
-                <span className="text-xs text-surface-500">Choose one or more</span>
+                <label className="text-sm font-medium text-surface-700">{isRu ? "Типы вакансий" : "Ish turlari"}</label>
+                <span className="text-xs text-surface-500">{isRu ? "Выберите один или несколько" : "Bittasini yoki bir nechtasini tanlang"}</span>
               </div>
               <div className="flex flex-wrap gap-2">
                 {jobTypeOptions.map((option) => {
@@ -308,7 +351,7 @@ export default function AutoApplyPage() {
                           : "border-surface-200 bg-white text-surface-600 hover:border-surface-300"
                       }`}
                     >
-                      {option.label}
+                      {getJobTypeLabel(option.value)}
                     </button>
                   );
                 })}
@@ -317,8 +360,8 @@ export default function AutoApplyPage() {
 
             <div className="space-y-3">
               <div className="flex items-center justify-between">
-                <label className="text-sm font-medium text-surface-700">Experience levels</label>
-                <span className="text-xs text-surface-500">Optional</span>
+                <label className="text-sm font-medium text-surface-700">{isRu ? "Уровни опыта" : "Tajriba darajalari"}</label>
+                <span className="text-xs text-surface-500">{isRu ? "Необязательно" : "Ixtiyoriy"}</span>
               </div>
               <div className="flex flex-wrap gap-2">
                 {experienceOptions.map((option) => {
@@ -336,7 +379,7 @@ export default function AutoApplyPage() {
                           : "border-surface-200 bg-white text-surface-600 hover:border-surface-300"
                       }`}
                     >
-                      {option.label}
+                      {getExperienceLabel(option.value)}
                     </button>
                   );
                 })}
@@ -345,15 +388,15 @@ export default function AutoApplyPage() {
 
             <div className="grid gap-4 md:grid-cols-2">
               <div className="space-y-2">
-                <label className="text-sm font-medium text-surface-700">Locations</label>
+                <label className="text-sm font-medium text-surface-700">{isRu ? "Локации" : "Joylashuvlar"}</label>
                 <Input
                   value={locations}
                   onChange={(e) => setLocations(e.target.value)}
-                  placeholder="Tashkent, Remote"
+                  placeholder={isRu ? "Ташкент, Удаленно" : "Toshkent, Masofaviy"}
                 />
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-medium text-surface-700">Keywords</label>
+                <label className="text-sm font-medium text-surface-700">{isRu ? "Ключевые слова" : "Kalit so'zlar"}</label>
                 <Input
                   value={keywords}
                   onChange={(e) => setKeywords(e.target.value)}
@@ -364,7 +407,7 @@ export default function AutoApplyPage() {
 
             <div className="grid gap-4 md:grid-cols-3">
               <div className="space-y-2">
-                <label className="text-sm font-medium text-surface-700">Minimum salary</label>
+                <label className="text-sm font-medium text-surface-700">{isRu ? "Минимальная зарплата" : "Minimal maosh"}</label>
                 <Input
                   type="number"
                   min="0"
@@ -374,7 +417,7 @@ export default function AutoApplyPage() {
                 />
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-medium text-surface-700">Max applications</label>
+                <label className="text-sm font-medium text-surface-700">{isRu ? "Макс. заявок" : "Maksimal arizalar"}</label>
                 <Input
                   type="number"
                   min="1"
@@ -384,14 +427,14 @@ export default function AutoApplyPage() {
                 />
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-medium text-surface-700">Mode</label>
+                <label className="text-sm font-medium text-surface-700">{isRu ? "Режим" : "Rejim"}</label>
                 <Button
                   type="button"
                   variant={dryRun ? "default" : "outline"}
                   className="w-full"
                   onClick={() => setDryRun((prev) => !prev)}
                 >
-                  {dryRun ? "Dry run preview" : "Submit applications"}
+                  {dryRun ? (isRu ? "Предпросмотр" : "Oldindan ko'rish") : (isRu ? "Отправка" : "Ariza yuborish")}
                 </Button>
               </div>
             </div>
@@ -399,10 +442,10 @@ export default function AutoApplyPage() {
             <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-surface-200 bg-surface-50 p-4">
               <div>
                 <p className="text-sm font-medium text-surface-900">
-                  Include cover letters
+                  {isRu ? "Сопроводительные письма" : "Cover letter qo'shish"}
                 </p>
                 <p className="text-xs text-surface-500">
-                  The backend can add a short cover letter when applying.
+                  {isRu ? "Система может автоматически добавить короткое сопроводительное письмо." : "Ariza yuborishda tizim qisqa cover letter qo'shishi mumkin."}
                 </p>
               </div>
               <Button
@@ -410,7 +453,7 @@ export default function AutoApplyPage() {
                 variant={includeCoverLetter ? "default" : "outline"}
                 onClick={() => setIncludeCoverLetter((prev) => !prev)}
               >
-                {includeCoverLetter ? "Enabled" : "Disabled"}
+                {includeCoverLetter ? (isRu ? "Включено" : "Yoqilgan") : (isRu ? "Отключено" : "O'chirilgan")}
               </Button>
             </div>
 
@@ -424,7 +467,7 @@ export default function AutoApplyPage() {
               ) : (
                 <Sparkles className="mr-2 h-4 w-4" />
               )}
-              {dryRun ? "Preview matching jobs" : "Start auto-apply"}
+              {dryRun ? (isRu ? "Подходящие вакансии (предпросмотр)" : "Mos ishlarni ko'rish") : (isRu ? "Запустить автоотклик" : "Avto-arizani boshlash")}
             </Button>
           </CardContent>
         </Card>
@@ -432,37 +475,37 @@ export default function AutoApplyPage() {
         <div className="space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle>Current setup</CardTitle>
+              <CardTitle>{isRu ? "Текущие настройки" : "Joriy sozlamalar"}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4 text-sm">
               <div className="flex items-start gap-3">
                 <Briefcase className="mt-0.5 h-4 w-4 text-surface-400" />
                 <div>
-                  <p className="font-medium text-surface-900">Resume</p>
+                  <p className="font-medium text-surface-900">{isRu ? "Резюме" : "Rezyume"}</p>
                   <p className="text-surface-500">
-                    {selectedResume ? selectedResume.title : "No published resume selected"}
+                    {selectedResume ? selectedResume.title : (isRu ? "Опубликованное резюме не выбрано" : "Nashr qilingan rezyume tanlanmagan")}
                   </p>
                 </div>
               </div>
               <div className="flex items-start gap-3">
                 <MapPin className="mt-0.5 h-4 w-4 text-surface-400" />
                 <div>
-                  <p className="font-medium text-surface-900">Locations</p>
-                  <p className="text-surface-500">{locations || "Any location"}</p>
+                  <p className="font-medium text-surface-900">{isRu ? "Локации" : "Joylashuvlar"}</p>
+                  <p className="text-surface-500">{locations || (isRu ? "Любое местоположение" : "Istalgan joy")}</p>
                 </div>
               </div>
               <div className="flex items-start gap-3">
                 <CheckCircle2 className="mt-0.5 h-4 w-4 text-surface-400" />
                 <div>
-                  <p className="font-medium text-surface-900">Applications per run</p>
+                  <p className="font-medium text-surface-900">{isRu ? "За один запуск" : "Bir ishga tushirishdagi arizalar"}</p>
                   <p className="text-surface-500">{maxApplications}</p>
                 </div>
               </div>
               <div className="flex items-start gap-3">
                 <Sparkles className="mt-0.5 h-4 w-4 text-surface-400" />
                 <div>
-                  <p className="font-medium text-surface-900">Mode</p>
-                  <p className="text-surface-500">{dryRun ? "Preview only" : "Real submissions"}</p>
+                  <p className="font-medium text-surface-900">{isRu ? "Режим" : "Rejim"}</p>
+                  <p className="text-surface-500">{dryRun ? (isRu ? "Только предпросмотр" : "Faqat oldindan ko'rish") : (isRu ? "Реальная отправка" : "Haqiqiy yuborish")}</p>
                 </div>
               </div>
             </CardContent>
@@ -471,38 +514,39 @@ export default function AutoApplyPage() {
           {result && (
             <Card>
               <CardHeader>
-                <CardTitle>Run summary</CardTitle>
+                <CardTitle>{isRu ? "Сводка запуска" : "Ishga tushirish xulosasi"}</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 {quotaSummary && (
                   <div className="rounded-xl border border-surface-200 bg-surface-50 p-4">
                     <div className="flex items-center justify-between gap-3">
                       <div>
-                        <p className="text-sm font-medium text-surface-900">Quota progress</p>
+                        <p className="text-sm font-medium text-surface-900">{isRu ? "Лимит" : "Limit holati"}</p>
                         <p className="text-xs text-surface-500">
-                          {quotaSummary.feature || "Auto-apply"} {result.dry_run ? "preview" : "usage"} for{" "}
-                          {quotaSummary.tier || user?.subscription_tier || "current"} plan
+                          {quotaSummary.feature || (isRu ? "Автоотклик" : "Avto-ariza")}{" "}
+                          {result.dry_run ? (isRu ? "предпросмотр" : "oldindan ko'rish") : (isRu ? "использование" : "foydalanish")}{" "}
+                          {isRu ? "для тарифа" : "uchun"} {quotaSummary.tier || user?.subscription_tier || (isRu ? "текущий" : "joriy")}
                         </p>
                       </div>
                       <Badge variant={quotaSummary.isUnlimited ? "info" : "secondary"}>
-                        {quotaSummary.isUnlimited ? "Unlimited" : "Monthly cap"}
+                        {quotaSummary.isUnlimited ? (isRu ? "Без лимита" : "Cheksiz") : (isRu ? "Месячный лимит" : "Oylik limit")}
                       </Badge>
                     </div>
 
                     <div className="mt-3 flex items-end justify-between gap-3 text-sm">
                       <p className="font-medium text-surface-900">
-                        {formatQuotaValue(quotaSummary.used)} / {formatQuotaValue(quotaSummary.limit)}
+                        {formatQuotaValue(quotaSummary.used, isRu)} / {formatQuotaValue(quotaSummary.limit, isRu)}
                       </p>
                       <p className="text-surface-500">
                         {quotaSummary.remaining === "unlimited"
-                          ? "No monthly cap"
-                          : `${formatQuotaValue(quotaSummary.remaining)} remaining`}
+                          ? (isRu ? "Месячного лимита нет" : "Oylik limit yo'q")
+                          : `${formatQuotaValue(quotaSummary.remaining, isRu)} ${isRu ? "осталось" : "qoldi"}`}
                       </p>
                     </div>
 
                     {quotaSummary.isUnlimited ? (
                       <div className="mt-3 rounded-full border border-dashed border-surface-300 bg-white px-3 py-2 text-xs text-surface-500">
-                        This plan does not impose a monthly auto-apply limit.
+                        {isRu ? "В этом тарифе нет месячного лимита на автоотклик." : "Bu tarifda oylik auto-apply limiti yo'q."}
                       </div>
                     ) : (
                       <div className="mt-3 space-y-2">
@@ -513,7 +557,7 @@ export default function AutoApplyPage() {
                         />
                         {result.dry_run && (
                           <p className="text-xs text-surface-500">
-                            Preview mode shows the current quota state and does not consume quota.
+                            {isRu ? "Режим предпросмотра не расходует лимит." : "Oldindan ko'rish rejimi limitni sarflamaydi."}
                           </p>
                         )}
                       </div>
@@ -526,19 +570,19 @@ export default function AutoApplyPage() {
                     <p className="text-2xl font-bold text-surface-900">
                       {result.total_jobs_matched}
                     </p>
-                    <p className="text-xs text-surface-500">Matched</p>
+                    <p className="text-xs text-surface-500">{isRu ? "Найдено" : "Mos keldi"}</p>
                   </div>
                   <div className="rounded-xl bg-green-50 p-3">
                     <p className="text-2xl font-bold text-green-700">
                       {result.applications_submitted}
                     </p>
-                    <p className="text-xs text-green-600">Submitted</p>
+                    <p className="text-xs text-green-600">{isRu ? "Отправлено" : "Yuborildi"}</p>
                   </div>
                   <div className="rounded-xl bg-amber-50 p-3">
                     <p className="text-2xl font-bold text-amber-700">
                       {result.applications_skipped}
                     </p>
-                    <p className="text-xs text-amber-600">Skipped</p>
+                    <p className="text-xs text-amber-600">{isRu ? "Пропущено" : "O'tkazib yuborildi"}</p>
                   </div>
                 </div>
 
@@ -554,7 +598,7 @@ export default function AutoApplyPage() {
                           <p className="text-sm text-surface-500">{item.company_name}</p>
                         </div>
                         <Badge variant={item.applied ? "default" : "secondary"}>
-                          {item.applied ? "Applied" : "Skipped"}
+                          {item.applied ? (isRu ? "Отправлено" : "Yuborildi") : (isRu ? "Пропущено" : "O'tkazildi")}
                         </Badge>
                       </div>
                       <p className="mt-2 text-sm text-surface-600">{item.message}</p>
@@ -571,11 +615,13 @@ export default function AutoApplyPage() {
                 Before you start
               </p>
               <p className="text-sm text-surface-500">
-                Auto-apply works best with a published resume and a narrow set of filters. You can use dry run first to review matches before submitting.
+                {isRu
+                  ? "Автоотклик лучше работает с опубликованным резюме и точными фильтрами. Сначала используйте предпросмотр, потом отправляйте."
+                  : "Avto-ariza nashr qilingan rezyume va aniq filtrlar bilan yaxshi ishlaydi. Avval oldindan ko'rib, keyin yuboring."}
               </p>
               <Link href="/student/resumes">
                 <Button variant="outline" className="w-full">
-                  Manage resumes
+                  {isRu ? "Управлять резюме" : "Rezyumelarni boshqarish"}
                 </Button>
               </Link>
             </CardContent>

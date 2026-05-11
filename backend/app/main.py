@@ -21,7 +21,7 @@ DOCS:
     - OpenAPI JSON: http://localhost:8000/openapi.json
 
 =============================================================================
-AUTHOR: SmartCareer AI Team
+AUTHOR: CareerUZ Team
 VERSION: 1.0.0
 =============================================================================
 """
@@ -86,19 +86,22 @@ def _bootstrap_admin_user() -> None:
     try:
         user = db.query(User).filter(User.email == email).first()
         if user:
+            if user.role == UserRole.ADMIN:
+                # Already an admin — skip to avoid overwriting password on every restart.
+                logger.info("Bootstrap admin already exists and is admin: %s — skipping", email)
+                return
+            # Promote existing non-admin user without resetting their password.
             user.role = UserRole.ADMIN
             if settings.BOOTSTRAP_ADMIN_FORCE_SUPER_ADMIN:
                 user.admin_role = AdminSubRole.SUPER_ADMIN.value
             user.full_name = settings.BOOTSTRAP_ADMIN_FULL_NAME or user.full_name
-            user.phone = settings.BOOTSTRAP_ADMIN_PHONE or user.phone
             user.is_active_account = True
             user.is_verified = True
-            user.set_password(password)
             action = "promoted"
         else:
             user = User(
                 email=email,
-                full_name=settings.BOOTSTRAP_ADMIN_FULL_NAME,
+                full_name=settings.BOOTSTRAP_ADMIN_FULL_NAME or "Admin",
                 phone=settings.BOOTSTRAP_ADMIN_PHONE,
                 role=UserRole.ADMIN,
                 admin_role=AdminSubRole.SUPER_ADMIN.value if settings.BOOTSTRAP_ADMIN_FORCE_SUPER_ADMIN else None,
@@ -110,10 +113,10 @@ def _bootstrap_admin_user() -> None:
             action = "created"
 
         db.commit()
-        logger.info("✅ Bootstrap admin %s: %s", action, email)
+        logger.info("Bootstrap admin %s: %s", action, email)
     except Exception as exc:
         db.rollback()
-        logger.error("❌ Failed to bootstrap admin user: %s", exc)
+        logger.error("Failed to bootstrap admin user: %s", exc)
     finally:
         db.close()
 
@@ -280,7 +283,7 @@ def create_application() -> FastAPI:
     application = FastAPI(
         title=settings.APP_NAME,
         description="""
-        ## SmartCareer AI API
+        ## CareerUZ API
         
         AI-powered career platform API for resume generation and job matching.
         
@@ -315,7 +318,7 @@ def create_application() -> FastAPI:
         allow_origins=settings.cors_origins_list,
         allow_credentials=True,
         allow_methods=["*"],
-        allow_headers=["*"],
+        allow_headers=["authorization", "content-type", "x-request-id", "x-csrf-token"],
     )
     
     # =========================================================================
