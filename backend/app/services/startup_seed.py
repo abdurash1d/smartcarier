@@ -13,6 +13,7 @@ import logging
 from datetime import datetime, timedelta, timezone
 from uuid import uuid4
 
+from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.config import settings
@@ -20,6 +21,7 @@ from app.database import SessionLocal
 from app.models import Job, JobStatus, User, UserRole
 
 logger = logging.getLogger(__name__)
+_AUTO_SEED_ADVISORY_LOCK_KEY = 91924517
 
 
 _SEED_JOB_BLUEPRINTS = [
@@ -147,13 +149,18 @@ _SEED_JOB_BLUEPRINTS = [
 
 
 def _get_or_create_seed_company(db: Session) -> User:
-    company = db.query(User).filter(User.role == UserRole.COMPANY).first()
+    seed_email = settings.AUTO_SEED_COMPANY_EMAIL.strip().lower()
+    company = db.query(User).filter(User.email == seed_email).first()
     if company:
+        if company.role != UserRole.COMPANY:
+            raise RuntimeError(
+                f"AUTO_SEED_COMPANY_EMAIL belongs to non-company user: {seed_email}"
+            )
         return company
 
     company = User(
         id=uuid4(),
-        email=settings.AUTO_SEED_COMPANY_EMAIL.strip().lower(),
+        email=seed_email,
         full_name=settings.AUTO_SEED_COMPANY_MANAGER_NAME,
         role=UserRole.COMPANY,
         company_name=settings.AUTO_SEED_COMPANY_NAME,
@@ -167,6 +174,29 @@ def _get_or_create_seed_company(db: Session) -> User:
     db.refresh(company)
     logger.info("Auto-seed company created: %s", company.email)
     return company
+
+
+def _try_acquire_seed_lock(db: Session) -> bool:
+    bind = db.get_bind()
+    dialect = getattr(getattr(bind, "dialect", None), "name", "")
+    if dialect != "postgresql":
+        return True
+    acquired = db.execute(
+        text("SELECT pg_try_advisory_lock(:key)"),
+        {"key": _AUTO_SEED_ADVISORY_LOCK_KEY},
+    ).scalar()
+    return bool(acquired)
+
+
+def _release_seed_lock(db: Session) -> None:
+    bind = db.get_bind()
+    dialect = getattr(getattr(bind, "dialect", None), "name", "")
+    if dialect != "postgresql":
+        return
+    db.execute(
+        text("SELECT pg_advisory_unlock(:key)"),
+        {"key": _AUTO_SEED_ADVISORY_LOCK_KEY},
+    )
 
 
 def ensure_minimum_active_jobs(db: Session, min_active_jobs: int) -> int:
@@ -236,15 +266,73 @@ def ensure_minimum_active_jobs(db: Session, min_active_jobs: int) -> int:
     return created
 
 
+def cleanup_seed_company_duplicates(db: Session) -> int:
+    seed_email = settings.AUTO_SEED_COMPANY_EMAIL.strip().lower()
+    company = (
+        db.query(User)
+        .filter(User.email == seed_email, User.role == UserRole.COMPANY)
+        .first()
+    )
+    if not company:
+        return 0
+
+    duplicates = db.execute(
+        text(
+            """
+            WITH ranked AS (
+                SELECT
+                    id,
+                    ROW_NUMBER() OVER (
+                        PARTITION BY company_id, title, location
+                        ORDER BY created_at ASC, id ASC
+                    ) AS rn
+                FROM jobs
+                WHERE company_id = :company_id
+                  AND is_deleted = false
+                  AND status = 'active'
+            )
+            SELECT id FROM ranked WHERE rn > 1
+            """
+        ),
+        {"company_id": company.id},
+    ).fetchall()
+
+    if not duplicates:
+        return 0
+
+    duplicate_ids = [row[0] for row in duplicates]
+    now_utc = datetime.now(timezone.utc)
+    jobs = db.query(Job).filter(Job.id.in_(duplicate_ids), Job.is_deleted.is_(False)).all()
+    for job in jobs:
+        job.is_deleted = True
+        job.deleted_at = now_utc
+        job.status = JobStatus.CLOSED.value
+
+    db.commit()
+    logger.info("Auto-seed duplicate jobs cleaned up: %s", len(jobs))
+    return len(jobs)
+
+
 def run_startup_auto_seed() -> None:
     if not settings.AUTO_SEED_ENABLED:
         return
 
     db = SessionLocal()
+    lock_acquired = False
     try:
+        lock_acquired = _try_acquire_seed_lock(db)
+        if not lock_acquired:
+            logger.info("Auto-seed skipped: lock held by another process")
+            return
+        cleanup_seed_company_duplicates(db)
         ensure_minimum_active_jobs(db, settings.AUTO_SEED_MIN_ACTIVE_JOBS)
     except Exception as exc:
         db.rollback()
         logger.error("Auto-seed failed: %s", exc)
     finally:
+        if lock_acquired:
+            try:
+                _release_seed_lock(db)
+            except Exception as unlock_exc:
+                logger.warning("Auto-seed lock release warning: %s", unlock_exc)
         db.close()
