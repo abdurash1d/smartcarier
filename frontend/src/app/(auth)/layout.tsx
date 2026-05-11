@@ -35,7 +35,10 @@ export default function AuthLayout({
 
         {/* Background pattern */}
         <div className="absolute inset-0 -z-10">
-          <div className="absolute inset-0 bg-[linear-gradient(to_right,#f0f0f0_1px,transparent_1px),linear-gradient(to_bottom,#f0f0f0_1px,transparent_1px)] bg-[size:4rem_4rem] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_0%,#000_70%,transparent_110%)] dark:bg-none" />
+          <div className="absolute inset-0 dark:hidden">
+            <div className="absolute inset-0 bg-[linear-gradient(to_right,#f0f0f0_1px,transparent_1px),linear-gradient(to_bottom,#f0f0f0_1px,transparent_1px)] bg-[size:4rem_4rem] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_0%,#000_70%,transparent_110%)]" />
+          </div>
+          <div className="hidden dark:block absolute inset-0 bg-gradient-to-br from-slate-950 via-indigo-950 to-slate-900" />
         </div>
 
         {/* Logo */}
@@ -48,9 +51,7 @@ export default function AuthLayout({
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-purple-500 to-indigo-600 shadow-lg shadow-purple-500/25">
               <Sparkles className="h-5 w-5 text-white" />
             </div>
-            <span className="font-display text-2xl font-bold text-surface-900 dark:text-white">
-              CareerUZ
-            </span>
+            <span className="font-display text-2xl font-bold text-surface-900 dark:text-white">SmartCareer</span>
           </Link>
         </motion.div>
 
@@ -66,7 +67,7 @@ export default function AuthLayout({
           transition={{ delay: 0.5 }}
           className="mt-8 text-center text-sm text-surface-400 dark:text-surface-500"
         >
-          © {new Date().getFullYear()} CareerUZ. {t("landing.footer.rights")}
+          © {new Date().getFullYear()} SmartCareer. {t("landing.footer.rights")}
         </motion.div>
       </div>
 
