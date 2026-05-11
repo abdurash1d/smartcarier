@@ -266,6 +266,24 @@ class Settings(BaseSettings):
     ADMIN_ENFORCE_SUBROLES: bool = False
 
     # =========================================================================
+    # 🌱 STARTUP AUTO SEED (Production-safe)
+    # =========================================================================
+
+    # Enable controlled startup seed. Disabled by default.
+    AUTO_SEED_ENABLED: bool = False
+
+    # Ensure at least this many active jobs exist.
+    # No destructive operations are performed; missing jobs are appended.
+    AUTO_SEED_MIN_ACTIVE_JOBS: int = 10
+
+    # Fallback company for seed jobs (created only if no company users exist).
+    AUTO_SEED_COMPANY_EMAIL: str = "seed-company@careeruz.uz"
+    AUTO_SEED_COMPANY_PASSWORD: str = "Company123!"
+    AUTO_SEED_COMPANY_MANAGER_NAME: str = "CareerUZ HR Team"
+    AUTO_SEED_COMPANY_NAME: str = "CareerUZ Hiring"
+    AUTO_SEED_COMPANY_WEBSITE: str = "https://careeruz.uz"
+
+    # =========================================================================
     # 🐛 ERROR MONITORING & LOGGING
     # =========================================================================
     
@@ -327,6 +345,7 @@ class Settings(BaseSettings):
         "OAUTH_ENABLED",
         "BOOTSTRAP_ADMIN_FORCE_SUPER_ADMIN",
         "ADMIN_ENFORCE_SUBROLES",
+        "AUTO_SEED_ENABLED",
         "PAYMENTS_REQUIRE_WEBHOOK_SECRET",
         mode="before",
     )

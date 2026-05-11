@@ -55,6 +55,7 @@ from app.database import (
     normalize_legacy_user_role_values,
 )
 from app.models import User, UserRole, AdminSubRole
+from app.services.startup_seed import run_startup_auto_seed
 
 # =============================================================================
 # LOGGING CONFIGURATION
@@ -249,6 +250,7 @@ async def lifespan(app: FastAPI):
         logger.info("✅ Database connection successful")
         normalize_legacy_user_role_values()
         _bootstrap_admin_user()
+        run_startup_auto_seed()
     else:
         logger.error("❌ Database connection failed!")
 
