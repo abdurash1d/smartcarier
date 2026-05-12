@@ -157,7 +157,7 @@ export default function CompanySettingsPage() {
                   <div>
                     <Button variant="outline" size="sm">
                       <Camera className="mr-2 h-4 w-4" />
-                      {isRu ? "Yuklash" : "Logo yuklash"}
+                      {isRu ? "Загрузить" : "Logo yuklash"}
                     </Button>
                     <p className="mt-1 text-xs text-surface-500">
                       {isRu ? "Рекомендуется: 200x200px, PNG или JPG" : "Tavsiya: 200x200px, PNG yoki JPG"}

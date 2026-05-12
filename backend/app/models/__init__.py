@@ -140,6 +140,10 @@ from app.models.application import (
     ApplicationStatus,      # Enum: pending, reviewing, interview, etc.
 )
 
+from app.models.interview_scorecard import (
+    InterviewScorecard,     # 5-criteria structured interview evaluation
+)
+
 from app.models.payment import (
     Payment,               # Payment audit trail
     PaymentProvider,        # STRIPE

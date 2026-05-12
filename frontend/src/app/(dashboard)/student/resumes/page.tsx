@@ -82,7 +82,8 @@ const itemVariants = {
 // =============================================================================
 
 export default function ResumesPage() {
-  const { t } = useTranslation();
+  const { t, locale } = useTranslation();
+  const isRu = locale === "ru";
   const {
     resumes,
     isLoading,
@@ -145,7 +146,7 @@ export default function ResumesPage() {
         });
         break;
       case "delete":
-        if (confirm("Are you sure you want to delete this resume?")) {
+        if (confirm(isRu ? "Вы уверены, что хотите удалить это резюме?" : "Ushbu rezyumeni o'chirishga ishonchingiz komilmi?")) {
           await deleteResume(resume.id);
         }
         break;
@@ -325,12 +326,14 @@ export default function ResumesPage() {
                 <FileText className="h-10 w-10 text-surface-400" />
               </div>
               <h3 className="font-display text-xl font-semibold text-surface-900 dark:text-white">
-                {searchQuery || statusFilter !== "all" ? "No resumes found" : "No resumes yet"}
+                {searchQuery || statusFilter !== "all"
+                  ? (isRu ? "Резюме не найдены" : "Rezyumelar topilmadi")
+                  : (isRu ? "Резюме пока нет" : "Hozircha rezyume yo'q")}
               </h3>
               <p className="mt-2 max-w-sm text-surface-500">
                 {searchQuery || statusFilter !== "all"
-                  ? "Try adjusting your search or filter criteria."
-                  : "Create your first resume to start applying for jobs."}
+                  ? (isRu ? "Попробуйте изменить поиск или фильтры." : "Qidiruv yoki filtrlarni o'zgartirib ko'ring.")
+                  : (isRu ? "Создайте первое резюме, чтобы начать подавать заявки." : "Ish topish uchun birinchi rezyumeni yarating.")}
               </p>
               {!searchQuery && statusFilter === "all" && (
                 <Button
@@ -338,7 +341,7 @@ export default function ResumesPage() {
                   className="mt-6 bg-gradient-to-r from-purple-500 to-indigo-600"
                 >
                   <Plus className="mr-2 h-4 w-4" />
-                  Create Your First Resume
+                  {isRu ? "Создать первое резюме" : "Birinchi rezyumeni yaratish"}
                 </Button>
               )}
             </CardContent>
@@ -405,7 +408,7 @@ export default function ResumesPage() {
                     </span>
                     <span className="flex items-center gap-1">
                       <Eye className="h-4 w-4" />
-                      {resume.view_count} views
+                      {resume.view_count} {isRu ? "просмотров" : "ko'rish"}
                     </span>
                   </div>
 
@@ -414,7 +417,7 @@ export default function ResumesPage() {
                     <Link href={`/student/resumes/${resume.id}`} className="flex-1">
                       <Button variant="outline" size="sm" className="w-full">
                         <Eye className="mr-2 h-4 w-4" />
-                        View
+                        {isRu ? "Открыть" : "Ochish"}
                       </Button>
                     </Link>
                     <Link href={`/student/resumes/${resume.id}/edit`}>
@@ -452,7 +455,7 @@ export default function ResumesPage() {
                                   className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-surface-600 hover:bg-surface-100 dark:text-surface-400 dark:hover:bg-surface-700"
                                 >
                                   <Globe className="h-4 w-4" />
-                                  Publish
+                                  {isRu ? "Опубликовать" : "Nashr qilish"}
                                 </button>
                               )}
                               {resume.status === "published" && (
@@ -461,7 +464,7 @@ export default function ResumesPage() {
                                   className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-surface-600 hover:bg-surface-100 dark:text-surface-400 dark:hover:bg-surface-700"
                                 >
                                   <Archive className="h-4 w-4" />
-                                  Archive
+                                  {isRu ? "Архивировать" : "Arxivlash"}
                                 </button>
                               )}
                               <button
@@ -469,14 +472,14 @@ export default function ResumesPage() {
                                 className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-surface-600 hover:bg-surface-100 dark:text-surface-400 dark:hover:bg-surface-700"
                               >
                                 <Download className="h-4 w-4" />
-                                Download PDF
+                                {isRu ? "Скачать PDF" : "PDF yuklab olish"}
                               </button>
                               <button
                                 onClick={() => handleAction("duplicate", resume)}
                                 className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-surface-600 hover:bg-surface-100 dark:text-surface-400 dark:hover:bg-surface-700"
                               >
                                 <Copy className="h-4 w-4" />
-                                Duplicate
+                                {isRu ? "Дублировать" : "Nusxalash"}
                               </button>
                               <div className="my-1 border-t border-surface-200 dark:border-surface-700" />
                               <button
@@ -484,7 +487,7 @@ export default function ResumesPage() {
                                 className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-500/10"
                               >
                                 <Trash2 className="h-4 w-4" />
-                                Delete
+                                {isRu ? "Удалить" : "O'chirish"}
                               </button>
                             </motion.div>
                           </>

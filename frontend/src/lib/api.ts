@@ -320,6 +320,25 @@ export const applicationApi = {
 
   hiringFunnel: (params?: { days?: number }) =>
     api.get("/applications/analytics/funnel", { params }),
+
+  topCandidatesForJob: (jobId: string, params?: { limit?: number; pool?: "applicants" | "all" }) =>
+    api.get(`/applications/jobs/${jobId}/top-candidates`, { params }),
+
+  listScorecards: (applicationId: string) =>
+    api.get(`/applications/${applicationId}/scorecards`),
+
+  submitScorecard: (
+    applicationId: string,
+    data: {
+      technical_score?: number | null;
+      communication_score?: number | null;
+      cultural_fit_score?: number | null;
+      motivation_score?: number | null;
+      problem_solving_score?: number | null;
+      recommendation?: "hire" | "maybe" | "pass" | null;
+      notes?: string | null;
+    },
+  ) => api.post(`/applications/${applicationId}/scorecards`, data),
 };
 
 // Admin endpoints
@@ -406,6 +425,32 @@ export const aiApi = {
   
   matchJob: (resumeId: string, jobId: string) =>
     api.post("/ai/match-job", { resume_id: resumeId, job_id: jobId }),
+
+  // ---------- AI HR (recruiter-facing) ----------
+  hrJobDescription: (data: {
+    title: string;
+    seniority: string;
+    industry?: string;
+    location?: string;
+    must_have?: string[];
+    locale?: string;
+  }) => api.post("/ai/hr/job-description", data),
+
+  hrCandidateSummary: (applicationId: string, locale = "uz") =>
+    api.post(`/ai/hr/applications/${applicationId}/summary?locale=${locale}`),
+
+  hrInterviewQuestions: (applicationId: string, count = 8, locale = "uz") =>
+    api.post(`/ai/hr/applications/${applicationId}/questions?count=${count}&locale=${locale}`),
+
+  hrEmailTemplate: (applicationId: string, data: {
+    action: "interview" | "reject" | "offer" | "shortlist" | "follow_up";
+    interview_at?: string;
+    meeting_link?: string;
+    locale?: string;
+  }) => api.post(`/ai/hr/applications/${applicationId}/email`, data),
+
+  hrEmailSend: (applicationId: string, data: { subject: string; body: string }) =>
+    api.post(`/ai/hr/applications/${applicationId}/email/send`, data),
 };
 
 // Payment endpoints

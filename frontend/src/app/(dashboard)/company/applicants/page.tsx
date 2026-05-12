@@ -85,15 +85,38 @@ export default function CompanyApplicantsPage() {
     loadApplications();
   }, [jobs, selectedJob]);
 
+  // Sort + filter state
+  const [sortBy, setSortBy] = useState<"match" | "applied" | "name">("match");
+  const [topOnly, setTopOnly] = useState(false);
+
+  // Parse "85%" → 85 for sorting
+  const parseScore = (s: any): number => {
+    if (s == null) return -1;
+    const digits = String(s).replace(/[^0-9.]/g, "");
+    return digits ? parseFloat(digits) : -1;
+  };
+
   // Filter applications
-  const filteredApplications = applications.filter((app: any) => {
-    const matchesSearch =
-      !searchQuery ||
-      app.applicant?.full_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      app.applicant?.email?.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesStatus = statusFilter === "all" || app.status === statusFilter;
-    return matchesSearch && matchesStatus;
-  });
+  const filteredApplications = applications
+    .filter((app: any) => {
+      const matchesSearch =
+        !searchQuery ||
+        app.applicant?.full_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        app.applicant?.email?.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchesStatus = statusFilter === "all" || app.status === statusFilter;
+      const matchesTop = !topOnly || parseScore(app.match_score) >= 70;
+      return matchesSearch && matchesStatus && matchesTop;
+    })
+    .sort((a: any, b: any) => {
+      if (sortBy === "match") {
+        return parseScore(b.match_score) - parseScore(a.match_score);
+      }
+      if (sortBy === "name") {
+        return (a.applicant?.full_name || "").localeCompare(b.applicant?.full_name || "");
+      }
+      // applied
+      return new Date(b.applied_at || 0).getTime() - new Date(a.applied_at || 0).getTime();
+    });
 
   const handleStatusChange = async (applicationId: string, newStatus: KnownApplicationStatus) => {
     if (newStatus === "interview") {
@@ -172,6 +195,33 @@ export default function CompanyApplicantsPage() {
                 <SelectItem value="withdrawn">{isRu ? "Отозвано" : "Qaytarib olindi"}</SelectItem>
               </SelectContent>
             </Select>
+
+            {/* Sort dropdown */}
+            <Select value={sortBy} onValueChange={(v) => setSortBy(v as "match" | "applied" | "name")}>
+              <SelectTrigger className="w-full sm:w-48">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="match">{isRu ? "По совпадению" : "Moslik bo'yicha"}</SelectItem>
+                <SelectItem value="applied">{isRu ? "По дате" : "Sana bo'yicha"}</SelectItem>
+                <SelectItem value="name">{isRu ? "По имени" : "Ism bo'yicha"}</SelectItem>
+              </SelectContent>
+            </Select>
+
+            {/* Top Matches toggle */}
+            <button
+              type="button"
+              onClick={() => setTopOnly((v) => !v)}
+              className={`inline-flex items-center gap-1.5 rounded-xl border px-3 py-2 text-sm font-medium transition-colors ${
+                topOnly
+                  ? "border-emerald-500 bg-emerald-50 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300"
+                  : "border-surface-200 text-surface-700 hover:bg-surface-50 dark:border-surface-700 dark:text-surface-300 dark:hover:bg-surface-800"
+              }`}
+              title={isRu ? "Только сильные кандидаты (70%+ совпадение)" : "Faqat kuchli nomzodlar (70%+ moslik)"}
+            >
+              <span className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-500" />
+              {isRu ? "Топ совпадения" : "Top moslar"}
+            </button>
           </div>
         </CardContent>
       </Card>

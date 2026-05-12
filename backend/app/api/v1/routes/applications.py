@@ -46,7 +46,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, Query, Request
 from sqlalchemy.orm import Session
 from sqlalchemy import func, or_
 from sqlalchemy.exc import IntegrityError
-from pydantic import BaseModel, Field, ConfigDict
+from pydantic import BaseModel, Field, ConfigDict, field_validator
 
 from app.core.dependencies import (
     get_db,
@@ -1715,3 +1715,273 @@ async def auto_apply(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="An error occurred during auto-apply. Please try again."
         )
+
+
+# =============================================================================
+# REVERSE MATCHING — top candidates per job (HR side)
+# =============================================================================
+
+
+@router.get(
+    "/jobs/{job_id}/top-candidates",
+    response_model=StandardResponse,
+    summary="Top candidates for a job, ranked by match score",
+    description="""
+    Ranks every applicant for this job (and optionally the broader candidate
+    pool) using the shared `job_matching` service, then returns the top N.
+    Owner-company only.
+    """,
+)
+async def top_candidates_for_job(
+    job_id: UUID,
+    limit: int = Query(10, ge=1, le=50),
+    pool: str = Query(
+        "applicants",
+        description="'applicants' = only people who applied; 'all' = every published resume in the DB",
+        regex="^(applicants|all)$",
+    ),
+    company: User = Depends(get_current_company),
+    db: Session = Depends(get_db),
+):
+    start_time = time.time()
+
+    job = db.query(Job).filter(Job.id == job_id, Job.is_deleted == False).first()
+    if not job:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Job not found")
+    if job.company_id != company.id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
+
+    # =====================================================================
+    # 1. APPLIED CANDIDATES — score from already-stored match_breakdown,
+    #    fall back to live scoring if breakdown is missing (legacy data).
+    # =====================================================================
+    applied_apps = (
+        db.query(Application)
+        .filter(Application.job_id == job.id, Application.is_deleted == False)
+        .all()
+    )
+    applied_ids = {a.user_id for a in applied_apps}
+
+    scored: list = []
+    for app in applied_apps:
+        bd = app.match_breakdown
+        if not bd and app.resume:
+            try:
+                bd = job_matching.score_resume_against_job(app.resume.content, job)
+            except Exception:
+                bd = None
+        score = float(bd.get("score", 0)) if isinstance(bd, dict) else 0.0
+        matched = (bd or {}).get("matched_skills") or []
+        missing = (bd or {}).get("missing_skills") or []
+        applicant = app.user
+        scored.append(
+            {
+                "source": "applicant",
+                "application_id": str(app.id),
+                "user_id": str(applicant.id) if applicant else None,
+                "full_name": applicant.full_name if applicant else None,
+                "email": applicant.email if applicant else None,
+                "avatar_url": getattr(applicant, "avatar_url", None),
+                "status": app.status,
+                "score": round(score, 1),
+                "matched_skills": matched[:8],
+                "missing_skills": missing[:5],
+                "resume_title": app.resume.title if app.resume else None,
+            }
+        )
+
+    # =====================================================================
+    # 2. POOL = "all" — additionally score every published resume from
+    #    candidates who haven't applied yet (sourcing suggestions).
+    # =====================================================================
+    if pool == "all":
+        candidate_resumes = (
+            db.query(Resume)
+            .join(User, User.id == Resume.user_id)
+            .filter(
+                Resume.is_deleted == False,
+                Resume.status == ResumeStatus.PUBLISHED.value,
+                User.role == UserRole.STUDENT,
+                User.is_deleted == False,
+                ~Resume.user_id.in_(applied_ids) if applied_ids else True,
+            )
+            .all()
+        )
+        for resume in candidate_resumes:
+            try:
+                bd = job_matching.score_resume_against_job(resume.content, job)
+            except Exception:
+                continue
+            score = float(bd.get("score", 0))
+            if score < 25:  # below this it's noise
+                continue
+            user = resume.user
+            scored.append(
+                {
+                    "source": "sourced",
+                    "application_id": None,
+                    "user_id": str(user.id) if user else None,
+                    "full_name": user.full_name if user else None,
+                    "email": user.email if user else None,
+                    "avatar_url": getattr(user, "avatar_url", None),
+                    "status": None,
+                    "score": round(score, 1),
+                    "matched_skills": (bd.get("matched_skills") or [])[:8],
+                    "missing_skills": (bd.get("missing_skills") or [])[:5],
+                    "resume_title": resume.title,
+                }
+            )
+
+    scored.sort(key=lambda x: x["score"], reverse=True)
+
+    return create_response(
+        success=True,
+        message=f"Top {min(len(scored), limit)} candidates ranked for {job.title}",
+        data={
+            "job": {
+                "id": str(job.id),
+                "title": job.title,
+                "requirements_count": len(job.requirements) if isinstance(job.requirements, list) else 0,
+            },
+            "candidates": scored[:limit],
+            "pool": pool,
+            "total_evaluated": len(scored),
+        },
+        start_time=start_time,
+    )
+
+
+# =============================================================================
+# INTERVIEW SCORECARDS — structured, bias-resistant evaluation
+# =============================================================================
+
+
+class ScorecardSubmit(BaseModel):
+    """Submit / update an interview scorecard."""
+
+    technical_score: Optional[int] = Field(None, ge=1, le=5)
+    communication_score: Optional[int] = Field(None, ge=1, le=5)
+    cultural_fit_score: Optional[int] = Field(None, ge=1, le=5)
+    motivation_score: Optional[int] = Field(None, ge=1, le=5)
+    problem_solving_score: Optional[int] = Field(None, ge=1, le=5)
+    recommendation: Optional[str] = Field(None, description="hire | maybe | pass")
+    notes: Optional[str] = Field(None, max_length=4000)
+
+    @field_validator("recommendation")
+    @classmethod
+    def _valid_rec(cls, v):
+        if v is None:
+            return v
+        if v not in {"hire", "maybe", "pass"}:
+            raise ValueError("recommendation must be one of hire/maybe/pass")
+        return v
+
+
+def _scorecard_to_dict(s) -> Dict[str, Any]:
+    return {
+        "id": str(s.id),
+        "application_id": str(s.application_id),
+        "evaluator": {
+            "id": str(s.evaluator.id) if s.evaluator else None,
+            "name": s.evaluator.full_name if s.evaluator else None,
+        },
+        "technical_score": s.technical_score,
+        "communication_score": s.communication_score,
+        "cultural_fit_score": s.cultural_fit_score,
+        "motivation_score": s.motivation_score,
+        "problem_solving_score": s.problem_solving_score,
+        "overall_score": s.overall_score,
+        "recommendation": s.recommendation,
+        "notes": s.notes,
+        "created_at": s.created_at.isoformat() if s.created_at else None,
+        "updated_at": s.updated_at.isoformat() if s.updated_at else None,
+    }
+
+
+def _company_owns_application(application: Application, user: User) -> bool:
+    if user.role == UserRole.ADMIN.value:
+        return True
+    return bool(application.job and application.job.company_id == user.id)
+
+
+
+
+@router.get(
+    "/{application_id}/scorecards",
+    response_model=StandardResponse,
+    summary="List interview scorecards for an application",
+)
+async def list_scorecards(
+    application_id: UUID,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db),
+):
+    from app.models import InterviewScorecard
+
+    app = db.query(Application).filter(
+        Application.id == application_id, Application.is_deleted == False
+    ).first()
+    if not app:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Application not found")
+    if not _company_owns_application(app, current_user):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
+
+    rows = (
+        db.query(InterviewScorecard)
+        .filter(InterviewScorecard.application_id == app.id)
+        .order_by(InterviewScorecard.created_at.desc())
+        .all()
+    )
+    return {"success": True, "data": {"scorecards": [_scorecard_to_dict(s) for s in rows]}}
+
+
+@router.post(
+    "/{application_id}/scorecards",
+    response_model=StandardResponse,
+    summary="Submit a structured interview scorecard",
+    description=(
+        "Submits a 5-criteria evaluation (1-5 each) plus optional notes & "
+        "hire/maybe/pass recommendation. Returns the persisted scorecard with "
+        "an auto-computed overall_score (average of provided criteria)."
+    ),
+)
+async def create_scorecard(
+    application_id: UUID,
+    payload: ScorecardSubmit,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db),
+):
+    from app.models import InterviewScorecard
+
+    app = db.query(Application).filter(
+        Application.id == application_id, Application.is_deleted == False
+    ).first()
+    if not app:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Application not found")
+    if not _company_owns_application(app, current_user):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
+
+    overall = InterviewScorecard.average(
+        payload.technical_score,
+        payload.communication_score,
+        payload.cultural_fit_score,
+        payload.motivation_score,
+        payload.problem_solving_score,
+    )
+
+    scorecard = InterviewScorecard(
+        application_id=app.id,
+        evaluator_id=current_user.id,
+        technical_score=payload.technical_score,
+        communication_score=payload.communication_score,
+        cultural_fit_score=payload.cultural_fit_score,
+        motivation_score=payload.motivation_score,
+        problem_solving_score=payload.problem_solving_score,
+        overall_score=overall,
+        recommendation=payload.recommendation,
+        notes=payload.notes,
+    )
+    db.add(scorecard)
+    db.commit()
+    db.refresh(scorecard)
+    return {"success": True, "data": _scorecard_to_dict(scorecard), "message": "Scorecard saved"}
