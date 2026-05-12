@@ -200,9 +200,9 @@ export default function CreateResumePage() {
   const CurrentIcon = currentStep.icon;
 
   return (
-    <div className="min-h-screen bg-[radial-gradient(circle_at_top_left,#ecfeff,transparent_34%),linear-gradient(135deg,#f8fafc,#eef2ff)] p-4 md:p-6">
+    <div className="min-h-screen bg-[radial-gradient(circle_at_top_left,#ecfeff,transparent_34%),linear-gradient(135deg,#f8fafc,#eef2ff)] p-4 md:p-6 dark:bg-none dark:bg-surface-950">
       <div className="mx-auto max-w-7xl space-y-6">
-        <div className="flex flex-col gap-4 rounded-[28px] border border-white/70 bg-white/85 p-5 shadow-xl shadow-slate-200/60 backdrop-blur md:flex-row md:items-center md:justify-between">
+        <div className="flex flex-col gap-4 rounded-[28px] border border-white/70 bg-white/85 p-5 shadow-xl shadow-slate-200/60 backdrop-blur md:flex-row md:items-center md:justify-between dark:border-surface-700/70 dark:bg-surface-800/90">
           <div className="flex items-center gap-4">
             <Button variant="ghost" onClick={() => router.back()} className="gap-2 text-surface-600">
               <ArrowLeft className="h-4 w-4" />
@@ -229,7 +229,7 @@ export default function CreateResumePage() {
 
         <div className="grid gap-6 lg:grid-cols-[minmax(0,520px)_1fr]">
           <div className="space-y-5">
-            <div className="rounded-[24px] border border-white/70 bg-white/90 p-5 shadow-lg shadow-slate-200/50">
+            <div className="rounded-[24px] border border-white/70 bg-white/90 p-5 shadow-lg shadow-slate-200/50 dark:border-surface-700/70 dark:bg-surface-800/90">
               <Label>Resume nomi</Label>
               <Input
                 value={title}
@@ -239,7 +239,7 @@ export default function CreateResumePage() {
               />
             </div>
 
-            <div className="flex items-center gap-1 overflow-x-auto rounded-[24px] border border-white/70 bg-white/90 p-2 shadow-lg shadow-slate-200/40">
+            <div className="flex items-center gap-1 overflow-x-auto rounded-[24px] border border-white/70 bg-white/90 p-2 shadow-lg shadow-slate-200/40 dark:border-surface-700/70 dark:bg-surface-800/90">
               {STEPS.map((item, index) => {
                 const Icon = item.icon;
                 return (
@@ -266,7 +266,7 @@ export default function CreateResumePage() {
               key={step}
               initial={{ opacity: 0, x: 18 }}
               animate={{ opacity: 1, x: 0 }}
-              className="rounded-[28px] border border-white/70 bg-white/95 p-6 shadow-xl shadow-slate-200/60"
+              className="rounded-[28px] border border-white/70 bg-white/95 p-6 shadow-xl shadow-slate-200/60 dark:border-surface-700/70 dark:bg-surface-800/95"
             >
               <div className="mb-5 flex items-center gap-3">
                 <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-700">
@@ -421,7 +421,7 @@ export default function CreateResumePage() {
               )}
             </motion.div>
 
-            <div className="flex justify-between rounded-[24px] border border-white/70 bg-white/90 p-3 shadow-lg shadow-slate-200/40">
+            <div className="flex justify-between rounded-[24px] border border-white/70 bg-white/90 p-3 shadow-lg shadow-slate-200/40 dark:border-surface-700/70 dark:bg-surface-800/90">
               <Button variant="outline" onClick={() => step > 0 ? setStep(step - 1) : router.back()} className="gap-2">
                 <ArrowLeft className="h-4 w-4" />
                 {step > 0 ? "Oldingi" : "Bekor qilish"}
@@ -447,7 +447,7 @@ export default function CreateResumePage() {
             </div>
           </div>
 
-          <aside className="rounded-[28px] border border-white/70 bg-white/90 p-4 shadow-xl shadow-slate-200/60 lg:sticky lg:top-6 lg:h-[calc(100vh-3rem)] lg:overflow-auto">
+          <aside className="rounded-[28px] border border-white/70 bg-white/90 p-4 shadow-xl shadow-slate-200/60 lg:sticky lg:top-6 lg:h-[calc(100vh-3rem)] lg:overflow-auto dark:border-surface-700/70 dark:bg-surface-800/90">
             <div className="mb-4 flex items-center justify-between">
               <div className="flex items-center gap-2 text-sm font-bold text-slate-700">
                 <Eye className="h-4 w-4 text-emerald-700" />
@@ -458,7 +458,7 @@ export default function CreateResumePage() {
                 PDF
               </Button>
             </div>
-            <div className="origin-top overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl">
+            <div className="origin-top overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl dark:border-surface-700 dark:bg-surface-800">
               <div className="mx-auto w-[210mm] max-w-none scale-[0.54] origin-top-left lg:scale-[0.58] xl:scale-[0.68]">
                 <ResumePreview content={content} title={title} isPlaceholder={!content.personal_info?.name} />
               </div>
@@ -519,7 +519,7 @@ function TextArea({
         onChange={(event) => onChange(event.target.value)}
         placeholder={placeholder}
         rows={4}
-        className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+        className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 dark:border-surface-600 dark:bg-surface-800 dark:text-surface-100 dark:placeholder-surface-400"
       />
     </div>
   );

@@ -14,7 +14,7 @@ Xususiyatlari:
 - Retry mechanism
 - Email logging
 
-AUTHOR: SmartCareer AI Team
+AUTHOR: CareerUZ Team
 VERSION: 1.0.0
 =============================================================================
 """
@@ -76,20 +76,20 @@ class EmailType(str, Enum):
 
 EMAIL_TEMPLATES = {
     EmailType.WELCOME: {
-        "subject": "🎉 SmartCareer AI ga xush kelibsiz!",
-        "subject_ru": "🎉 Добро пожаловать в SmartCareer AI!",
+        "subject": "🎉 CareerUZ ga xush kelibsiz!",
+        "subject_ru": "🎉 Добро пожаловать в CareerUZ!",
     },
     EmailType.PASSWORD_RESET: {
-        "subject": "🔐 Parolni tiklash - SmartCareer AI",
-        "subject_ru": "🔐 Сброс пароля - SmartCareer AI",
+        "subject": "🔐 Parolni tiklash - CareerUZ",
+        "subject_ru": "🔐 Сброс пароля - CareerUZ",
     },
     EmailType.PASSWORD_CHANGED: {
         "subject": "✅ Parol muvaffaqiyatli o'zgartirildi",
         "subject_ru": "✅ Пароль успешно изменен",
     },
     EmailType.LOGIN_NOTIFICATION: {
-        "subject": "🔔 Yangi kirish aniqlandi - SmartCareer AI",
-        "subject_ru": "🔔 Обнаружен новый вход - SmartCareer AI",
+        "subject": "🔔 Yangi kirish aniqlandi - CareerUZ",
+        "subject_ru": "🔔 Обнаружен новый вход - CareerUZ",
     },
     EmailType.REGISTRATION_SUCCESS: {
         "subject": "✅ Ro'yxatdan o'tish muvaffaqiyatli!",
@@ -100,16 +100,16 @@ EMAIL_TEMPLATES = {
         "subject_ru": "📧 Подтвердите ваш email",
     },
     EmailType.PREMIUM_UPGRADE: {
-        "subject": "⭐ Premium ga o'tdingiz! - SmartCareer AI",
-        "subject_ru": "⭐ Вы перешли на Premium! - SmartCareer AI",
+        "subject": "⭐ Premium ga o'tdingiz! - CareerUZ",
+        "subject_ru": "⭐ Вы перешли на Premium! - CareerUZ",
     },
     EmailType.APPLICATION_STATUS: {
-        "subject": "📋 Ariza holati yangilandi - SmartCareer AI",
-        "subject_ru": "📋 Статус заявки обновлен - SmartCareer AI",
+        "subject": "📋 Ariza holati yangilandi - CareerUZ",
+        "subject_ru": "📋 Статус заявки обновлен - CareerUZ",
     },
     EmailType.INTERVIEW_SCHEDULED: {
-        "subject": "📅 Suhbat belgilandi! - SmartCareer AI",
-        "subject_ru": "📅 Собеседование назначено! - SmartCareer AI",
+        "subject": "📅 Suhbat belgilandi! - CareerUZ",
+        "subject_ru": "📅 Собеседование назначено! - CareerUZ",
     },
 }
 
@@ -197,7 +197,7 @@ class EmailService:
             template_config = EMAIL_TEMPLATES.get(email_type, {})
             subject = template_config.get(
                 f"subject_{language}" if language != "uz" else "subject",
-                template_config.get("subject", "SmartCareer AI")
+                template_config.get("subject", "CareerUZ")
             )
             
             # Render HTML body
@@ -451,7 +451,7 @@ class EmailService:
         """Render email template."""
         # Add common context
         context.update({
-            "app_name": "SmartCareer AI",
+            "app_name": "CareerUZ",
             "app_url": settings.FRONTEND_URL,
             "support_email": settings.SUPPORT_EMAIL,
             "current_year": datetime.now().year,
@@ -486,7 +486,7 @@ class EmailService:
         <head>
             <meta charset="utf-8">
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <title>SmartCareer AI</title>
+            <title>CareerUZ</title>
             <style>
                 body {{ font-family: 'Segoe UI', Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; background-color: #f4f4f4; }}
                 .container {{ max-width: 600px; margin: 20px auto; background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }}
@@ -503,7 +503,7 @@ class EmailService:
         <body>
             <div class="container">
                 <div class="header">
-                    <h1>🚀 SmartCareer AI</h1>
+                    <h1>🚀 CareerUZ</h1>
                 </div>
                 <div class="content">
         """
@@ -513,7 +513,7 @@ class EmailService:
             if language == "ru":
                 html += f"""
                     <h2>Добро пожаловать, {user_name}! 🎉</h2>
-                    <p>Спасибо за регистрацию в SmartCareer AI - платформе для карьеры нового поколения.</p>
+                    <p>Спасибо за регистрацию в CareerUZ - платформе для карьеры нового поколения.</p>
                     <p>Теперь вы можете:</p>
                     <ul>
                         <li>✨ Создавать профессиональные резюме с помощью AI</li>
@@ -526,7 +526,7 @@ class EmailService:
             else:
                 html += f"""
                     <h2>Xush kelibsiz, {user_name}! 🎉</h2>
-                    <p>SmartCareer AI ga ro'yxatdan o'tganingiz uchun rahmat - yangi avlod karyera platformasi.</p>
+                    <p>CareerUZ ga ro'yxatdan o'tganingiz uchun rahmat - yangi avlod karyera platformasi.</p>
                     <p>Endi siz quyidagilarni qilishingiz mumkin:</p>
                     <ul>
                         <li>✨ AI yordamida professional rezyume yaratish</li>
@@ -571,7 +571,7 @@ class EmailService:
                         <strong>🕐 Время изменения:</strong> {context.get('changed_at', 'Только что')}
                     </div>
                     <div class="warning-box">
-                        <strong>⚠️ Не вы?</strong> Если вы не меняли пароль, немедленно свяжитесь с нами: {context.get('support_email', 'support@smartcareer.uz')}
+                        <strong>⚠️ Не вы?</strong> Если вы не меняли пароль, немедленно свяжитесь с нами: {context.get('support_email', 'support@careeruz.uz')}
                     </div>
                 """
             else:
@@ -583,7 +583,7 @@ class EmailService:
                         <strong>🕐 O'zgartirilgan vaqt:</strong> {context.get('changed_at', 'Hozirgina')}
                     </div>
                     <div class="warning-box">
-                        <strong>⚠️ Bu siz emasmidingiz?</strong> Agar parolni o'zgartirmagan bo'lsangiz, darhol biz bilan bog'laning: {context.get('support_email', 'support@smartcareer.uz')}
+                        <strong>⚠️ Bu siz emasmidingiz?</strong> Agar parolni o'zgartirmagan bo'lsangiz, darhol biz bilan bog'laning: {context.get('support_email', 'support@careeruz.uz')}
                     </div>
                 """
         
@@ -679,16 +679,16 @@ class EmailService:
         else:
             # Generic template
             html += f"""
-                <h2>SmartCareer AI Bildirishnomasi</h2>
+                <h2>CareerUZ Bildirishnomasi</h2>
                 <p>Salom, {user_name}!</p>
-                <p>Sizga SmartCareer AI dan bildirishnoma keldi.</p>
+                <p>Sizga CareerUZ dan bildirishnoma keldi.</p>
             """
         
         # Close HTML
         html += f"""
                 </div>
                 <div class="footer">
-                    <p>© {datetime.now().year} SmartCareer AI. Barcha huquqlar himoyalangan.</p>
+                    <p>© {datetime.now().year} CareerUZ. Barcha huquqlar himoyalangan.</p>
                     <p>
                         <a href="{settings.FRONTEND_URL}" style="color: #7c3aed;">Veb-sayt</a> |
                         <a href="{settings.FRONTEND_URL}/settings" style="color: #7c3aed;">Sozlamalar</a> |

@@ -101,7 +101,7 @@ Expected structure (validated at application level):
 }
 
 =============================================================================
-AUTHOR: SmartCareer AI Team
+AUTHOR: CareerUZ Team
 VERSION: 1.0.0
 =============================================================================
 """

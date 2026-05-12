@@ -4,7 +4,7 @@ USER MODEL
 =============================================================================
 
 PURPOSE:
-    Represents user accounts in SmartCareer AI.
+    Represents user accounts in CareerUZ.
     Supports three user types: students (job seekers), companies, and admins.
 
 =============================================================================
@@ -48,7 +48,7 @@ SECURITY FEATURES
    - Validated before hashing
 
 =============================================================================
-AUTHOR: SmartCareer AI Team
+AUTHOR: CareerUZ Team
 VERSION: 1.0.0
 =============================================================================
 """
@@ -241,7 +241,7 @@ class User(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin):
         # Database-level regex constraints are PostgreSQL-specific
         
         # Table comment for documentation
-        {'comment': 'User accounts for SmartCareer AI (students, companies, admins)'}
+        {'comment': 'User accounts for CareerUZ (students, companies, admins)'}
     )
     
     # =========================================================================
@@ -706,6 +706,16 @@ class User(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin):
 
     def has_admin_permission(self, permission: str) -> bool:
         """Check permission for admin sub-role matrix."""
+        if self.role != UserRole.ADMIN:
+            return False
+
+        # Optional compatibility mode for teams that want every admin account
+        # to have full control without enforcing sub-role RBAC.
+        from app.config import settings
+
+        if not settings.ADMIN_ENFORCE_SUBROLES:
+            return True
+
         admin_role = self.effective_admin_role
         if admin_role is None:
             return False

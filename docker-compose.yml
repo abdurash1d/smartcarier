@@ -6,33 +6,33 @@ services:
   # =============================================================================
   postgres:
     image: postgres:15-alpine
-    container_name: smartcareer_postgres
+    container_name: careeruz_postgres
     restart: unless-stopped
     environment:
-      POSTGRES_DB: smartcareer
-      POSTGRES_USER: smartcareer
-      POSTGRES_PASSWORD: smartcareer_password_change_in_production
+      POSTGRES_DB: careeruz
+      POSTGRES_USER: careeruz
+      POSTGRES_PASSWORD: careeruz_password_change_in_production
       PGDATA: /var/lib/postgresql/data/pgdata
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U smartcareer"]
+      test: ["CMD-SHELL", "pg_isready -U careeruz"]
       interval: 10s
       timeout: 5s
       retries: 5
     networks:
-      - smartcareer_network
+      - careeruz_network
 
   # =============================================================================
   # Redis (for caching, sessions, and task queue)
   # =============================================================================
   redis:
     image: redis:7-alpine
-    container_name: smartcareer_redis
+    container_name: careeruz_redis
     restart: unless-stopped
-    command: redis-server --appendonly yes --requirepass smartcareer_redis_password
+    command: redis-server --appendonly yes --requirepass careeruz_redis_password
     ports:
       - "6379:6379"
     volumes:
@@ -43,7 +43,7 @@ services:
       timeout: 5s
       retries: 5
     networks:
-      - smartcareer_network
+      - careeruz_network
 
   # =============================================================================
   # Backend (FastAPI)
@@ -52,26 +52,26 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    container_name: smartcareer_backend
+    container_name: careeruz_backend
     restart: unless-stopped
     ports:
       - "8000:8000"
     environment:
       # App
-      APP_NAME: "SmartCareer AI"
+      APP_NAME: "CareerUZ"
       DEBUG: "false"
       
       # Database
-      DATABASE_URL: postgresql://smartcareer:smartcareer_password_change_in_production@postgres:5432/smartcareer
+      DATABASE_URL: postgresql://careeruz:careeruz_password_change_in_production@postgres:5432/careeruz
       
       # Redis
-      REDIS_URL: redis://:smartcareer_redis_password@redis:6379/0
+      REDIS_URL: redis://:careeruz_redis_password@redis:6379/0
       
       # JWT (use secrets from .env in production)
       # Defaults are intentionally long enough to satisfy backend production
       # secret validation when DEBUG=false. Override via `.env` in real deploys.
-      SECRET_KEY: ${SECRET_KEY:-smartcareer-dev-secret-key-0123456789abcdef0123456789abcdef}
-      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-smartcareer-dev-jwt-secret-0123456789abcdef0123456789abcdef}
+      SECRET_KEY: ${SECRET_KEY:-careeruz-dev-secret-key-0123456789abcdef0123456789abcdef}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-careeruz-dev-jwt-secret-0123456789abcdef0123456789abcdef}
       
       # AI
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
@@ -83,7 +83,7 @@ services:
       SMTP_PORT: ${SMTP_PORT:-587}
       SMTP_USER: ${SMTP_USER:-}
       SMTP_PASSWORD: ${SMTP_PASSWORD:-}
-      SMTP_FROM_EMAIL: ${SMTP_FROM_EMAIL:-noreply@smartcareer.uz}
+      SMTP_FROM_EMAIL: ${SMTP_FROM_EMAIL:-noreply@careeruz.uz}
       SENDGRID_API_KEY: ${SENDGRID_API_KEY:-}
       
       # Frontend URL
@@ -109,7 +109,7 @@ services:
         uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
       "
     networks:
-      - smartcareer_network
+      - careeruz_network
 
   # =============================================================================
   # Frontend (Next.js)
@@ -121,7 +121,7 @@ services:
       args:
         # Frontend code expects API base to include "/api/v1".
         NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8000/api/v1}
-    container_name: smartcareer_frontend
+    container_name: careeruz_frontend
     restart: unless-stopped
     ports:
       - "3000:3000"
@@ -132,7 +132,7 @@ services:
     depends_on:
       - backend
     networks:
-      - smartcareer_network
+      - careeruz_network
 
 # =============================================================================
 # Volumes
@@ -149,7 +149,7 @@ volumes:
 # Networks
 # =============================================================================
 networks:
-  smartcareer_network:
+  careeruz_network:
     driver: bridge
 
 

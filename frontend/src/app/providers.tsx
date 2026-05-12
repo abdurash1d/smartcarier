@@ -8,8 +8,20 @@
 
 "use client";
 
-import { ThemeProvider } from "next-themes";
+import { ThemeProvider, useTheme } from "next-themes";
+import { Toaster } from "sonner";
 import { TranslationProvider } from "@/contexts/TranslationContext";
+
+function ThemedToaster() {
+  const { resolvedTheme } = useTheme();
+  return (
+    <Toaster
+      position="top-right"
+      theme={resolvedTheme === "dark" ? "dark" : "light"}
+      toastOptions={{ className: "font-sans" }}
+    />
+  );
+}
 
 export function Providers({ children }: { children: React.ReactNode }) {
   return (
@@ -22,6 +34,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
       <TranslationProvider>
         {children}
       </TranslationProvider>
+      <ThemedToaster />
     </ThemeProvider>
   );
 }

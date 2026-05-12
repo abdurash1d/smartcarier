@@ -1,6 +1,6 @@
 """
 =============================================================================
-Configuration Settings for SmartCareer AI
+Configuration Settings for CareerUZ
 =============================================================================
 
 This file manages all application settings using Pydantic.
@@ -115,6 +115,11 @@ class Settings(BaseSettings):
     # "gemini-2.5-flash" - Tavsiya etiladi (tez va zamonaviy)
     # "gemini-2.5-pro" - Kuchliroq
     GEMINI_MODEL: str = "gemini-2.5-flash"
+
+    # Gemini transient error retry configuration
+    GEMINI_MAX_RETRIES: int = 3
+    GEMINI_RETRY_BASE_DELAY_SECONDS: float = 1
+    GEMINI_RETRY_MAX_DELAY_SECONDS: float = 8
     
     # AI provider tanlash: "gemini" yoki "openai"
     AI_PROVIDER: str = "gemini"
@@ -126,7 +131,7 @@ class Settings(BaseSettings):
     # Database connection string
     # Development: SQLite
     # Production: postgresql://user:password@host:port/database
-    DATABASE_URL: str = "sqlite:///./smartcareer.db"
+    DATABASE_URL: str = "sqlite:///./careeruz.db"
 
     # =========================================================================
     # 🧠 REDIS (Rate limiting, token blacklist, OAuth state)
@@ -172,7 +177,7 @@ class Settings(BaseSettings):
     # =========================================================================
     
     # Application name (shown in API docs and responses)
-    APP_NAME: str = "SmartCareer AI"
+    APP_NAME: str = "CareerUZ"
     
     # Version number
     APP_VERSION: str = "1.0.0"
@@ -207,8 +212,8 @@ class Settings(BaseSettings):
     SMTP_PORT: int = 587
     SMTP_USER: str = ""
     SMTP_PASSWORD: str = ""
-    SMTP_FROM_EMAIL: str = "noreply@smartcareer.uz"
-    SMTP_FROM_NAME: str = "SmartCareer AI"
+    SMTP_FROM_EMAIL: str = "noreply@careeruz.uz"
+    SMTP_FROM_NAME: str = "CareerUZ"
     SMTP_USE_TLS: bool = True
     
     # SendGrid (optional - for production)
@@ -228,7 +233,7 @@ class Settings(BaseSettings):
     FRONTEND_URL: str = "http://localhost:3000"
     
     # Support email
-    SUPPORT_EMAIL: str = "support@smartcareer.uz"
+    SUPPORT_EMAIL: str = "support@careeruz.uz"
     
     # =========================================================================
     # 🔐 OAUTH2 SETTINGS (Google, LinkedIn)
@@ -246,6 +251,37 @@ class Settings(BaseSettings):
     
     # OAuth enabled
     OAUTH_ENABLED: bool = False
+
+    # =========================================================================
+    # 👑 ADMIN BOOTSTRAP (Ops helper)
+    # =========================================================================
+
+    # If both email and password are provided, backend will create/promote
+    # this account to admin on startup.
+    BOOTSTRAP_ADMIN_EMAIL: str = ""
+    BOOTSTRAP_ADMIN_PASSWORD: str = ""
+    BOOTSTRAP_ADMIN_FULL_NAME: str = "System Admin"
+    BOOTSTRAP_ADMIN_PHONE: str = "+998901111111"
+    BOOTSTRAP_ADMIN_FORCE_SUPER_ADMIN: bool = True
+    ADMIN_ENFORCE_SUBROLES: bool = False
+
+    # =========================================================================
+    # 🌱 STARTUP AUTO SEED (Production-safe)
+    # =========================================================================
+
+    # Enable controlled startup seed. Disabled by default.
+    AUTO_SEED_ENABLED: bool = False
+
+    # Ensure at least this many active jobs exist.
+    # No destructive operations are performed; missing jobs are appended.
+    AUTO_SEED_MIN_ACTIVE_JOBS: int = 10
+
+    # Fallback company for seed jobs (created only if no company users exist).
+    AUTO_SEED_COMPANY_EMAIL: str = "seed-company@careeruz.uz"
+    AUTO_SEED_COMPANY_PASSWORD: str = "Company123!"
+    AUTO_SEED_COMPANY_MANAGER_NAME: str = "CareerUZ HR Team"
+    AUTO_SEED_COMPANY_NAME: str = "CareerUZ Hiring"
+    AUTO_SEED_COMPANY_WEBSITE: str = "https://careeruz.uz"
 
     # =========================================================================
     # 🐛 ERROR MONITORING & LOGGING
@@ -307,6 +343,9 @@ class Settings(BaseSettings):
         "TOKEN_BLACKLIST_USE_REDIS",
         "SMTP_USE_TLS",
         "OAUTH_ENABLED",
+        "BOOTSTRAP_ADMIN_FORCE_SUPER_ADMIN",
+        "ADMIN_ENFORCE_SUBROLES",
+        "AUTO_SEED_ENABLED",
         "PAYMENTS_REQUIRE_WEBHOOK_SECRET",
         mode="before",
     )
@@ -327,6 +366,21 @@ class Settings(BaseSettings):
         """
         if self.DEBUG and "RATE_LIMIT_ENABLED" not in os.environ:
             self.RATE_LIMIT_ENABLED = False
+        return self
+
+    @model_validator(mode="after")
+    def _normalize_sqlite_database_url(self) -> "Settings":
+        """
+        Resolve relative SQLite URLs against backend root for stable local runs.
+
+        This avoids accidental creation of multiple DB files when the server is
+        started from different working directories.
+        """
+        prefix = "sqlite:///./"
+        if self.DATABASE_URL.startswith(prefix):
+            relative_path = self.DATABASE_URL[len(prefix):]
+            absolute_path = (BACKEND_ROOT / relative_path).resolve()
+            self.DATABASE_URL = f"sqlite:///{absolute_path.as_posix()}"
         return self
 
     @model_validator(mode="after")

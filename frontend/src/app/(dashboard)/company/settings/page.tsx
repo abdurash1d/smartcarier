@@ -36,15 +36,16 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
+import { useTranslation } from "@/hooks/useTranslation";
 
 const companySchema = z.object({
-  company_name: z.string().min(2, "Company name is required"),
+  company_name: z.string().min(2, "Название компании обязательно / Kompaniya nomi majburiy"),
   company_description: z.string().max(2000).optional(),
-  company_website: z.string().url("Invalid URL").optional().or(z.literal("")),
+  company_website: z.string().url("Неверный URL / Noto'g'ri URL").optional().or(z.literal("")),
   company_size: z.string().optional(),
   company_industry: z.string().optional(),
-  full_name: z.string().min(2, "Contact name is required"),
-  email: z.string().email("Invalid email"),
+  full_name: z.string().min(2, "Имя контакта обязательно / Kontakt nomi majburiy"),
+  email: z.string().email("Неверный email / Noto'g'ri email"),
   phone: z.string().optional(),
   location: z.string().optional(),
 });
@@ -75,6 +76,8 @@ const industries = [
 ];
 
 export default function CompanySettingsPage() {
+  const { locale } = useTranslation();
+  const isRu = locale === "ru";
   const { user, updateUser, isLoading } = useAuth();
   const [activeTab, setActiveTab] = useState("company");
 
@@ -102,9 +105,9 @@ export default function CompanySettingsPage() {
   const onSubmit = async (data: CompanyFormData) => {
     try {
       await updateUser(data);
-      toast.success("Settings updated successfully!");
+      toast.success(isRu ? "Настройки успешно обновлены!" : "Sozlamalar muvaffaqiyatli yangilandi!");
     } catch (error) {
-      toast.error("Failed to update settings");
+      toast.error(isRu ? "Не удалось обновить настройки" : "Sozlamalarni yangilab bo'lmadi");
     }
   };
 
@@ -113,27 +116,27 @@ export default function CompanySettingsPage() {
       {/* Header */}
       <div>
         <h1 className="font-display text-2xl font-bold text-surface-900 dark:text-white">
-          Company Settings
+          {isRu ? "Настройки компании" : "Kompaniya sozlamalari"}
         </h1>
         <p className="mt-1 text-surface-500">
-          Manage your company profile and account settings
+          {isRu ? "Управляйте профилем компании и аккаунтом" : "Kompaniya profili va akkaunt sozlamalarini boshqaring"}
         </p>
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList>
-          <TabsTrigger value="company">Company Profile</TabsTrigger>
-          <TabsTrigger value="account">Account</TabsTrigger>
-          <TabsTrigger value="notifications">Notifications</TabsTrigger>
+          <TabsTrigger value="company">{isRu ? "Профиль компании" : "Kompaniya profili"}</TabsTrigger>
+          <TabsTrigger value="account">{isRu ? "Аккаунт" : "Akkaunt"}</TabsTrigger>
+          <TabsTrigger value="notifications">{isRu ? "Уведомления" : "Bildirishnomalar"}</TabsTrigger>
         </TabsList>
 
         {/* Company Profile Tab */}
         <TabsContent value="company" className="space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle>Company Information</CardTitle>
+              <CardTitle>{isRu ? "Информация о компании" : "Kompaniya ma'lumotlari"}</CardTitle>
               <CardDescription>
-                This information will be displayed on your job postings
+                {isRu ? "Эта информация будет отображаться в ваших вакансиях" : "Bu ma'lumotlar vakansiyalaringizda ko'rsatiladi"}
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -144,7 +147,7 @@ export default function CompanySettingsPage() {
                     {user?.company_logo_url ? (
                       <img
                         src={user.company_logo_url}
-                        alt={user.company_name || "Company"}
+                        alt={user.company_name || (isRu ? "Компания" : "Kompaniya")}
                         className="h-16 w-16 rounded-lg object-cover"
                       />
                     ) : (
@@ -154,10 +157,10 @@ export default function CompanySettingsPage() {
                   <div>
                     <Button variant="outline" size="sm">
                       <Camera className="mr-2 h-4 w-4" />
-                      Upload Logo
+                      {isRu ? "Yuklash" : "Logo yuklash"}
                     </Button>
                     <p className="mt-1 text-xs text-surface-500">
-                      Recommended: 200x200px, PNG or JPG
+                      {isRu ? "Рекомендуется: 200x200px, PNG или JPG" : "Tavsiya: 200x200px, PNG yoki JPG"}
                     </p>
                   </div>
                 </div>
@@ -165,7 +168,7 @@ export default function CompanySettingsPage() {
                 {/* Company Info */}
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div className="space-y-2">
-                    <Label htmlFor="company_name">Company Name</Label>
+                    <Label htmlFor="company_name">{isRu ? "Название компании" : "Kompaniya nomi"}</Label>
                     <Input
                       id="company_name"
                       icon={<Building2 className="h-5 w-5" />}
@@ -174,7 +177,7 @@ export default function CompanySettingsPage() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="company_website">Website</Label>
+                    <Label htmlFor="company_website">{isRu ? "Veb-sayt" : "Veb-sayt"}</Label>
                     <Input
                       id="company_website"
                       icon={<Globe className="h-5 w-5" />}
@@ -184,47 +187,77 @@ export default function CompanySettingsPage() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="company_size">Company Size</Label>
+                    <Label htmlFor="company_size">{isRu ? "Размер компании" : "Kompaniya hajmi"}</Label>
                     <Select
                       value={watch("company_size")}
                       onValueChange={(value) => setValue("company_size", value, { shouldDirty: true })}
                     >
                       <SelectTrigger>
-                        <SelectValue placeholder="Select size" />
+                        <SelectValue placeholder={isRu ? "Выберите размер" : "Hajmni tanlang"} />
                       </SelectTrigger>
                       <SelectContent>
                         {companySizes.map((size) => (
                           <SelectItem key={size.value} value={size.value}>
-                            {size.label}
+                            {isRu
+                              ? size.label
+                                  .replace("employees", "сотрудников")
+                                  .replace("employee", "сотрудник")
+                              : size.label.replace("employees", "xodim")}
                           </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="company_industry">Industry</Label>
+                    <Label htmlFor="company_industry">{isRu ? "Отрасль" : "Soha"}</Label>
                     <Select
                       value={watch("company_industry")}
                       onValueChange={(value) => setValue("company_industry", value, { shouldDirty: true })}
                     >
                       <SelectTrigger>
-                        <SelectValue placeholder="Select industry" />
+                        <SelectValue placeholder={isRu ? "Выберите отрасль" : "Soha tanlang"} />
                       </SelectTrigger>
                       <SelectContent>
                         {industries.map((industry) => (
                           <SelectItem key={industry} value={industry}>
-                            {industry}
+                            {isRu
+                              ? ({
+                                  Technology: "Технологии",
+                                  Finance: "Финансы",
+                                  Healthcare: "Здравоохранение",
+                                  Education: "Образование",
+                                  Manufacturing: "Производство",
+                                  Retail: "Розничная торговля",
+                                  Media: "Медиа",
+                                  Consulting: "Консалтинг",
+                                  "Real Estate": "Недвижимость",
+                                  Transportation: "Транспорт",
+                                  Other: "Другое",
+                                } as Record<string, string>)[industry]
+                              : ({
+                                  Technology: "Texnologiya",
+                                  Finance: "Moliya",
+                                  Healthcare: "Sog'liqni saqlash",
+                                  Education: "Ta'lim",
+                                  Manufacturing: "Ishlab chiqarish",
+                                  Retail: "Savdo",
+                                  Media: "Media",
+                                  Consulting: "Konsalting",
+                                  "Real Estate": "Ko'chmas mulk",
+                                  Transportation: "Transport",
+                                  Other: "Boshqa",
+                                } as Record<string, string>)[industry]}
                           </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="location">Location</Label>
+                    <Label htmlFor="location">{isRu ? "Локация" : "Joylashuv"}</Label>
                     <Input
                       id="location"
                       icon={<MapPin className="h-5 w-5" />}
-                      placeholder="Tashkent, Uzbekistan"
+                      placeholder={isRu ? "Ташкент, Узбекистан" : "Toshkent, O'zbekiston"}
                       error={errors.location?.message}
                       {...register("location")}
                     />
@@ -233,10 +266,14 @@ export default function CompanySettingsPage() {
 
                 {/* Description */}
                 <div className="space-y-2">
-                  <Label htmlFor="company_description">About Company</Label>
+                  <Label htmlFor="company_description">{isRu ? "О компании" : "Kompaniya haqida"}</Label>
                   <Textarea
                     id="company_description"
-                    placeholder="Tell candidates about your company, culture, and what makes you unique..."
+                    placeholder={
+                      isRu
+                        ? "Расскажите кандидатам о компании, культуре и ваших преимуществах..."
+                        : "Nomzodlarga kompaniyangiz, madaniyatingiz va ustunliklaringiz haqida yozing..."
+                    }
                     className="min-h-[150px]"
                     error={errors.company_description?.message}
                     {...register("company_description")}
@@ -247,7 +284,7 @@ export default function CompanySettingsPage() {
                 <div className="flex justify-end">
                   <Button type="submit" disabled={!isDirty} isLoading={isLoading}>
                     <Save className="mr-2 h-4 w-4" />
-                    Save Changes
+                    {isRu ? "Сохранить" : "Saqlash"}
                   </Button>
                 </div>
               </form>
@@ -259,16 +296,16 @@ export default function CompanySettingsPage() {
         <TabsContent value="account" className="space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle>Contact Information</CardTitle>
+              <CardTitle>{isRu ? "Контактная информация" : "Kontakt ma'lumotlari"}</CardTitle>
               <CardDescription>
-                Primary contact for your company account
+                {isRu ? "Основной контакт для аккаунта компании" : "Kompaniya akkaunti uchun asosiy kontakt"}
               </CardDescription>
             </CardHeader>
             <CardContent>
               <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div className="space-y-2">
-                    <Label htmlFor="full_name">Contact Name</Label>
+                    <Label htmlFor="full_name">{isRu ? "Kontakt ismi" : "Kontakt nomi"}</Label>
                     <Input
                       id="full_name"
                       error={errors.full_name?.message}
@@ -286,7 +323,7 @@ export default function CompanySettingsPage() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="phone">Phone</Label>
+                    <Label htmlFor="phone">{isRu ? "Телефон" : "Telefon"}</Label>
                     <Input
                       id="phone"
                       icon={<Phone className="h-5 w-5" />}
@@ -298,7 +335,7 @@ export default function CompanySettingsPage() {
                 <div className="flex justify-end">
                   <Button type="submit" disabled={!isDirty} isLoading={isLoading}>
                     <Save className="mr-2 h-4 w-4" />
-                    Save Changes
+                    {isRu ? "Сохранить" : "Saqlash"}
                   </Button>
                 </div>
               </form>
@@ -307,38 +344,38 @@ export default function CompanySettingsPage() {
 
           <Card>
             <CardHeader>
-              <CardTitle>Change Password</CardTitle>
+              <CardTitle>{isRu ? "Сменить пароль" : "Parolni o'zgartirish"}</CardTitle>
             </CardHeader>
             <CardContent>
               <form className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="current_password">Current Password</Label>
+                  <Label htmlFor="current_password">{isRu ? "Текущий пароль" : "Joriy parol"}</Label>
                   <Input id="current_password" type="password" icon={<Key className="h-5 w-5" />} />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="new_password">New Password</Label>
+                  <Label htmlFor="new_password">{isRu ? "Новый пароль" : "Yangi parol"}</Label>
                   <Input id="new_password" type="password" icon={<Key className="h-5 w-5" />} />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="confirm_password">Confirm New Password</Label>
+                  <Label htmlFor="confirm_password">{isRu ? "Подтвердите новый пароль" : "Yangi parolni tasdiqlang"}</Label>
                   <Input id="confirm_password" type="password" icon={<Key className="h-5 w-5" />} />
                 </div>
-                <Button>Update Password</Button>
+                <Button>{isRu ? "Обновить пароль" : "Parolni yangilash"}</Button>
               </form>
             </CardContent>
           </Card>
 
           <Card className="border-red-200 dark:border-red-800">
             <CardHeader>
-              <CardTitle className="text-red-600">Danger Zone</CardTitle>
+              <CardTitle className="text-red-600">{isRu ? "Опасная зона" : "Xavfli bo'lim"}</CardTitle>
               <CardDescription>
-                Permanently delete your company account
+                {isRu ? "Навсегда удалить аккаунт компании" : "Kompaniya akkauntini butunlay o'chirish"}
               </CardDescription>
             </CardHeader>
             <CardContent>
               <Button variant="destructive">
                 <Trash2 className="mr-2 h-4 w-4" />
-                Delete Company Account
+                {isRu ? "Удалить аккаунт компании" : "Kompaniya akkauntini o'chirish"}
               </Button>
             </CardContent>
           </Card>
@@ -348,28 +385,28 @@ export default function CompanySettingsPage() {
         <TabsContent value="notifications" className="space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle>Email Notifications</CardTitle>
+              <CardTitle>{isRu ? "Email уведомления" : "Email bildirishnomalari"}</CardTitle>
               <CardDescription>
-                Configure when you receive email notifications
+                {isRu ? "Настройте, когда получать email уведомления" : "Qachon email bildirishnomalarini olishni sozlang"}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               {[
                 {
-                  title: "New Applications",
-                  description: "Get notified when someone applies to your jobs",
+                  title: isRu ? "Новые заявки" : "Yangi arizalar",
+                  description: isRu ? "Уведомлять, когда кто-то откликается на ваши вакансии" : "Vakansiyalarga kimdir ariza yuborsa xabar berish",
                 },
                 {
-                  title: "Application Updates",
-                  description: "When applicants withdraw or update their applications",
+                  title: isRu ? "Обновления заявок" : "Ariza yangilanishlari",
+                  description: isRu ? "Когда кандидат обновляет или отзывает заявку" : "Nomzodlar arizasini yangilasa yoki bekor qilsa",
                 },
                 {
-                  title: "Job Expiration",
-                  description: "Reminders when your job postings are about to expire",
+                  title: isRu ? "Срок вакансии" : "Vakansiya muddati",
+                  description: isRu ? "Напоминания перед истечением срока вакансии" : "Vakansiya muddati tugashidan oldingi eslatmalar",
                 },
                 {
-                  title: "Weekly Summary",
-                  description: "Summary of applications and views for all jobs",
+                  title: isRu ? "Еженедельный отчёт" : "Haftalik hisobot",
+                  description: isRu ? "Сводка заявок и просмотров по всем вакансиям" : "Barcha vakansiyalar bo'yicha ariza va ko'rishlar xulosasi",
                 },
               ].map((item, i) => (
                 <div

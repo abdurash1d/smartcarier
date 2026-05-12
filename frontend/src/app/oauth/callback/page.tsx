@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuthStore } from "@/store/authStore";
 import type { User } from "@/types/api";
 import { getApiBaseUrl } from "@/lib/runtime-config";
+import { useTranslation } from "@/hooks/useTranslation";
 
 const API_BASE_URL = getApiBaseUrl();
 
@@ -70,16 +71,34 @@ function getRoleRoot(role?: string | null) {
 }
 
 export default function OAuthCallbackPage() {
+  const { locale } = useTranslation();
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
+  const processedRef = useRef(false);
+  const missingTokenError =
+    locale === "ru"
+      ? "В OAuth callback отсутствуют токены. Попробуйте снова."
+      : "OAuth callbackda tokenlar topilmadi. Qayta urinib ko'ring.";
+  const loadProfileError =
+    locale === "ru"
+      ? "Не удалось загрузить профиль после OAuth"
+      : "OAuthdan keyin profilni yuklab bo'lmadi";
+  const invalidProfileError =
+    locale === "ru"
+      ? "Данные профиля OAuth некорректны"
+      : "OAuth profil ma'lumotlari yaroqsiz";
+  const loginFailedError = locale === "ru" ? "Не удалось войти через OAuth" : "OAuth orqali kirish muvaffaqiyatsiz";
 
   useEffect(() => {
+    if (processedRef.current) return;
+    processedRef.current = true;
+
     const run = async () => {
       try {
         const { access_token, refresh_token } = readOAuthParams();
 
         if (!access_token || !refresh_token) {
-          setError("OAuth callback missing tokens. Please try again.");
+          setError(missingTokenError);
           return;
         }
 
@@ -95,37 +114,40 @@ export default function OAuthCallbackPage() {
         });
 
         if (!res.ok) {
-          throw new Error("Failed to load profile after OAuth");
+          throw new Error(loadProfileError);
         }
 
         const payload = await res.json();
         const user = extractUser(payload);
 
         if (!user) {
-          throw new Error("OAuth profile payload is invalid");
+          throw new Error(invalidProfileError);
         }
 
         useAuthStore.getState().setUser(user);
 
         router.replace(getRoleRoot(user.role));
       } catch (e: any) {
-        setError(e?.message || "OAuth login failed");
+        setError(e?.message || loginFailedError);
       }
     };
 
     run();
-  }, [router]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   if (error) {
     return (
       <div className="mx-auto max-w-md p-8">
-        <h1 className="text-xl font-semibold">OAuth Login Failed</h1>
+        <h1 className="text-xl font-semibold">
+          {locale === "ru" ? "Ошибка входа через OAuth" : "OAuth orqali kirish muvaffaqiyatsiz"}
+        </h1>
         <p className="mt-2 text-sm text-surface-600">{error}</p>
         <button
           className="mt-6 rounded-lg bg-purple-600 px-4 py-2 text-white"
           onClick={() => router.replace("/login")}
         >
-          Back to Login
+          {locale === "ru" ? "Назад ко входу" : "Kirishga qaytish"}
         </button>
       </div>
     );
@@ -133,8 +155,14 @@ export default function OAuthCallbackPage() {
 
   return (
     <div className="mx-auto max-w-md p-8">
-      <h1 className="text-xl font-semibold">Signing you in...</h1>
-      <p className="mt-2 text-sm text-surface-600">Completing OAuth login and loading your profile.</p>
+      <h1 className="text-xl font-semibold">
+        {locale === "ru" ? "Выполняем вход..." : "Tizimga kirilmoqda..."}
+      </h1>
+      <p className="mt-2 text-sm text-surface-600">
+        {locale === "ru"
+          ? "Завершаем вход через OAuth и загружаем ваш профиль."
+          : "OAuth orqali kirish yakunlanmoqda va profilingiz yuklanmoqda."}
+      </p>
     </div>
   );
 }

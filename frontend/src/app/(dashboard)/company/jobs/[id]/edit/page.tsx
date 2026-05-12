@@ -171,7 +171,7 @@ export default function EditJobPage() {
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="space-y-6 rounded-2xl border border-surface-200 bg-white p-6 shadow-sm"
+        className="space-y-6 rounded-2xl border border-surface-200 bg-white p-6 shadow-sm dark:border-surface-700 dark:bg-surface-800"
       >
         {/* Basic Info */}
         <div className="space-y-4">

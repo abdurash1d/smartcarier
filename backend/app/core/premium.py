@@ -13,7 +13,7 @@ Usage:
         # Only premium users can access this endpoint
         pass
 
-AUTHOR: SmartCareer AI Team
+AUTHOR: CareerUZ Team
 VERSION: 1.0.0
 =============================================================================
 """

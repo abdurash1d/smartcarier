@@ -12,14 +12,14 @@ import { defineConfig, devices } from '@playwright/test';
 export default defineConfig({
   testDir: './tests/e2e',
   globalSetup: './tests/e2e/global-setup.ts',
-  /* Run tests in files in parallel */
-  fullyParallel: true,
+  /* Keep auth/rate-limited flows deterministic across local and CI runs. */
+  fullyParallel: false,
   /* Fail the build on CI if you accidentally left test.only in the source code. */
   forbidOnly: !!process.env.CI,
   /* Retry on CI only */
   retries: process.env.CI ? 2 : 0,
-  /* Opt out of parallel tests on CI. */
-  workers: process.env.CI ? 1 : undefined,
+  /* Run E2E sequentially to avoid backend login rate-limit collisions. */
+  workers: 1,
   /* Reporter to use. See https://playwright.dev/docs/test-reporters */
   reporter: [
     ['html'],
@@ -57,10 +57,15 @@ export default defineConfig({
 
   /* Run your local dev server before starting the tests */
   webServer: {
-    // Build once and run the production server so E2E hits the same runtime
-    // shape as CI/deploy, instead of a hot-reload dev server.
-    command: 'node -e "require(\'fs\').rmSync(\'.next\', { recursive: true, force: true })" && npm run build && npm run start -- -p 3000',
+    // Build once and run a production Next server for E2E.
+    // Do not use `npm start` here because this repo's start script runs the
+    // standalone server artifact, which expects Docker-style file layout.
+    // In CI/local E2E that causes `/_next/static/*` 404 and blank pages.
+    command: 'node -e "require(\'fs\').rmSync(\'.next\', { recursive: true, force: true })" && npm run build && npx next start -p 3000',
     url: 'http://127.0.0.1:3000',
+    env: {
+      NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000/api/v1',
+    },
     reuseExistingServer: !process.env.CI,
     timeout: 120 * 1000,
   },

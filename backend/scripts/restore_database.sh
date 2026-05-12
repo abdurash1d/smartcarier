@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # =============================================================================
-# SmartCareer AI - Database Restore Script
+# CareerUZ - Database Restore Script
 # =============================================================================
 #
 # This script restores database from backup
@@ -10,7 +10,7 @@
 #   ./scripts/restore_database.sh [backup_file]
 #
 # Example:
-#   ./scripts/restore_database.sh backups/smartcareer_backup_20260119_140000.db.gz
+#   ./scripts/restore_database.sh backups/careeruz_backup_20260119_140000.db.gz
 #
 # =============================================================================
 
@@ -21,7 +21,7 @@ RED='\033[0;31m'
 NC='\033[0m'
 
 echo -e "${GREEN}==================================${NC}"
-echo -e "${GREEN}SmartCareer AI - Database Restore${NC}"
+echo -e "${GREEN}CareerUZ - Database Restore${NC}"
 echo -e "${GREEN}==================================${NC}"
 echo ""
 
@@ -33,12 +33,12 @@ if [ -z "$1" ]; then
     ls -lh backups/*.gz 2>/dev/null || echo "  No backups found"
     echo ""
     echo "Usage: $0 <backup_file>"
-    echo "Example: $0 backups/smartcareer_backup_20260119_140000.db.gz"
+    echo "Example: $0 backups/careeruz_backup_20260119_140000.db.gz"
     exit 1
 fi
 
 BACKUP_FILE="$1"
-DB_FILE="./smartcareer.db"
+DB_FILE="./careeruz.db"
 BACKUP_CURRENT="${DB_FILE}.backup_$(date +%Y%m%d_%H%M%S)"
 
 # Check if backup exists

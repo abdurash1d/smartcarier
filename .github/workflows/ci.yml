@@ -6,6 +6,11 @@ on:
   pull_request:
     branches: [ main, develop ]
 
+env:
+  # GitHub Actions is deprecating Node.js 20 runtime for JavaScript actions.
+  # Opt in early so checkout/setup/upload actions run on Node 24.
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
 jobs:
   # ===========================================================================
   # BACKEND TESTS
@@ -20,10 +25,10 @@ jobs:
     
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
       
       - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
           cache: 'pip'
@@ -47,7 +52,7 @@ jobs:
           RATE_LIMIT_ENABLED: "true"
       
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v3
+        uses: codecov/codecov-action@v5
         with:
           file: ./backend/coverage.xml
           flags: backend
@@ -62,10 +67,10 @@ jobs:
     
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
       
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: '3.11'
       
@@ -76,18 +81,15 @@ jobs:
       
       - name: Run flake8
         working-directory: ./backend
-        run: flake8 app tests --max-line-length=120 --extend-ignore=E203,W503
-        continue-on-error: true
+        run: flake8 app tests --max-line-length=120 --extend-ignore=E203,W503 || true
       
       - name: Run black (check)
         working-directory: ./backend
-        run: black --check app tests
-        continue-on-error: true
+        run: black --check app tests || true
       
       - name: Run isort (check)
         working-directory: ./backend
-        run: isort --check-only app tests
-        continue-on-error: true
+        run: isort --check-only app tests || true
 
   # ===========================================================================
   # FRONTEND TESTS
@@ -98,10 +100,10 @@ jobs:
     
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
       
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: '18'
           cache: 'npm'
@@ -115,11 +117,10 @@ jobs:
         working-directory: ./frontend
         run: npm run type-check
         continue-on-error: true
-      
+
       - name: Run ESLint
         working-directory: ./frontend
         run: npm run lint
-        continue-on-error: true
       
       - name: Build
         working-directory: ./frontend
@@ -139,7 +140,7 @@ jobs:
       postgres:
         image: postgres:15
         env:
-          POSTGRES_DB: smartcareer_test
+          POSTGRES_DB: careeruz_test
           POSTGRES_USER: test
           POSTGRES_PASSWORD: test
         options: >-
@@ -152,15 +153,15 @@ jobs:
     
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
       
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: '3.11'
       
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: '18'
           cache: 'npm'
@@ -186,9 +187,11 @@ jobs:
           done
           curl -fsS http://127.0.0.1:8000/readyz > /dev/null
         env:
-          DATABASE_URL: postgresql://test:test@localhost:5432/smartcareer_test
+          DATABASE_URL: postgresql://test:test@localhost:5432/careeruz_test
           JWT_SECRET_KEY: ci-e2e-jwt-secret-0123456789abcdef0123456789
           SECRET_KEY: ci-e2e-app-secret-0123456789abcdef0123456789
+          EMAIL_TRANSPORT: "disabled"
+          OAUTH_ENABLED: "false"
           # Keep debug mode for richer logs in CI; schema is created by Alembic above.
           SMARTCAREER_DEBUG: "true"
           # E2E hits auth endpoints many times across projects (chromium/firefox/webkit/mobile).
@@ -210,7 +213,7 @@ jobs:
           # Frontend code expects API base to include "/api/v1".
           NEXT_PUBLIC_API_URL: http://127.0.0.1:8000/api/v1
           # Used by Playwright global-setup seeding (admin account).
-          DATABASE_URL: postgresql://test:test@localhost:5432/smartcareer_test
+          DATABASE_URL: postgresql://test:test@localhost:5432/careeruz_test
 
       - name: Dump backend logs (on failure)
         if: failure()
@@ -220,7 +223,7 @@ jobs:
           tail -n 400 backend-uvicorn.log || true
 
       - name: Upload backend logs
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         if: always()
         with:
           name: backend-logs
@@ -228,11 +231,19 @@ jobs:
           retention-days: 30
       
       - name: Upload Playwright report
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         if: always()
         with:
           name: playwright-report
           path: frontend/playwright-report/
+          retention-days: 30
+
+      - name: Upload Playwright test results
+        uses: actions/upload-artifact@v5
+        if: always()
+        with:
+          name: playwright-test-results
+          path: frontend/test-results/
           retention-days: 30
 
   # ===========================================================================
@@ -244,7 +255,7 @@ jobs:
     
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
       
       - name: Run Trivy vulnerability scanner
         uses: aquasecurity/trivy-action@master
@@ -256,7 +267,7 @@ jobs:
         continue-on-error: true
       
       - name: Upload Trivy results to GitHub Security
-        uses: github/codeql-action/upload-sarif@v2
+        uses: github/codeql-action/upload-sarif@v3
         with:
           sarif_file: 'trivy-results.sarif'
         continue-on-error: true
@@ -271,7 +282,7 @@ jobs:
     
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
       
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -281,7 +292,7 @@ jobs:
         with:
           context: ./backend
           push: false
-          tags: smartcareer-backend:test
+          tags: careeruz-backend:test
           cache-from: type=gha
           cache-to: type=gha,mode=max
       
@@ -290,50 +301,53 @@ jobs:
         with:
           context: ./frontend
           push: false
-          tags: smartcareer-frontend:test
+          tags: careeruz-frontend:test
           cache-from: type=gha
           cache-to: type=gha,mode=max
           build-args: |
             NEXT_PUBLIC_API_URL=http://127.0.0.1:8000
 
   # ===========================================================================
-  # DEPLOYMENT (Only on main branch)
+  # DEPLOYMENT — Render.com (main branch only, all checks must pass)
   # ===========================================================================
+  # Prerequisites (add these in GitHub → Settings → Secrets → Actions):
+  #   RENDER_DEPLOY_HOOK_BACKEND  — from Render dashboard → backend service → Settings → Deploy Hook
+  #   RENDER_DEPLOY_HOOK_FRONTEND — from Render dashboard → frontend service → Settings → Deploy Hook
   deploy:
-    name: Deploy to Production
+    name: Deploy to Production (Render)
     runs-on: ubuntu-latest
     needs: [backend-tests, frontend-tests, e2e-tests, build-check]
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-    
+
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-      
-      - name: Deploy notification
+      - name: Trigger backend deploy on Render
+        env:
+          RENDER_DEPLOY_HOOK_BACKEND: ${{ secrets.RENDER_DEPLOY_HOOK_BACKEND }}
         run: |
-          echo "🚀 Ready to deploy to production"
-          echo "Add your deployment steps here (e.g., deploy to AWS, Vercel, etc.)"
-      
-      # Example: Deploy to Vercel
-      # - name: Deploy to Vercel
-      #   uses: amondnet/vercel-action@v25
-      #   with:
-      #     vercel-token: ${{ secrets.VERCEL_TOKEN }}
-      #     vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
-      #     vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
-      #     vercel-args: '--prod'
-      
-      # Example: Deploy to AWS
-      # - name: Configure AWS credentials
-      #   uses: aws-actions/configure-aws-credentials@v4
-      #   with:
-      #     aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-      #     aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-      #     aws-region: us-east-1
-      # 
-      # - name: Deploy to ECS
-      #   run: |
-      #     # Your AWS deployment commands
+          if [ -z "$RENDER_DEPLOY_HOOK_BACKEND" ]; then
+            echo "RENDER_DEPLOY_HOOK_BACKEND secret not set — skipping."
+          else
+            echo "Triggering backend deploy..."
+            curl -s --fail-with-body "$RENDER_DEPLOY_HOOK_BACKEND" \
+              | jq -r '.deploy.id // "triggered"'
+            echo "Backend deploy triggered."
+          fi
+
+      - name: Trigger frontend deploy on Render
+        env:
+          RENDER_DEPLOY_HOOK_FRONTEND: ${{ secrets.RENDER_DEPLOY_HOOK_FRONTEND }}
+        run: |
+          if [ -z "$RENDER_DEPLOY_HOOK_FRONTEND" ]; then
+            echo "RENDER_DEPLOY_HOOK_FRONTEND secret not set — skipping."
+          else
+            echo "Triggering frontend deploy..."
+            curl -s --fail-with-body "$RENDER_DEPLOY_HOOK_FRONTEND" \
+              | jq -r '.deploy.id // "triggered"'
+            echo "Frontend deploy triggered."
+          fi
+
+      - name: Summary
+        run: echo "Monitor deploy progress at https://dashboard.render.com"
 
 
 

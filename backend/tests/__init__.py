@@ -1,8 +1,8 @@
 """
-SmartCareer AI - Test Suite
+CareerUZ - Test Suite
 ===========================
 
-Comprehensive testing for the SmartCareer AI backend.
+Comprehensive testing for the CareerUZ backend.
 
 Test Structure:
 - unit/: Unit tests for individual services and functions

@@ -15,7 +15,7 @@ ENDPOINTS:
     GET  /me            - Get current user profile
 
 =============================================================================
-AUTHOR: SmartCareer AI Team
+AUTHOR: CareerUZ Team
 VERSION: 1.0.0
 =============================================================================
 """
@@ -24,9 +24,11 @@ VERSION: 1.0.0
 # IMPORTS
 # =============================================================================
 
+import json
 import logging
 from datetime import datetime, timezone
 from time import time
+from typing import Optional
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks, Request, Query
@@ -56,6 +58,7 @@ from app.schemas.auth import (
     TokenRefreshRequest,
     LogoutRequest,
     ForgotPasswordRequest,
+    ForgotPasswordResponse,
     ResetPasswordRequest,
     ChangePasswordRequest,
     UserResponse,
@@ -69,7 +72,7 @@ from app.config import settings
 
 logger = logging.getLogger(__name__)
 
-_LOCAL_OAUTH_STATES: dict[str, float] = {}
+_LOCAL_OAUTH_STATES: dict[str, tuple[float, Optional[str]]] = {}
 
 # =============================================================================
 # ROUTER
@@ -195,8 +198,20 @@ def _require_oauth_state_store(provider: str):
 
 
 def _local_oauth_state_enabled() -> bool:
-    """Allow OAuth state fallback only for local development."""
-    return bool(settings.DEBUG and not settings.REDIS_ENABLED)
+    """
+    Allow OAuth state fallback when Redis-backed state is intentionally disabled.
+
+    Why:
+    - Some local/dev environments set global DEBUG-like env values to production
+      labels (e.g. DEBUG=release), which turns off the old DEBUG-only fallback.
+    - If Redis is disabled, failing closed makes OAuth unusable even for single
+      process development.
+
+    Security note:
+    - In production, prefer REDIS_ENABLED=true so state is shared across workers.
+      Process-local fallback is best-effort and can break across replicas.
+    """
+    return bool(settings.DEBUG or not settings.REDIS_ENABLED)
 
 
 def _oauth_state_key(provider: str, state: str) -> str:
@@ -204,49 +219,122 @@ def _oauth_state_key(provider: str, state: str) -> str:
 
 
 def _cleanup_local_oauth_states(now: float) -> None:
-    expired_keys = [key for key, expires_at in _LOCAL_OAUTH_STATES.items() if expires_at <= now]
+    expired_keys = []
+    for key, value in _LOCAL_OAUTH_STATES.items():
+        # New entries are (expires_at, payload); legacy entries were a bare float.
+        expires_at = value[0] if isinstance(value, tuple) else value
+        if expires_at <= now:
+            expired_keys.append(key)
     for key in expired_keys:
         _LOCAL_OAUTH_STATES.pop(key, None)
 
 
-def _store_oauth_state(provider: str, state: str) -> None:
-    """Persist OAuth state for later callback validation."""
+_VALID_OAUTH_ROLES = {"student", "company"}
+
+
+def _serialize_oauth_state_payload(role: Optional[str]) -> str:
+    """Encode optional metadata next to the state token. Default = student."""
+    chosen = role if role in _VALID_OAUTH_ROLES else "student"
+    return json.dumps({"role": chosen})
+
+
+def _deserialize_oauth_state_payload(raw: Optional[str]) -> dict:
+    """Best-effort parse; treats legacy presence-flag values as default."""
+    if not raw or raw == "1":
+        return {"role": "student"}
+    try:
+        parsed = json.loads(raw)
+        if not isinstance(parsed, dict):
+            return {"role": "student"}
+        role = parsed.get("role")
+        if role not in _VALID_OAUTH_ROLES:
+            parsed["role"] = "student"
+        return parsed
+    except (TypeError, ValueError):
+        return {"role": "student"}
+
+
+def _store_oauth_state(provider: str, state: str, role: Optional[str] = None) -> None:
+    """Persist OAuth state + chosen role for later callback validation."""
+    payload = _serialize_oauth_state_payload(role)
     if _local_oauth_state_enabled():
+        from app.core.redis_client import get_redis
+
+        redis_client = get_redis()
+        if redis_client is not None:
+            redis_client.set(
+                _oauth_state_key(provider, state),
+                payload,
+                ex=settings.OAUTH_STATE_TTL_SECONDS,
+            )
+            return
+
         now = time()
         _cleanup_local_oauth_states(now)
-        _LOCAL_OAUTH_STATES[_oauth_state_key(provider, state)] = now + settings.OAUTH_STATE_TTL_SECONDS
+        _LOCAL_OAUTH_STATES[_oauth_state_key(provider, state)] = (
+            now + settings.OAUTH_STATE_TTL_SECONDS,
+            payload,
+        )
         logger.info("Using local in-memory OAuth state storage for development")
         return
 
     redis_client = _require_oauth_state_store(provider)
     redis_client.set(
         _oauth_state_key(provider, state),
-        "1",
+        payload,
         ex=settings.OAUTH_STATE_TTL_SECONDS,
     )
 
 
-def _consume_oauth_state(provider: str, state: str) -> None:
-    """Validate and consume a previously stored OAuth state token."""
+def _consume_oauth_state(provider: str, state: str) -> dict:
+    """Validate state token; returns the stored payload (e.g. {'role': 'company'})."""
     state_key = _oauth_state_key(provider, state)
     provider_label = provider.title()
 
     if _local_oauth_state_enabled():
+        from app.core.redis_client import get_redis
+
+        redis_client = get_redis()
+        if redis_client is not None:
+            raw = redis_client.get(state_key)
+            if raw is None:
+                raise _oauth_error(
+                    status.HTTP_400_BAD_REQUEST,
+                    "INVALID_OAUTH_STATE",
+                    f"Invalid or expired {provider_label} OAuth state.",
+                )
+            redis_client.delete(state_key)
+            return _deserialize_oauth_state_payload(
+                raw.decode() if isinstance(raw, bytes) else raw
+            )
+
         now = time()
         _cleanup_local_oauth_states(now)
-        expires_at = _LOCAL_OAUTH_STATES.pop(state_key, None)
-        if expires_at is None or expires_at <= now:
+        entry = _LOCAL_OAUTH_STATES.pop(state_key, None)
+        if entry is None:
             raise _oauth_error(
                 status.HTTP_400_BAD_REQUEST,
                 "INVALID_OAUTH_STATE",
                 f"Invalid or expired {provider_label} OAuth state.",
             )
-        return
+        # Backward-compat: old in-memory entries stored just an expiry float.
+        if isinstance(entry, tuple):
+            expires_at, raw_payload = entry
+        else:
+            expires_at, raw_payload = entry, None
+        if expires_at <= now:
+            raise _oauth_error(
+                status.HTTP_400_BAD_REQUEST,
+                "INVALID_OAUTH_STATE",
+                f"Invalid or expired {provider_label} OAuth state.",
+            )
+        return _deserialize_oauth_state_payload(raw_payload)
 
     redis_client = _require_oauth_state_store(provider)
 
     try:
-        if not redis_client.exists(state_key):
+        raw = redis_client.get(state_key)
+        if raw is None:
             raise _oauth_error(
                 status.HTTP_400_BAD_REQUEST,
                 "INVALID_OAUTH_STATE",
@@ -254,6 +342,9 @@ def _consume_oauth_state(provider: str, state: str) -> None:
             )
 
         redis_client.delete(state_key)
+        return _deserialize_oauth_state_payload(
+            raw.decode() if isinstance(raw, bytes) else raw
+        )
     except HTTPException:
         raise
     except Exception as e:
@@ -281,6 +372,25 @@ async def send_password_reset_email(email: str, user_name: str, token: str):
     except Exception as e:
         logger.error(f"Failed to send password reset email: {e}")
         # Don't raise - email failure shouldn't block the flow
+
+
+def _is_email_delivery_available() -> bool:
+    """
+    Determine whether outbound email is configured for the current runtime.
+    """
+    mode = (settings.EMAIL_TRANSPORT or "auto").strip().lower()
+    smtp_configured = bool(settings.SMTP_USER and settings.SMTP_PASSWORD)
+    sendgrid_configured = bool(settings.SENDGRID_API_KEY)
+
+    if mode == "disabled":
+        return False
+    if mode == "smtp":
+        return smtp_configured
+    if mode == "sendgrid":
+        return sendgrid_configured
+
+    # auto
+    return smtp_configured or sendgrid_configured
 
 
 # =============================================================================
@@ -643,7 +753,7 @@ async def logout(
 
 @router.post(
     "/forgot-password",
-    response_model=MessageResponse,
+    response_model=ForgotPasswordResponse,
     summary="Request password reset",
     description="""
     Request a password reset email.
@@ -658,10 +768,13 @@ async def logout(
 async def forgot_password(
     request: ForgotPasswordRequest,
     background_tasks: BackgroundTasks,
+    http_request: Request,
     db: Session = Depends(get_db)
 ):
     """Send password reset email."""
-    
+    from app.core.rate_limiter import check_login_rate_limit
+    check_login_rate_limit(http_request, request.email)
+
     logger.info(f"Password reset requested for: {request.email}")
     
     # Find user (but don't reveal if exists)
@@ -670,22 +783,36 @@ async def forgot_password(
         User.is_deleted == False
     ).first()
     
+    debug_reset_url: str | None = None
+    email_delivery_available = _is_email_delivery_available()
+
     if user:
         # Create reset token
         reset_token = create_reset_password_token(user.email)
-        
-        # Send email in background
-        background_tasks.add_task(
-            send_password_reset_email,
-            user.email,
-            user.full_name,
-            reset_token
-        )
+
+        if email_delivery_available:
+            # Send email in background
+            background_tasks.add_task(
+                send_password_reset_email,
+                user.email,
+                user.full_name,
+                reset_token
+            )
+        else:
+            logger.warning(
+                "Password reset email not queued: EMAIL transport is unavailable (mode=%s)",
+                settings.EMAIL_TRANSPORT,
+            )
+
+        # Safe debug fallback for local/staging.
+        if settings.DEBUG and not email_delivery_available:
+            debug_reset_url = f"{settings.FRONTEND_URL}/reset-password?token={reset_token}"
     
     # Always return success (prevent email enumeration)
-    return MessageResponse(
+    return ForgotPasswordResponse(
         message="If an account exists with this email, a reset link has been sent.",
-        success=True
+        success=True,
+        debug_reset_url=debug_reset_url,
     )
 
 
@@ -842,26 +969,32 @@ async def get_current_user_profile(
     summary="Google OAuth - Get authorization URL",
     description="Get Google OAuth authorization URL for frontend redirect"
 )
-async def google_oauth_authorize(redirect: bool = False):
+async def google_oauth_authorize(
+    redirect: bool = False,
+    role: Optional[str] = Query(None, description="Role for new sign-ups: 'student' or 'company'"),
+):
     """
     Get Google OAuth authorization URL.
 
     If redirect=true, this endpoint will directly redirect the browser to Google.
+    The optional `role` query param ('student' | 'company') controls the role
+    assigned to brand-new users created via this flow. It's ignored for users
+    that already exist.
     """
     from app.services.oauth_service import oauth_service
     import secrets
-    
+
     if not oauth_service.is_configured()["google"]:
         raise HTTPException(
             status_code=status.HTTP_501_NOT_IMPLEMENTED,
             detail="Google OAuth not configured. Add GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET to .env"
         )
-    
+
     # Generate CSRF state token
     state = secrets.token_urlsafe(32)
 
-    # Store state for CSRF validation. Fail closed if state storage is missing.
-    _store_oauth_state("google", state)
+    # Store state + chosen role for the callback to read back.
+    _store_oauth_state("google", state, role=role)
     
     # Get authorization URL
     auth_url = oauth_service.get_google_auth_url(state)
@@ -888,31 +1021,36 @@ async def google_oauth_callback(
     from app.services.oauth_service import oauth_service
     
     try:
-        # Validate CSRF state
-        _consume_oauth_state("google", state)
+        # Validate CSRF state and recover the role the user picked at sign-up.
+        state_payload = _consume_oauth_state("google", state)
+        chosen_role_value = state_payload.get("role", "student")
+        chosen_role = (
+            UserRole.COMPANY if chosen_role_value == "company" else UserRole.STUDENT
+        )
 
         # Get user info from Google
         user_info = await oauth_service.get_google_user_info(code)
-        
+
         email = user_info.get("email")
         if not email:
             raise ValueError("No email in Google response")
-        
+
         # Check if user exists
         user = db.query(User).filter(
             User.email == email.lower(),
             User.is_deleted == False
         ).first()
-        
+
         if user:
-            # Existing user - login
-            logger.info(f"Google OAuth login for existing user: {user.id}")
+            # Existing user - login (existing role is preserved; the `role`
+            # query param only affects new signups).
+            logger.info(f"Google OAuth login for existing user: {user.id} (role={user.role})")
         else:
-            # New user - create account
+            # New user - create account with the role selected on the register page.
             user = User(
                 email=email.lower(),
                 full_name=user_info.get("name", "User"),
-                role=UserRole.STUDENT,  # Default role
+                role=chosen_role,
                 is_active_account=True,
                 is_verified=True,  # Email verified by Google
                 avatar_url=user_info.get("picture"),
@@ -975,7 +1113,10 @@ async def google_oauth_callback(
     summary="LinkedIn OAuth - Get authorization URL",
     description="Get LinkedIn OAuth authorization URL for frontend redirect"
 )
-async def linkedin_oauth_authorize(redirect: bool = False):
+async def linkedin_oauth_authorize(
+    redirect: bool = False,
+    role: Optional[str] = Query(None, description="Role for new sign-ups: 'student' or 'company'"),
+):
     """
     Get LinkedIn OAuth authorization URL.
 
@@ -983,18 +1124,18 @@ async def linkedin_oauth_authorize(redirect: bool = False):
     """
     from app.services.oauth_service import oauth_service
     import secrets
-    
+
     if not oauth_service.is_configured()["linkedin"]:
         raise HTTPException(
             status_code=status.HTTP_501_NOT_IMPLEMENTED,
             detail="LinkedIn OAuth not configured. Add LINKEDIN_CLIENT_ID and LINKEDIN_CLIENT_SECRET to .env"
         )
-    
+
     # Generate CSRF state token
     state = secrets.token_urlsafe(32)
 
-    # Store state for CSRF validation. Fail closed if state storage is missing.
-    _store_oauth_state("linkedin", state)
+    # Store state + chosen role for the callback.
+    _store_oauth_state("linkedin", state, role=role)
     
     # Get authorization URL
     auth_url = oauth_service.get_linkedin_auth_url(state)
@@ -1021,31 +1162,35 @@ async def linkedin_oauth_callback(
     from app.services.oauth_service import oauth_service
     
     try:
-        # Validate CSRF state
-        _consume_oauth_state("linkedin", state)
+        # Validate CSRF state and recover the role the user picked at sign-up.
+        state_payload = _consume_oauth_state("linkedin", state)
+        chosen_role_value = state_payload.get("role", "student")
+        chosen_role = (
+            UserRole.COMPANY if chosen_role_value == "company" else UserRole.STUDENT
+        )
 
         # Get user info from LinkedIn
         user_info = await oauth_service.get_linkedin_user_info(code)
-        
+
         email = user_info.get("email")
         if not email:
             raise ValueError("No email in LinkedIn response")
-        
+
         # Check if user exists
         user = db.query(User).filter(
             User.email == email.lower(),
             User.is_deleted == False
         ).first()
-        
+
         if user:
-            # Existing user - login
-            logger.info(f"LinkedIn OAuth login for existing user: {user.id}")
+            # Existing user - login (existing role preserved)
+            logger.info(f"LinkedIn OAuth login for existing user: {user.id} (role={user.role})")
         else:
-            # New user - create account
+            # New user - create account with the role selected on the register page.
             user = User(
                 email=email.lower(),
                 full_name=user_info.get("name", "User"),
-                role=UserRole.STUDENT,  # Default role
+                role=chosen_role,
                 is_active_account=True,
                 is_verified=True,  # Email verified by LinkedIn
                 avatar_url=user_info.get("picture"),
@@ -1100,7 +1245,6 @@ async def linkedin_oauth_callback(
             error_code="LINKEDIN_OAUTH_AUTHENTICATION_FAILED",
             message="OAuth authentication failed",
         )
-
 
 
 

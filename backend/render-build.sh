@@ -1,22 +1,19 @@
 #!/bin/bash
 # Render.com Build Script for Backend
-# Bu script Render.com'da build vaqtida ishlaydi
+# Runs during the BUILD phase — no database access at this stage.
+# Migrations are handled at startup via the startCommand in render.yaml.
 
-set -e  # Xatolik bo'lsa to'xtatish
+set -e
 
-echo "🚀 Starting backend build..."
+echo "==> Starting backend build..."
 
-# Python version tekshirish
 python --version
+pip --version
 
-# Dependencies install
-echo "📦 Installing dependencies..."
-pip install --upgrade pip
-pip install -r requirements.txt
+echo "==> Upgrading pip..."
+pip install --upgrade pip --quiet
 
-# Database migrations
-echo "🗄️ Running database migrations..."
-alembic upgrade head
+echo "==> Installing dependencies..."
+pip install -r requirements.txt --quiet
 
-echo "✅ Build completed successfully!"
-
+echo "==> Build complete."

@@ -42,7 +42,7 @@ WHY TWO TOKENS?
     - Better security without constant re-login
 
 =============================================================================
-AUTHOR: SmartCareer AI Team
+AUTHOR: CareerUZ Team
 VERSION: 1.0.0
 =============================================================================
 """
@@ -681,14 +681,11 @@ def decode_token(token: str) -> Dict[str, Any]:
         settings.SECRET_KEY,
         algorithms=[settings.ALGORITHM],
     )
-    # Legacy unit tests compare `datetime.fromtimestamp(exp)` with UTC naive
-    # datetimes, so normalize numeric timestamps for that expectation.
+    # Numeric exp/iat claims are already UTC Unix timestamps — no offset needed.
     if isinstance(payload.get("exp"), (int, float)):
-        local_offset = datetime.now() - datetime.utcnow()
-        payload["exp"] = int(payload["exp"] - local_offset.total_seconds())
+        payload["exp"] = int(payload["exp"])
     if isinstance(payload.get("iat"), (int, float)):
-        local_offset = datetime.now() - datetime.utcnow()
-        payload["iat"] = int(payload["iat"] - local_offset.total_seconds())
+        payload["iat"] = int(payload["iat"])
     return payload
 
 

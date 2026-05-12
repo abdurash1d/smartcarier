@@ -1,6 +1,6 @@
-# SmartCareer AI - Frontend
+# CareerUZ - Frontend
 
-Production-grade Next.js 14 frontend for the SmartCareer AI platform.
+Production-grade Next.js 14 frontend for the CareerUZ platform.
 
 ## 🚀 Features
 
@@ -226,8 +226,8 @@ npm run analyze
 ### Docker
 
 ```bash
-docker build -t smartcareer-frontend .
-docker run -p 3000:3000 smartcareer-frontend
+docker build -t careeruz-frontend .
+docker run -p 3000:3000 careeruz-frontend
 ```
 
 ## 📄 License

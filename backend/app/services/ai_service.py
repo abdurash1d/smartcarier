@@ -4,7 +4,7 @@ AI SERVICE - OpenAI GPT-4 Integration for Resume Generation
 =============================================================================
 
 PURPOSE:
-    This service handles all AI-powered operations for SmartCareer AI.
+    This service handles all AI-powered operations for CareerUZ.
     It acts as the bridge between our application and OpenAI's GPT-4 API.
 
 WHY THIS ARCHITECTURE?
@@ -30,7 +30,7 @@ USAGE:
     # Generate a resume
     result = await ai_service.generate_resume_from_data(user_data)
 
-AUTHOR: SmartCareer AI Team
+AUTHOR: CareerUZ Team
 VERSION: 1.0.0
 """
 

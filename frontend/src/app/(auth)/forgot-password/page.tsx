@@ -11,22 +11,32 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Mail, ArrowLeft, CheckCircle } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
+import { useTranslation } from "@/hooks/useTranslation";
+import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
-// Validation schema
-const forgotPasswordSchema = z.object({
-  email: z.string().email("Please enter a valid email address"),
-});
-
-type ForgotPasswordFormData = z.infer<typeof forgotPasswordSchema>;
+type ForgotPasswordFormData = {
+  email: string;
+};
 
 export default function ForgotPasswordPage() {
+  const { locale } = useTranslation();
   const [isLoading, setIsLoading] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [debugResetUrl, setDebugResetUrl] = useState<string | null>(null);
   const { requestPasswordReset } = useAuth();
+  const forgotPasswordSchema = z.object({
+    email: z
+      .string()
+      .email(
+        locale === "ru"
+          ? "Пожалуйста, введите корректный email адрес"
+          : "Iltimos, to'g'ri email manzilini kiriting"
+      ),
+  });
 
   const {
     register,
@@ -40,12 +50,19 @@ export default function ForgotPasswordPage() {
   const onSubmit = async (data: ForgotPasswordFormData) => {
     setIsLoading(true);
     setError(null);
+    setDebugResetUrl(null);
 
     try {
-      await requestPasswordReset(data.email);
+      const response = await requestPasswordReset(data.email);
+      setDebugResetUrl(response?.debug_reset_url ?? null);
       setIsSuccess(true);
     } catch (err: unknown) {
-      setError((err as { message?: string })?.message || "Failed to send reset email");
+      setError(
+        (err as { message?: string })?.message ||
+          (locale === "ru"
+            ? "Не удалось отправить письмо для сброса пароля"
+            : "Parolni tiklash xatini yuborib bo'lmadi")
+      );
     } finally {
       setIsLoading(false);
     }
@@ -57,26 +74,42 @@ export default function ForgotPasswordPage() {
         <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-full bg-green-100">
           <CheckCircle className="h-8 w-8 text-green-600" />
         </div>
-        <h1 className="font-display text-2xl font-bold text-surface-900">Check your email</h1>
+        <h1 className="font-display text-2xl font-bold text-surface-900">
+          {locale === "ru" ? "Проверьте почту" : "Emailingizni tekshiring"}
+        </h1>
         <p className="mt-3 text-surface-500">
-          We've sent a password reset link to{" "}
+          {locale === "ru"
+            ? "Мы отправили ссылку для сброса пароля на"
+            : "Parolni tiklash havolasini quyidagi emailga yubordik"}{" "}
           <strong className="text-surface-700">{getValues("email")}</strong>
         </p>
         <p className="mt-4 text-sm text-surface-400">
-          Didn't receive the email? Check your spam folder or{" "}
+          {locale === "ru"
+            ? "Не получили письмо? Проверьте папку спам или"
+            : "Email kelmadimi? Spam papkasini tekshiring yoki"}{" "}
           <button
             onClick={() => setIsSuccess(false)}
             className="font-medium text-brand-600 hover:text-brand-500"
           >
-            try again
+            {locale === "ru" ? "попробуйте снова" : "qayta urinib ko'ring"}
           </button>
         </p>
+        {debugResetUrl && (
+          <div className="mt-4 rounded-xl border border-amber-300 bg-amber-50 p-3 text-left text-xs text-amber-800">
+            <p className="font-semibold">
+              {locale === "ru"
+                ? "Тестовый режим: email недоступен"
+                : "Test rejim: email yuborish yoqilmagan"}
+            </p>
+            <p className="mt-1 break-all">{debugResetUrl}</p>
+          </div>
+        )}
         <Link
           href="/login"
           className="mt-8 inline-flex items-center gap-2 text-sm font-medium text-brand-600 hover:text-brand-500"
         >
           <ArrowLeft className="h-4 w-4" />
-          Back to sign in
+          {locale === "ru" ? "Назад ко входу" : "Kirishga qaytish"}
         </Link>
       </div>
     );
@@ -85,23 +118,26 @@ export default function ForgotPasswordPage() {
   return (
     <div className="mx-auto w-full max-w-sm">
       <div className="mb-8">
-        <h1 className="font-display text-2xl font-bold text-surface-900">Forgot your password?</h1>
-        <p className="mt-2 text-surface-500">
-          No worries! Enter your email and we'll send you a reset link.
+        <h1 className="font-display text-2xl font-bold text-surface-900 dark:text-white">
+          {locale === "ru" ? "Забыли пароль?" : "Parolingizni unutdingizmi?"}
+        </h1>
+        <p className="mt-2 text-surface-500 dark:text-surface-400">
+          {locale === "ru"
+            ? "Не переживайте! Введите email, и мы отправим ссылку для сброса."
+            : "Xavotir olmang! Emailingizni kiriting, biz tiklash havolasini yuboramiz."}
         </p>
       </div>
 
-      {/* Error alert */}
       {error && (
-        <div className="mb-6 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">
-          {error}
+        <div className="mb-6">
+          <Alert variant="error">{error}</Alert>
         </div>
       )}
 
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
         {/* Email */}
         <div className="space-y-2">
-          <Label htmlFor="email">Email address</Label>
+          <Label htmlFor="email">{locale === "ru" ? "Email адрес" : "Email manzil"}</Label>
           <Input
             id="email"
             type="email"
@@ -114,7 +150,7 @@ export default function ForgotPasswordPage() {
 
         {/* Submit */}
         <Button type="submit" className="w-full" size="lg" isLoading={isLoading}>
-          Send reset link
+          {locale === "ru" ? "Отправить ссылку" : "Tiklash havolasini yuborish"}
         </Button>
       </form>
 
@@ -124,12 +160,11 @@ export default function ForgotPasswordPage() {
         className="mt-8 inline-flex items-center gap-2 text-sm font-medium text-surface-500 hover:text-surface-700"
       >
         <ArrowLeft className="h-4 w-4" />
-        Back to sign in
+        {locale === "ru" ? "Назад ко входу" : "Kirishga qaytish"}
       </Link>
     </div>
   );
 }
-
 
 
 

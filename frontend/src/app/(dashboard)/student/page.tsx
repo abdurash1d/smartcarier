@@ -12,7 +12,7 @@
 
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { motion } from "framer-motion";
@@ -41,6 +41,8 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatRelativeTime, formatSalaryRange } from "@/lib/utils";
+import { jobApi, userApi } from "@/lib/api";
+import type { Job } from "@/types/api";
 
 // =============================================================================
 // ANIMATION VARIANTS
@@ -138,12 +140,66 @@ export default function StudentDashboardPage() {
   const { resumes, isLoading: resumesLoading, fetchResumes } = useResume();
   const { stats: appStats, applications, isLoading: appsLoading, fetchMyApplications } = useApplications();
   const { jobs, isLoading: jobsLoading, fetchJobs } = useJobs();
+  const [summaryCounts, setSummaryCounts] = useState<{ resumes: number; applications: number } | null>(null);
+
+  type Recommendation = {
+    job: Job;
+    match_score: number;
+    skill_matches: string[];
+    missing_skills: string[];
+  };
+  const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
+  const [recsLoading, setRecsLoading] = useState(true);
+  const [needsResume, setNeedsResume] = useState(false);
 
   useEffect(() => {
     fetchResumes();
     fetchMyApplications();
     fetchJobs({}, 1);
   }, [fetchJobs, fetchMyApplications, fetchResumes]);
+
+  useEffect(() => {
+    let ignore = false;
+    setRecsLoading(true);
+    jobApi
+      .recommended({ limit: 3 })
+      .then((res) => {
+        if (ignore) return;
+        const payload = (res.data ?? {}) as {
+          matches?: Recommendation[];
+          message?: string;
+        };
+        const matches = Array.isArray(payload.matches) ? payload.matches : [];
+        setRecommendations(matches);
+        setNeedsResume(matches.length === 0 && /resume/i.test(payload.message ?? ""));
+      })
+      .catch(() => {
+        if (!ignore) setRecommendations([]);
+      })
+      .finally(() => {
+        if (!ignore) setRecsLoading(false);
+      });
+    return () => {
+      ignore = true;
+    };
+  }, [user?.id]);
+
+  useEffect(() => {
+    const loadSummaryCounts = async () => {
+      try {
+        const response = await userApi.getProfile();
+        const payload = response.data?.data ?? response.data ?? {};
+        const resumesCount = typeof payload.resume_count === "number" ? payload.resume_count : 0;
+        const applicationsCount = typeof payload.application_count === "number" ? payload.application_count : 0;
+        setSummaryCounts({ resumes: resumesCount, applications: applicationsCount });
+      } catch {
+        setSummaryCounts(null);
+      }
+    };
+
+    if (!user?.id) return;
+    loadSummaryCounts();
+  }, [user?.id]);
 
   const isLoading = resumesLoading || appsLoading;
 
@@ -168,22 +224,28 @@ export default function StudentDashboardPage() {
   const stats = [
     {
       title: t("dashboard.stats.totalResumes"),
-      value: isLoading ? "—" : resumes.length,
+      value: isLoading ? "—" : (summaryCounts?.resumes ?? resumes.length),
       icon: FileText,
       color: "from-purple-500 to-indigo-600",
       bgColor: "bg-purple-100 dark:bg-purple-500/20",
       iconColor: "text-purple-600",
-      change: resumes.length > 0 ? t("dashboard.stats.resumeCount", { count: resumes.length }) : t("dashboard.stats.thisWeek"),
+      change:
+        (summaryCounts?.resumes ?? resumes.length) > 0
+          ? t("dashboard.stats.resumeCount", { count: summaryCounts?.resumes ?? resumes.length })
+          : t("dashboard.stats.thisWeek"),
       changeType: "positive",
     },
     {
       title: t("dashboard.stats.applicationsSent"),
-      value: isLoading ? "—" : appStats.total,
+      value: isLoading ? "—" : (summaryCounts?.applications ?? appStats.total),
       icon: Send,
       color: "from-cyan-500 to-blue-600",
       bgColor: "bg-cyan-100 dark:bg-cyan-500/20",
       iconColor: "text-cyan-600",
-      change: appStats.pending > 0 ? t("dashboard.stats.pendingCount", { count: appStats.pending }) : t("dashboard.stats.noApplications"),
+      change:
+        appStats.pending > 0
+          ? t("dashboard.stats.pendingCount", { count: appStats.pending })
+          : t("dashboard.stats.noApplications"),
       changeType: "positive",
     },
     {
@@ -215,7 +277,7 @@ export default function StudentDashboardPage() {
     id: app.id,
     type: "application",
     title: `${app.job?.title || t("dashboard.jobs.jobFallback")} - ${app.job?.company?.name || app.job?.company_name || t("common.company")}`,
-    time: app.applied_at ? formatRelativeTime(app.applied_at) : "",
+    time: app.applied_at ? formatRelativeTime(app.applied_at, locale) : "",
     icon: app.status === "interview" ? Calendar : app.status === "accepted" ? CheckCircle : Send,
     color: app.status === "interview"
       ? "bg-green-100 text-green-600 dark:bg-green-500/20"
@@ -306,7 +368,7 @@ export default function StudentDashboardPage() {
                 </div>
                 <Link href="/student/settings">
                   <Button variant="outline" size="sm">
-                    {t("dashboard.profile.completed")}
+                    {t("dashboard.sidebar.profileSettings")}
                   </Button>
                 </Link>
               </div>
@@ -458,56 +520,93 @@ export default function StudentDashboardPage() {
               </Link>
             </CardHeader>
             <CardContent>
-              {jobsLoading ? (
+              {recsLoading ? (
                 <div className="space-y-3">
                   {[1, 2, 3].map((i) => (
-                    <Skeleton key={i} className="h-20 w-full rounded-xl" />
+                    <Skeleton key={i} className="h-24 w-full rounded-xl" />
                   ))}
                 </div>
-              ) : jobs.length === 0 ? (
+              ) : needsResume ? (
+                <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed border-purple-200 bg-purple-50/40 py-8 text-center dark:border-purple-500/30 dark:bg-purple-500/5">
+                  <Sparkles className="h-7 w-7 text-purple-500" />
+                  <p className="text-sm text-surface-600 dark:text-surface-300">
+                    {t("dashboard.recommended.noResume")}
+                  </p>
+                  <Link href="/student/resumes/create-ai">
+                    <Button size="sm">{t("dashboard.recommended.createResumeCTA")}</Button>
+                  </Link>
+                </div>
+              ) : recommendations.length === 0 ? (
                 <p className="py-6 text-center text-sm text-surface-500">
                   {t("dashboard.recommended.empty")}
                 </p>
               ) : (
                 <div className="space-y-4">
-                  {jobs.slice(0, 3).map((job, index) => (
-                    <Link key={job.id} href={`/student/jobs`}>
-                      <motion.div
-                        initial={{ opacity: 0, x: 20 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        transition={{ delay: index * 0.1 }}
-                        className="group rounded-xl border border-surface-200 p-4 transition-all hover:border-purple-200 hover:shadow-md dark:border-surface-700 dark:hover:border-purple-500/30 cursor-pointer"
-                      >
-                        <div className="flex items-start justify-between">
-                          <div>
-                            <h4 className="font-semibold text-surface-900 dark:text-white group-hover:text-purple-600">
-                              {job.title}
-                            </h4>
-                            <p className="text-sm text-surface-500">
-                              {job.company?.name || t("common.company")} • {job.location}
-                            </p>
-                            {(job.salary_min || job.salary_max) && (
-                              <p className="mt-1 text-sm font-medium text-green-600">
-                                {formatSalaryRange(job.salary_min, job.salary_max)}
+                  {recommendations.map((rec, index) => {
+                    const score = Math.round(rec.match_score);
+                    const tone =
+                      score >= 80
+                        ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300"
+                        : score >= 60
+                        ? "bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300"
+                        : "bg-surface-100 text-surface-600 dark:bg-surface-700 dark:text-surface-300";
+                    const job = rec.job;
+                    return (
+                      <Link key={job.id} href={`/student/jobs/${job.id}`}>
+                        <motion.div
+                          initial={{ opacity: 0, x: 20 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          transition={{ delay: index * 0.1 }}
+                          className="group rounded-xl border border-surface-200 p-4 transition-all hover:border-purple-200 hover:shadow-md dark:border-surface-700 dark:hover:border-purple-500/30 cursor-pointer"
+                        >
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0 flex-1">
+                              <h4 className="truncate font-semibold text-surface-900 dark:text-white group-hover:text-purple-600">
+                                {job.title}
+                              </h4>
+                              <p className="truncate text-sm text-surface-500">
+                                {job.company?.name || t("common.company")} • {job.location}
                               </p>
-                            )}
+                              {(job.salary_min || job.salary_max) && (
+                                <p className="mt-1 text-sm font-medium text-green-600">
+                                  {formatSalaryRange(job.salary_min, job.salary_max, locale)}
+                                </p>
+                              )}
+                            </div>
+                            <div className={`flex flex-col items-end shrink-0 rounded-lg px-2.5 py-1.5 ${tone}`}>
+                              <span className="text-base font-bold leading-none">{score}%</span>
+                              <span className="mt-0.5 text-[10px] font-semibold uppercase tracking-wider opacity-80">
+                                {t("dashboard.recommended.matchLabel")}
+                              </span>
+                            </div>
                           </div>
-                          <Badge variant="secondary" className="text-xs shrink-0">
-                            {job.job_type?.replace("_", " ")}
-                          </Badge>
-                        </div>
-                        {job.requirements?.skills && job.requirements.skills.length > 0 && (
-                          <div className="mt-3 flex flex-wrap gap-1">
-                            {job.requirements.skills.slice(0, 4).map((tag: string) => (
-                              <Badge key={tag} variant="secondary" className="text-xs">
-                                {tag}
-                              </Badge>
-                            ))}
-                          </div>
-                        )}
-                      </motion.div>
-                    </Link>
-                  ))}
+                          {rec.skill_matches.length > 0 && (
+                            <div className="mt-3">
+                              <p className="text-[11px] font-semibold uppercase tracking-wider text-surface-500">
+                                {t("dashboard.recommended.matchedSkills")}
+                              </p>
+                              <div className="mt-1.5 flex flex-wrap gap-1">
+                                {rec.skill_matches.slice(0, 4).map((skill: string) => (
+                                  <Badge
+                                    key={skill}
+                                    variant="secondary"
+                                    className="bg-emerald-50 text-emerald-700 text-xs dark:bg-emerald-500/10 dark:text-emerald-300"
+                                  >
+                                    {skill}
+                                  </Badge>
+                                ))}
+                                {rec.skill_matches.length > 4 && (
+                                  <span className="text-xs text-surface-500">
+                                    +{rec.skill_matches.length - 4}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          )}
+                        </motion.div>
+                      </Link>
+                    );
+                  })}
                 </div>
               )}
             </CardContent>
@@ -552,11 +651,11 @@ export default function StudentDashboardPage() {
                       {formatInterviewDateTime(upcomingInterview.interview_at as string, locale)}
                     </p>
                     <div className="mt-3 flex flex-wrap items-center gap-3">
-                      <Badge variant="secondary" className="bg-white/80 text-surface-700">
+                      <Badge variant="secondary" className="bg-white/80 text-surface-700 dark:bg-surface-700 dark:text-surface-200">
                         {formatInterviewTypeLabel(upcomingInterview.interview_type, t)}
                       </Badge>
                       {upcomingInterview.meeting_link ? (
-                        <Button asChild variant="outline" size="sm" className="h-8 rounded-full border-green-200 bg-white/80 px-3 text-green-700 hover:bg-green-50">
+                        <Button asChild variant="outline" size="sm" className="h-8 rounded-full border-green-200 bg-white/80 px-3 text-green-700 hover:bg-green-50 dark:border-green-500/30 dark:bg-surface-800 dark:text-green-300 dark:hover:bg-surface-700">
                           <a
                             href={upcomingInterview.meeting_link}
                             target="_blank"

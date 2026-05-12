@@ -148,7 +148,7 @@ export default function ResumeDetailPage() {
       <motion.div
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
-        className="flex items-center justify-between rounded-2xl border border-surface-200 bg-white p-4 shadow-sm"
+        className="flex items-center justify-between rounded-2xl border border-surface-200 bg-white p-4 shadow-sm dark:border-surface-700 dark:bg-surface-800"
       >
         <div className="flex items-center gap-3">
           <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-purple-100">
@@ -182,7 +182,7 @@ export default function ResumeDetailPage() {
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.1 }}
-        className="overflow-hidden rounded-[28px] border border-surface-200 bg-white shadow-xl"
+        className="overflow-hidden rounded-[28px] border border-surface-200 bg-white shadow-xl dark:border-surface-700 dark:bg-surface-800"
       >
         <ResumePreview content={resume.content} title={resume.title} />
       </motion.div>

@@ -13,8 +13,10 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import Link from "next/link";
+import { useTranslation } from "@/hooks/useTranslation";
 
 export default function VerifyEmailPageClient() {
+  const { locale } = useTranslation();
   const searchParams = useSearchParams()!;
   const router = useRouter();
   const token = searchParams.get("token");
@@ -27,23 +29,37 @@ export default function VerifyEmailPageClient() {
       void verifyEmail();
     } else {
       setStatus("error");
-      setMessage("No verification token provided");
+      setMessage(
+        locale === "ru"
+          ? "Токен подтверждения не предоставлен"
+          : "Tasdiqlash tokeni taqdim etilmagan"
+      );
     }
     // token must be included so it reacts if user re-opens with a different token
-  }, [token]);
+  }, [token, locale]);
 
   const verifyEmail = async () => {
     try {
       const response = await api.get(`/auth/verify-email/${token}`);
       setStatus("success");
-      setMessage(response.data.message || "Email verified successfully!");
+      setMessage(
+        response.data.message ||
+          (locale === "ru"
+            ? "Email успешно подтвержден!"
+            : "Email muvaffaqiyatli tasdiqlandi!")
+      );
 
       setTimeout(() => {
         router.push("/login");
       }, 3000);
     } catch (error: any) {
       setStatus("error");
-      setMessage(error.response?.data?.detail || "Verification failed. Token may be invalid or expired.");
+      setMessage(
+        error.response?.data?.detail ||
+          (locale === "ru"
+            ? "Подтверждение не удалось. Токен может быть недействительным или просроченным."
+            : "Tasdiqlash amalga oshmadi. Token yaroqsiz yoki muddati tugagan bo'lishi mumkin.")
+      );
     }
   };
 
@@ -56,9 +72,13 @@ export default function VerifyEmailPageClient() {
         {status === "loading" && (
           <div className="space-y-4">
             <Loader2 className="h-16 w-16 mx-auto animate-spin text-brand-500" />
-            <h2 className="text-2xl font-bold">Verifying Email...</h2>
+            <h2 className="text-2xl font-bold">
+              {locale === "ru" ? "Подтверждаем email..." : "Email tasdiqlanmoqda..."}
+            </h2>
             <p className="text-surface-600 dark:text-surface-400">
-              Please wait while we verify your email address
+              {locale === "ru"
+                ? "Пожалуйста, подождите, пока мы подтверждаем ваш email адрес"
+                : "Email manzilingiz tasdiqlanayotgan paytda biroz kuting"}
             </p>
           </div>
         )}
@@ -68,12 +88,16 @@ export default function VerifyEmailPageClient() {
             <div className="bg-green-100 dark:bg-green-950 rounded-full p-4 w-20 h-20 mx-auto flex items-center justify-center">
               <CheckCircle className="h-12 w-12 text-green-600 dark:text-green-400" />
             </div>
-            <h2 className="text-2xl font-bold text-green-600 dark:text-green-400">Email Verified!</h2>
+            <h2 className="text-2xl font-bold text-green-600 dark:text-green-400">
+              {locale === "ru" ? "Email подтвержден!" : "Email tasdiqlandi!"}
+            </h2>
             <p className="text-surface-700 dark:text-surface-300">{message}</p>
-            <p className="text-sm text-surface-500">Redirecting to login...</p>
+            <p className="text-sm text-surface-500">
+              {locale === "ru" ? "Переход на страницу входа..." : "Kirish sahifasiga yo'naltirilmoqda..."}
+            </p>
             <Link href="/login">
               <Button variant="gradient" size="lg" className="mt-4">
-                Go to Login
+                {locale === "ru" ? "Перейти ко входу" : "Kirishga o'tish"}
               </Button>
             </Link>
           </div>
@@ -84,17 +108,19 @@ export default function VerifyEmailPageClient() {
             <div className="bg-red-100 dark:bg-red-950 rounded-full p-4 w-20 h-20 mx-auto flex items-center justify-center">
               <XCircle className="h-12 w-12 text-red-600 dark:text-red-400" />
             </div>
-            <h2 className="text-2xl font-bold text-red-600 dark:text-red-400">Verification Failed</h2>
+            <h2 className="text-2xl font-bold text-red-600 dark:text-red-400">
+              {locale === "ru" ? "Подтверждение не удалось" : "Tasdiqlash muvaffaqiyatsiz"}
+            </h2>
             <p className="text-surface-700 dark:text-surface-300">{message}</p>
             <div className="flex flex-col gap-2 mt-4">
               <Link href="/register">
                 <Button variant="outline" className="w-full">
-                  Register Again
+                  {locale === "ru" ? "Зарегистрироваться снова" : "Qayta ro'yxatdan o'tish"}
                 </Button>
               </Link>
               <Link href="/login">
                 <Button variant="ghost" className="w-full">
-                  Back to Login
+                  {locale === "ru" ? "Назад ко входу" : "Kirishga qaytish"}
                 </Button>
               </Link>
             </div>

@@ -1,4 +1,4 @@
-# 🔒 SECURITY SETUP GUIDE - SmartCareer AI
+# 🔒 SECURITY SETUP GUIDE - CareerUZ
 
 **Automatic Setup by AI Assistant**  
 **Date:** 2026-01-19  
@@ -59,7 +59,7 @@ ls -lh backend/backups/
 
 # Restore from backup
 cd backend
-./scripts/restore_database.sh backups/smartcareer_backup_YYYYMMDD_HHMMSS.db.gz
+./scripts/restore_database.sh backups/careeruz_backup_YYYYMMDD_HHMMSS.db.gz
 ```
 
 ---

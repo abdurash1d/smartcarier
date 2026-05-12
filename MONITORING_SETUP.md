@@ -39,7 +39,7 @@
 # 2. Sign up (Free plan)
 # 3. Create new project
 #    - Platform: Python (FastAPI)
-#    - Name: SmartCareer Backend
+#    - Name: CareerUZ Backend
 # 4. Create project
 ```
 
@@ -315,7 +315,7 @@ class JSONFormatter(logging.Formatter):
 # Use JSON logging
 handler = logging.StreamHandler()
 handler.setFormatter(JSONFormatter())
-logger = logging.getLogger("smartcareer")
+logger = logging.getLogger("careeruz")
 logger.addHandler(handler)
 logger.setLevel(logging.INFO)
 ```

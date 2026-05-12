@@ -26,6 +26,7 @@ import {
   AlertTriangle,
   Server,
   KeyRound,
+  Building2,
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { UserAvatar } from "@/components/ui/avatar";
@@ -42,6 +43,14 @@ interface NavItem {
   badge?: number;
 }
 
+function maskEmail(email?: string | null): string {
+  if (!email) return "";
+  const [local, domain] = email.split("@");
+  if (!domain) return email;
+  if (local.length <= 2) return `${local[0] ?? "*"}***@${domain}`;
+  return `${local.slice(0, 2)}***@${domain}`;
+}
+
 const studentNavItems: NavItem[] = [
   { labelKey: "dashboard.sidebar.myResumes", href: "/student/resumes", icon: FileText },
   { labelKey: "dashboard.sidebar.findJobs", href: "/student/jobs", icon: Briefcase },
@@ -56,9 +65,12 @@ const companyNavItems: NavItem[] = [
 ];
 
 const adminNavItems: NavItem[] = [
-  { labelKey: "dashboard.sidebar.overview", href: "/admin#overview", icon: Activity },
+  { labelKey: "dashboard.sidebar.overview", href: "/admin", icon: LayoutDashboard },
+  { labelKey: "dashboard.sidebar.users", href: "/admin/users", icon: Users },
+  { labelKey: "dashboard.sidebar.companies", href: "/admin/companies", icon: Building2 },
+  { labelKey: "dashboard.sidebar.jobs", href: "/admin/jobs", icon: Briefcase },
+  { labelKey: "dashboard.sidebar.applications", href: "/admin/applications", icon: ClipboardList },
   { labelKey: "dashboard.sidebar.systemHealth", href: "/admin#health", icon: Server },
-  { labelKey: "dashboard.sidebar.users", href: "/admin#users", icon: Users },
   { labelKey: "dashboard.sidebar.errors", href: "/admin#errors", icon: AlertTriangle },
   { labelKey: "dashboard.sidebar.access", href: "/admin/access", icon: KeyRound },
 ];
@@ -70,7 +82,8 @@ interface DashboardLayoutProps {
 export function DashboardLayout({ children }: DashboardLayoutProps) {
   const pathname = usePathname()!;
   const { user, logout, isStudent, isCompany, isAdmin } = useAuth();
-  const { t } = useTranslation();
+  const { t, locale } = useTranslation();
+  const fallbackUserName = locale === "ru" ? "Пользователь" : "Foydalanuvchi";
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [currentHash, setCurrentHash] = useState("");
@@ -97,6 +110,8 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
   const userMenuLink = isAdmin ? "/admin#overview" : isCompany ? "/company/settings" : "/student/settings";
   const userMenuLabel = isAdmin ? t("dashboard.sidebar.overview") : t("dashboard.sidebar.settings");
   const UserMenuIcon = isAdmin ? LayoutDashboard : Settings;
+  const adminRoleLabel = locale === "ru" ? "Системный администратор" : "Tizim administratori";
+  const visibleEmail = isAdmin ? maskEmail(user?.email) : user?.email;
 
   const activeNavName = useMemo(() => {
     const activeItem = navItems.find((item) => {
@@ -152,7 +167,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                 <Sparkles className="h-5 w-5 text-white" />
               </div>
               <span className="font-display text-xl font-bold text-surface-900 dark:text-white">
-                SmartCareer
+                CareerUZ
               </span>
             </Link>
             <button
@@ -174,7 +189,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                 {t("dashboard.quickActions.createAIResumeDesc")}
               </p>
               <Link
-                href="/student/resumes/new"
+                href="/student/resumes/create-ai"
                 className="flex items-center justify-center gap-2 rounded-lg bg-white px-3 py-2 text-sm font-medium text-brand-600 hover:bg-brand-50 transition-colors"
               >
                 <PlusCircle className="h-4 w-4" />
@@ -213,12 +228,14 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
           {/* User section */}
           <div className="border-t border-surface-200 dark:border-surface-800 p-4">
             <div className="flex items-center gap-3">
-              <UserAvatar name={user?.full_name || "User"} imageUrl={user?.avatar_url} />
+              <UserAvatar name={user?.full_name || fallbackUserName} imageUrl={user?.avatar_url} />
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-surface-900 dark:text-white truncate">
                   {user?.full_name}
                 </p>
-                <p className="text-xs text-surface-500 truncate">{user?.email}</p>
+                <p className="text-xs text-surface-500 truncate">
+                  {isAdmin ? adminRoleLabel : visibleEmail}
+                </p>
               </div>
             </div>
           </div>
@@ -277,7 +294,9 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                       <p className="text-sm font-medium text-surface-900 dark:text-white">
                         {user?.full_name}
                       </p>
-                      <p className="text-xs text-surface-500">{user?.email}</p>
+                      <p className="text-xs text-surface-500">
+                        {isAdmin ? `${adminRoleLabel} · ${visibleEmail}` : visibleEmail}
+                      </p>
                     </div>
                     <div className="py-1">
                       <Link

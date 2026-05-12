@@ -258,7 +258,7 @@ export default function CompanyDashboardPage() {
                           <p className="text-xs text-surface-400">{job.views_count ?? 0} {t("companyDashboard.views")}</p>
                         </div>
                         <StatusBadge status={job.status} />
-                        <Link href={`/company/jobs`}>
+                        <Link href={`/company/jobs/${job.id}/edit`}>
                           <Button variant="ghost" size="sm">
                             <ChevronRight className="h-4 w-4" />
                           </Button>
@@ -296,7 +296,7 @@ export default function CompanyDashboardPage() {
                 </div>
               ) : (
                 activeJobs.slice(0, 4).map((job: Job) => (
-                  <Link key={job.id} href={`/company/jobs`}>
+                  <Link key={job.id} href={`/company/jobs/${job.id}/edit`}>
                     <div className="rounded-xl border border-surface-200 p-4 transition-all hover:border-blue-200 hover:bg-blue-50/50 dark:border-surface-700 dark:hover:border-blue-500/30">
                       <p className="font-semibold text-surface-900 dark:text-white">
                         {job.title}

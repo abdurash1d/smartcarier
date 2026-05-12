@@ -18,7 +18,7 @@ ENDPOINTS:
     POST   /{job_id}/close        - Close job
 
 =============================================================================
-AUTHOR: SmartCareer AI Team
+AUTHOR: CareerUZ Team
 VERSION: 1.0.0
 =============================================================================
 """
@@ -29,12 +29,13 @@ VERSION: 1.0.0
 
 import logging
 import time
+import re
 from typing import Optional, List, Dict, Any
 from uuid import UUID
 from enum import Enum
 
 from fastapi import APIRouter, Depends, HTTPException, status, Query
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import func, or_, and_, desc, asc
 from pydantic import BaseModel, Field
 
@@ -62,6 +63,7 @@ from app.schemas.application import (
 )
 from app.schemas.auth import MessageResponse
 from app.config import settings
+from app.services import job_matching
 
 # =============================================================================
 # LOGGING
@@ -449,7 +451,7 @@ async def search_jobs(
     # APPLY PAGINATION
     # =========================================================================
     
-    jobs = q.offset(pagination.skip).limit(pagination.limit).all()
+    jobs = q.options(joinedload(Job.company)).offset(pagination.skip).limit(pagination.limit).all()
     
     total_pages = (total + pagination.page_size - 1) // pagination.page_size
     
@@ -605,12 +607,136 @@ async def get_saved_jobs(
 
 
 @router.get(
+    "/recommended",
+    response_model=JobMatchResponse,
+    summary="Personalized job recommendations for current user",
+    description="""
+    Returns jobs ranked by match score against the user's most recent published resume.
+
+    - Auto-picks the latest published resume (falls back to the most recent draft).
+    - Reuses the same skill/experience/title scoring as POST /jobs/match.
+    - Returns 200 with an empty `matches` list and an explanatory message when the
+      user has no resume yet, so the client can render a CTA instead of an error.
+    """,
+)
+async def recommended_jobs(
+    limit: int = Query(10, ge=1, le=50, description="Maximum number of recommendations"),
+    remote_only: bool = Query(False, description="Only include remote-friendly roles"),
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db),
+):
+    """Personalized recommendations driven by the user's resume content."""
+    start_time = time.time()
+
+    # =========================================================================
+    # STEP 1: Pick the user's most relevant resume
+    # =========================================================================
+    resume = (
+        db.query(Resume)
+        .filter(
+            Resume.user_id == current_user.id,
+            Resume.is_deleted == False,
+            Resume.status == "published",
+        )
+        .order_by(Resume.updated_at.desc())
+        .first()
+    )
+
+    if not resume:
+        resume = (
+            db.query(Resume)
+            .filter(Resume.user_id == current_user.id, Resume.is_deleted == False)
+            .order_by(Resume.updated_at.desc())
+            .first()
+        )
+
+    if not resume:
+        return JobMatchResponse(
+            success=True,
+            message="No resume found yet. Create one to unlock personalized recommendations.",
+            total_jobs_analyzed=0,
+            matches=[],
+            resume_skills=[],
+            processing_time_seconds=round(time.time() - start_time, 2),
+        )
+
+    # =========================================================================
+    # STEP 2: Extract resume signals (reuse the same helpers as /match)
+    # =========================================================================
+    resume_skills = job_matching.extract_skills_from_resume(resume.content)
+    resume_experience = job_matching.extract_experience_level(resume.content)
+    resume_keywords = job_matching.extract_keywords(resume.content)
+
+    # =========================================================================
+    # STEP 3: Candidate jobs (active only; cheap pre-filter for remote_only)
+    # =========================================================================
+    q = db.query(Job).filter(
+        Job.is_deleted == False,
+        Job.status == JobStatus.ACTIVE.value,
+    )
+    if remote_only:
+        q = q.filter(or_(Job.is_remote_allowed == True, Job.job_type == "remote"))
+
+    jobs = q.all()
+
+    # =========================================================================
+    # STEP 4: Score & rank
+    # =========================================================================
+    scored: List[Dict[str, Any]] = []
+    for job in jobs:
+        score, skill_matches, missing_skills, reasons = job_matching.calculate_match_score(
+            resume_skills=resume_skills,
+            resume_experience=resume_experience,
+            resume_keywords=resume_keywords,
+            job=job,
+        )
+        scored.append(
+            {
+                "job": job,
+                "score": score,
+                "skill_matches": skill_matches,
+                "missing_skills": missing_skills,
+                "reasons": reasons,
+            }
+        )
+
+    scored.sort(key=lambda x: x["score"], reverse=True)
+    scored = scored[:limit]
+
+    match_results = [
+        JobMatchScore(
+            job=job_to_response(item["job"]),
+            match_score=round(item["score"], 1),
+            match_reasons=item["reasons"],
+            skill_matches=item["skill_matches"],
+            missing_skills=item["missing_skills"][:5],
+        )
+        for item in scored
+    ]
+
+    processing_time = time.time() - start_time
+    logger.info(
+        f"🎯 Recommendations for user {current_user.id}: "
+        f"{len(match_results)}/{len(jobs)} jobs in {processing_time:.2f}s"
+    )
+
+    return JobMatchResponse(
+        success=True,
+        message=f"Found {len(match_results)} recommended jobs",
+        total_jobs_analyzed=len(jobs),
+        matches=match_results,
+        resume_skills=resume_skills[:20],
+        processing_time_seconds=round(processing_time, 2),
+    )
+
+
+@router.get(
     "/{job_id}",
     response_model=JobResponse,
     summary="Get job details",
     description="""
     Get detailed information about a job posting.
-    
+
     **Note:** This endpoint increments the view count (unless you're the owner).
     """
 )
@@ -993,9 +1119,9 @@ async def match_jobs(
     # STEP 2: Extract skills from resume
     # =========================================================================
     
-    resume_skills = _extract_skills_from_resume(resume.content)
-    resume_experience = _extract_experience_level(resume.content)
-    resume_keywords = _extract_keywords(resume.content)
+    resume_skills = job_matching.extract_skills_from_resume(resume.content)
+    resume_experience = job_matching.extract_experience_level(resume.content)
+    resume_keywords = job_matching.extract_keywords(resume.content)
     
     logger.info(f"   Extracted {len(resume_skills)} skills from resume")
     
@@ -1047,11 +1173,11 @@ async def match_jobs(
     matches = []
     
     for job in jobs:
-        score, skill_matches, missing_skills, reasons = _calculate_match_score(
+        score, skill_matches, missing_skills, reasons = job_matching.calculate_match_score(
             resume_skills=resume_skills,
             resume_experience=resume_experience,
             resume_keywords=resume_keywords,
-            job=job
+            job=job,
         )
         
         matches.append({
@@ -1172,199 +1298,4 @@ async def close_job(
     
     return job_to_response(job)
 
-
-# =============================================================================
-# HELPER FUNCTIONS FOR JOB MATCHING
-# =============================================================================
-
-def _extract_skills_from_resume(content: Dict[str, Any]) -> List[str]:
-    """Extract all skills from resume content."""
-    skills = []
-    
-    # Get from skills section
-    skills_data = content.get("skills", {})
-    
-    if isinstance(skills_data, list):
-        skills.extend(skills_data)
-    elif isinstance(skills_data, dict):
-        # Technical skills
-        for category in skills_data.get("technical_skills", []):
-            if isinstance(category, dict):
-                skills.extend(category.get("skills", []))
-            elif isinstance(category, str):
-                skills.append(category)
-        
-        # Soft skills
-        skills.extend(skills_data.get("soft_skills", []))
-        
-        # Tools and technologies
-        skills.extend(skills_data.get("tools_technologies", []))
-    
-    # Get from work experience
-    for exp in content.get("work_experience", []):
-        if isinstance(exp, dict):
-            skills.extend(exp.get("technologies_used", []))
-    
-    # Normalize and deduplicate
-    skills = list(set(s.lower().strip() for s in skills if s))
-    
-    return skills
-
-
-def _extract_experience_level(content: Dict[str, Any]) -> str:
-    """Determine experience level from resume content."""
-    work_exp = content.get("work_experience", [])
-    
-    if not work_exp:
-        return "junior"
-    
-    # Simple heuristic based on number of positions
-    num_positions = len(work_exp)
-    
-    if num_positions >= 5:
-        return "senior"
-    elif num_positions >= 3:
-        return "mid"
-    elif num_positions >= 1:
-        return "junior"
-    else:
-        return "intern"
-
-
-def _extract_keywords(content: Dict[str, Any]) -> List[str]:
-    """Extract important keywords from resume content."""
-    keywords = []
-    
-    # From summary
-    summary = content.get("professional_summary", {})
-    if isinstance(summary, dict):
-        keywords.extend(summary.get("keywords", []))
-    
-    # From job titles
-    for exp in content.get("work_experience", []):
-        if isinstance(exp, dict) and exp.get("job_title"):
-            keywords.append(exp["job_title"].lower())
-    
-    # From education
-    for edu in content.get("education", []):
-        if isinstance(edu, dict) and edu.get("field_of_study"):
-            keywords.append(edu["field_of_study"].lower())
-    
-    return list(set(keywords))
-
-
-def _calculate_match_score(
-    resume_skills: List[str],
-    resume_experience: str,
-    resume_keywords: List[str],
-    job: Job
-) -> tuple:
-    """
-    Calculate match score between resume and job.
-    
-    Returns: (score, skill_matches, missing_skills, reasons)
-    """
-    score = 0.0
-    reasons = []
-    skill_matches = []
-    missing_skills = []
-    
-    # Normalize job requirements
-    job_requirements = []
-    if job.requirements:
-        for req in job.requirements:
-            if isinstance(req, str):
-                job_requirements.append(req.lower())
-    
-    # =========================================================================
-    # SKILL MATCHING (50 points max)
-    # =========================================================================
-    
-    # Find skill overlaps
-    for skill in resume_skills:
-        skill_lower = skill.lower()
-        for req in job_requirements:
-            if skill_lower in req or req in skill_lower:
-                if skill not in skill_matches:
-                    skill_matches.append(skill)
-                    score += 5  # 5 points per matching skill
-                break
-    
-    # Find missing skills
-    for req in job_requirements:
-        found = False
-        for skill in resume_skills:
-            if skill.lower() in req or req in skill.lower():
-                found = True
-                break
-        if not found and req not in missing_skills:
-            missing_skills.append(req)
-    
-    # Cap skill score at 50
-    skill_score = min(len(skill_matches) * 5, 50)
-    score = skill_score
-    
-    if skill_matches:
-        reasons.append(f"You have {len(skill_matches)} matching skills")
-    
-    # =========================================================================
-    # EXPERIENCE LEVEL MATCHING (20 points)
-    # =========================================================================
-    
-    experience_levels = {
-        "intern": 0,
-        "junior": 1,
-        "mid": 2,
-        "senior": 3,
-        "lead": 4,
-        "executive": 5
-    }
-    
-    resume_level = experience_levels.get(resume_experience, 1)
-    job_level = experience_levels.get(job.experience_level, 2)
-    
-    # Exact match or slightly over-qualified is good
-    level_diff = resume_level - job_level
-    
-    if level_diff == 0:
-        score += 20
-        reasons.append("Experience level matches perfectly")
-    elif level_diff == 1:
-        score += 15
-        reasons.append("Slightly over-qualified (good!)")
-    elif level_diff == -1:
-        score += 10
-        reasons.append("Slightly under-qualified, but close")
-    elif level_diff > 1:
-        score += 5
-        reasons.append("May be over-qualified for this role")
-    
-    # =========================================================================
-    # TITLE/KEYWORD MATCHING (20 points)
-    # =========================================================================
-    
-    job_title_lower = job.title.lower()
-    
-    for keyword in resume_keywords:
-        if keyword in job_title_lower:
-            score += 10
-            reasons.append(f"Your background matches: {keyword}")
-            break
-    
-    # =========================================================================
-    # REMOTE/LOCATION BONUS (10 points)
-    # =========================================================================
-    
-    if job.is_remote_allowed or job.job_type == "remote":
-        score += 5
-        reasons.append("Remote work available")
-    
-    # =========================================================================
-    # NORMALIZE SCORE TO 0-100
-    # =========================================================================
-    
-    # Max theoretical score: 50 (skills) + 20 (exp) + 20 (keywords) + 10 (bonus) = 100
-    score = min(score, 100)
-    
-    return score, skill_matches, missing_skills, reasons
 

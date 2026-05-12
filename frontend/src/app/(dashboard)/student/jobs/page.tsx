@@ -76,9 +76,10 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { formatRelativeTime, formatSalaryRange, cn } from "@/lib/utils";
-import { jobApi } from "@/lib/api";
+import { jobApi, resumeApi } from "@/lib/api";
 import { toast } from "sonner";
 import type { Job, JobType, ExperienceLevel } from "@/types/api";
+import { useTranslation } from "@/hooks/useTranslation";
 
 // NOTE: Job data is loaded from backend via useJobs().
 
@@ -136,11 +137,13 @@ function SalarySlider({
   value: [number, number];
   onChange: (value: [number, number]) => void;
 }) {
+  const { locale } = useTranslation();
+  const isRu = locale === "ru";
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between text-sm">
-        <span className="text-surface-500">Min: ${value[0].toLocaleString()}</span>
-        <span className="text-surface-500">Max: ${value[1].toLocaleString()}</span>
+        <span className="text-surface-500">{isRu ? "Мин" : "Min"}: ${value[0].toLocaleString()}</span>
+        <span className="text-surface-500">{isRu ? "Макс" : "Maks"}: ${value[1].toLocaleString()}</span>
       </div>
       <div className="relative h-2 rounded-full bg-surface-200">
         <div
@@ -175,7 +178,7 @@ function SalarySlider({
           value={value[0]}
           onChange={(e) => onChange([parseInt(e.target.value) || 0, value[1]])}
           className="text-center text-sm"
-          placeholder="Min"
+          placeholder={isRu ? "Мин" : "Min"}
         />
         <span className="flex items-center text-surface-400">-</span>
         <Input
@@ -183,7 +186,7 @@ function SalarySlider({
           value={value[1]}
           onChange={(e) => onChange([value[0], parseInt(e.target.value) || 10000])}
           className="text-center text-sm"
-          placeholder="Max"
+          placeholder={isRu ? "Макс" : "Maks"}
         />
       </div>
     </div>
@@ -253,6 +256,8 @@ function JobCard({
   onToggleSave: () => void;
   onQuickApply: () => void;
 }) {
+  const { locale } = useTranslation();
+  const isRu = locale === "ru";
   return (
     <motion.div
       layout
@@ -306,7 +311,7 @@ function JobCard({
             </span>
             {job.job_type === "remote" && (
               <Badge variant="remote" className="text-xs py-0">
-                Remote
+                {isRu ? "Удаленно" : "Masofaviy"}
               </Badge>
             )}
             <span className="flex items-center gap-1">
@@ -364,7 +369,7 @@ function JobCard({
                 className="bg-gradient-to-r from-purple-500 to-indigo-600 text-xs"
               >
                 <Zap className="mr-1 h-3 w-3" />
-                Quick Apply
+                {isRu ? "Быстрый отклик" : "Tezkor ariza"}
               </Button>
             </div>
           </div>
@@ -393,6 +398,8 @@ function JobDetailsPanel({
   onApply: () => void;
   onShare: () => void;
 }) {
+  const { locale } = useTranslation();
+  const isRu = locale === "ru";
   return (
     <motion.div
       initial={{ opacity: 0, x: 20 }}
@@ -418,7 +425,7 @@ function JobDetailsPanel({
                   className="gap-1"
                 >
                   <Target className="h-3 w-3" />
-                  {job.matchScore}% Match
+                  {job.matchScore}% {isRu ? "совпадение" : "moslik"}
                 </Badge>
               )}
               <Badge variant={job.job_type as any}>{job.job_type.replace("_", " ")}</Badge>
@@ -442,7 +449,7 @@ function JobDetailsPanel({
               <MapPin className="h-5 w-5 text-purple-600" />
             </div>
             <div>
-              <p className="text-xs text-surface-500">Location</p>
+              <p className="text-xs text-surface-500">{isRu ? "Локация" : "Joylashuv"}</p>
               <p className="font-medium text-surface-900 dark:text-white">{job.location}</p>
             </div>
           </div>
@@ -451,7 +458,7 @@ function JobDetailsPanel({
               <DollarSign className="h-5 w-5 text-green-600" />
             </div>
             <div>
-              <p className="text-xs text-surface-500">Salary</p>
+              <p className="text-xs text-surface-500">{isRu ? "Зарплата" : "Maosh"}</p>
               <p className="font-medium text-surface-900 dark:text-white">
                 {formatSalaryRange(job.salary_min, job.salary_max)}
               </p>
@@ -462,7 +469,7 @@ function JobDetailsPanel({
               <Briefcase className="h-5 w-5 text-blue-600" />
             </div>
             <div>
-              <p className="text-xs text-surface-500">Experience</p>
+              <p className="text-xs text-surface-500">{isRu ? "Опыт" : "Tajriba"}</p>
               <p className="font-medium text-surface-900 dark:text-white">
                 {job.experience_level}
               </p>
@@ -473,9 +480,9 @@ function JobDetailsPanel({
               <Users className="h-5 w-5 text-amber-600" />
             </div>
             <div>
-              <p className="text-xs text-surface-500">Applicants</p>
+              <p className="text-xs text-surface-500">{isRu ? "Кандидаты" : "Nomzodlar"}</p>
               <p className="font-medium text-surface-900 dark:text-white">
-                {job.applications_count} applied
+                {job.applications_count} {isRu ? "подали" : "ariza"}
               </p>
             </div>
           </div>
@@ -484,7 +491,7 @@ function JobDetailsPanel({
         {/* Description */}
         <div className="mt-6">
           <h3 className="font-display text-lg font-semibold text-surface-900 dark:text-white">
-            Job Description
+            {isRu ? "Описание вакансии" : "Ish tavsifi"}
           </h3>
           <div className="mt-3 whitespace-pre-line text-sm text-surface-600 dark:text-surface-400">
             {job.description}
@@ -494,13 +501,13 @@ function JobDetailsPanel({
         {/* Requirements */}
         <div className="mt-6">
           <h3 className="font-display text-lg font-semibold text-surface-900 dark:text-white">
-            Requirements
+            {isRu ? "Требования" : "Talablar"}
           </h3>
           <div className="mt-3 space-y-4">
             {/* Skills */}
             <div>
               <p className="mb-2 text-sm font-medium text-surface-700 dark:text-surface-300">
-                Required Skills
+                {isRu ? "Требуемые навыки" : "Kerakli ko'nikmalar"}
               </p>
               <div className="flex flex-wrap gap-2">
                 {job.requirements.skills?.map((skill) => (
@@ -517,7 +524,7 @@ function JobDetailsPanel({
                   <Clock className="h-4 w-4 text-surface-500" />
                 </div>
                 <div>
-                  <p className="text-xs text-surface-500">Experience</p>
+                  <p className="text-xs text-surface-500">{isRu ? "Опыт" : "Tajriba"}</p>
                   <p className="text-sm font-medium text-surface-900 dark:text-white">
                     {job.requirements.experience}
                   </p>
@@ -531,7 +538,7 @@ function JobDetailsPanel({
                   <GraduationCap className="h-4 w-4 text-surface-500" />
                 </div>
                 <div>
-                  <p className="text-xs text-surface-500">Education</p>
+                  <p className="text-xs text-surface-500">{isRu ? "Образование" : "Ta'lim"}</p>
                   <p className="text-sm font-medium text-surface-900 dark:text-white">
                     {job.requirements.education}
                   </p>
@@ -544,7 +551,7 @@ function JobDetailsPanel({
         {/* About Company */}
         <div className="mt-6">
           <h3 className="font-display text-lg font-semibold text-surface-900 dark:text-white">
-            About {job.company?.name}
+            {isRu ? "О компании" : "Kompaniya haqida"} {job.company?.name}
           </h3>
           <div className="mt-3 rounded-xl border border-surface-200 p-4 dark:border-surface-700">
             <div className="flex items-center gap-4">
@@ -555,17 +562,18 @@ function JobDetailsPanel({
                 <p className="font-semibold text-surface-900 dark:text-white">
                   {job.company?.name}
                 </p>
-                <p className="text-sm text-surface-500">Technology Company</p>
+                <p className="text-sm text-surface-500">{isRu ? "Технологическая компания" : "Texnologik kompaniya"}</p>
               </div>
             </div>
             <p className="mt-3 text-sm text-surface-600 dark:text-surface-400">
-              A leading technology company in Uzbekistan, building innovative solutions
-              for millions of users across Central Asia.
+              {isRu
+                ? "Ведущая технологическая компания Узбекистана, создающая инновационные решения для миллионов пользователей Центральной Азии."
+                : "O'zbekistondagi yetakchi texnologik kompaniya bo'lib, Markaziy Osiyodagi millionlab foydalanuvchilar uchun innovatsion yechimlar yaratadi."}
             </p>
             <div className="mt-3 flex items-center gap-4 text-sm text-surface-500">
               <span className="flex items-center gap-1">
                 <Users className="h-4 w-4" />
-                500+ employees
+                {isRu ? "500+ сотрудников" : "500+ xodim"}
               </span>
               <span className="flex items-center gap-1">
                 <Globe className="h-4 w-4" />
@@ -587,12 +595,12 @@ function JobDetailsPanel({
             {isSaved ? (
               <>
                 <BookmarkCheck className="mr-2 h-4 w-4" />
-                Saved
+                {isRu ? "Сохранено" : "Saqlandi"}
               </>
             ) : (
               <>
                 <Bookmark className="mr-2 h-4 w-4" />
-                Save for Later
+                {isRu ? "Сохранить" : "Keyinroq saqlash"}
               </>
             )}
           </Button>
@@ -609,7 +617,7 @@ function JobDetailsPanel({
           onClick={onApply}
         >
           <Send className="mr-2 h-4 w-4" />
-          Apply Now
+          {isRu ? "Откликнуться" : "Hozir ariza yuborish"}
         </Button>
       </div>
     </motion.div>
@@ -636,22 +644,136 @@ const searchSuggestions = [
 // =============================================================================
 
 export default function JobsPage() {
+  const { locale } = useTranslation();
+  const isRu = locale === "ru";
   const router = useRouter();
-  const { jobs, isLoading, fetchJobs } = useJobs();
+  const { jobs, isLoading, fetchJobs, matchJobs } = useJobs();
   const [localJobs, setLocalJobs] = useState<(Job & { matchScore?: number })[]>([]);
   const [selectedJob, setSelectedJob] = useState<(Job & { matchScore?: number }) | null>(null);
   const [savedJobs, setSavedJobs] = useState<Set<string>>(new Set());
+  const [feedMode, setFeedMode] = useState<"matched" | "all">("matched");
+  const [hasPublishedResume, setHasPublishedResume] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [sortBy, setSortBy] = useState("relevance");
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [showMobileFilters, setShowMobileFilters] = useState(false);
   const [isDesktop, setIsDesktop] = useState(false);
+  const getLocationLabel = (value: string) => {
+    const ruMap: Record<string, string> = {
+      tashkent: "Ташкент",
+      samarkand: "Самарканд",
+      bukhara: "Бухара",
+      remote: "Удаленно",
+      hybrid: "Гибрид",
+    };
+    const uzMap: Record<string, string> = {
+      tashkent: "Toshkent",
+      samarkand: "Samarqand",
+      bukhara: "Buxoro",
+      remote: "Masofaviy",
+      hybrid: "Gibrid",
+    };
+    return isRu ? ruMap[value] || value : uzMap[value] || value;
+  };
+  const getJobTypeLabel = (value: string) => {
+    const ruMap: Record<string, string> = {
+      full_time: "Полная занятость",
+      part_time: "Частичная занятость",
+      remote: "Удаленно",
+      hybrid: "Гибрид",
+      contract: "Контракт",
+    };
+    const uzMap: Record<string, string> = {
+      full_time: "To'liq stavka",
+      part_time: "Yarim stavka",
+      remote: "Masofaviy",
+      hybrid: "Gibrid",
+      contract: "Shartnoma",
+    };
+    return isRu ? ruMap[value] || value : uzMap[value] || value;
+  };
+  const getExperienceLabel = (value: string) => {
+    const ruMap: Record<string, string> = {
+      junior: "Junior",
+      mid: "Middle",
+      senior: "Senior",
+      lead: "Lead/Manager",
+    };
+    const uzMap: Record<string, string> = {
+      junior: "Junior",
+      mid: "O'rta",
+      senior: "Senior",
+      lead: "Rahbar",
+    };
+    return isRu ? ruMap[value] || value : uzMap[value] || value;
+  };
+  const getDatePostedLabel = (value: string) => {
+    const ruMap: Record<string, string> = {
+      "24h": "Последние 24 часа",
+      "7d": "Последние 7 дней",
+      "30d": "Последние 30 дней",
+      all: "Любое время",
+    };
+    const uzMap: Record<string, string> = {
+      "24h": "Oxirgi 24 soat",
+      "7d": "Oxirgi 7 kun",
+      "30d": "Oxirgi 30 kun",
+      all: "Istalgan vaqt",
+    };
+    return isRu ? ruMap[value] || value : uzMap[value] || value;
+  };
+
+  const loadMatchedJobs = useCallback(async () => {
+    const response = await resumeApi.list({ status: "published", page: 1, limit: 100 });
+    const payload = response.data?.data || response.data;
+    const resumes = Array.isArray(payload?.resumes)
+      ? payload.resumes
+      : Array.isArray(payload)
+        ? payload
+        : [];
+
+    if (resumes.length === 0) {
+      setHasPublishedResume(false);
+      return false;
+    }
+
+    setHasPublishedResume(true);
+    const bestResume = [...resumes].sort((a: any, b: any) => {
+      const left = new Date(a?.updated_at || a?.created_at || 0).getTime();
+      const right = new Date(b?.updated_at || b?.created_at || 0).getTime();
+      return right - left;
+    })[0];
+
+    if (!bestResume?.id) {
+      return false;
+    }
+
+    await matchJobs(bestResume.id);
+    return true;
+  }, [matchJobs]);
+
+  const loadJobsForFeedMode = useCallback(async (mode: "matched" | "all") => {
+    if (mode === "all") {
+      await fetchJobs();
+      return;
+    }
+
+    try {
+      const matchedLoaded = await loadMatchedJobs();
+      if (!matchedLoaded) {
+        setFeedMode("all");
+        await fetchJobs();
+      }
+    } catch {
+      setFeedMode("all");
+      await fetchJobs();
+    }
+  }, [fetchJobs, loadMatchedJobs]);
 
   // Load jobs from backend
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
-    fetchJobs();
+    void loadJobsForFeedMode("matched");
     // Load saved jobs
     jobApi.savedJobs({ limit: 100 }).then((res) => {
       const data = res.data?.data || res.data;
@@ -659,7 +781,7 @@ export default function JobsPage() {
         setSavedJobs(new Set(data.map((j: any) => j.id)));
       }
     }).catch(() => {});
-  }, []);
+  }, [loadJobsForFeedMode]);
 
   useEffect(() => {
     const updateViewport = () => {
@@ -678,6 +800,24 @@ export default function JobsPage() {
   useEffect(() => {
     setLocalJobs(jobs as (Job & { matchScore?: number })[]);
   }, [jobs]);
+
+  const switchToAllJobs = useCallback(async () => {
+    setFeedMode("all");
+    await loadJobsForFeedMode("all");
+  }, [loadJobsForFeedMode]);
+
+  const switchToMatchedJobs = useCallback(async () => {
+    try {
+      const ok = await loadMatchedJobs();
+      if (!ok) {
+        toast.info(isRu ? "Опубликованное резюме не найдено. Сначала опубликуйте резюме." : "Nashr qilingan rezyume topilmadi. Avval rezyumeni nashr qiling.");
+        return;
+      }
+      setFeedMode("matched");
+    } catch {
+      toast.error(isRu ? "Не удалось загрузить подходящие вакансии." : "Mos ishlarni yuklashda xatolik yuz berdi.");
+    }
+  }, [isRu, loadMatchedJobs]);
 
   // Filter states
   const [filters, setFilters] = useState({
@@ -883,7 +1023,7 @@ export default function JobsPage() {
           <div className="flex items-center gap-2">
             <Filter className="h-5 w-5 text-purple-600" />
             <span className="font-display font-semibold text-surface-900 dark:text-white">
-              Filters
+              {isRu ? "Фильтры" : "Filtrlar"}
             </span>
             {activeFiltersCount > 0 && (
               <Badge variant="default" className="ml-2">
@@ -897,14 +1037,14 @@ export default function JobsPage() {
               className="flex items-center gap-1 text-xs text-purple-600 hover:underline"
             >
               <RotateCcw className="h-3 w-3" />
-              Reset
+              {isRu ? "Сброс" : "Tozalash"}
             </button>
           )}
         </div>
 
         {/* Location Filter */}
         <FilterSection
-          title="Location"
+          title={isRu ? "Локация" : "Joylashuv"}
           isOpen={openSections.location}
           onToggle={() => toggleSection("location")}
         >
@@ -921,7 +1061,7 @@ export default function JobsPage() {
                   className="h-4 w-4 rounded border-surface-300 text-purple-600 focus:ring-purple-500"
                 />
                 <span className="text-sm text-surface-700 dark:text-surface-300">
-                  {option.label}
+                  {getLocationLabel(option.value)}
                 </span>
               </label>
             ))}
@@ -930,7 +1070,7 @@ export default function JobsPage() {
 
         {/* Job Type Filter */}
         <FilterSection
-          title="Job Type"
+          title={isRu ? "Тип работы" : "Ish turi"}
           isOpen={openSections.jobType}
           onToggle={() => toggleSection("jobType")}
         >
@@ -948,7 +1088,7 @@ export default function JobsPage() {
                 />
                 <option.icon className="h-4 w-4 text-surface-400" />
                 <span className="text-sm text-surface-700 dark:text-surface-300">
-                  {option.label}
+                  {getJobTypeLabel(option.value)}
                 </span>
               </label>
             ))}
@@ -957,7 +1097,7 @@ export default function JobsPage() {
 
         {/* Experience Level Filter */}
         <FilterSection
-          title="Experience Level"
+          title={isRu ? "Уровень опыта" : "Tajriba darajasi"}
           isOpen={openSections.experience}
           onToggle={() => toggleSection("experience")}
         >
@@ -975,7 +1115,7 @@ export default function JobsPage() {
                 />
                 <div>
                   <span className="text-sm text-surface-700 dark:text-surface-300">
-                    {option.label}
+                    {getExperienceLabel(option.value)}
                   </span>
                   <span className="ml-1 text-xs text-surface-400">
                     ({option.sublabel})
@@ -988,7 +1128,7 @@ export default function JobsPage() {
 
         {/* Salary Range Filter */}
         <FilterSection
-          title="Salary Range"
+          title={isRu ? "Диапазон зарплаты" : "Maosh oralig'i"}
           isOpen={openSections.salary}
           onToggle={() => toggleSection("salary")}
         >
@@ -1002,7 +1142,7 @@ export default function JobsPage() {
 
         {/* Company Filter */}
         <FilterSection
-          title="Company"
+          title={isRu ? "Компания" : "Kompaniya"}
           isOpen={openSections.company}
           onToggle={() => toggleSection("company")}
         >
@@ -1028,7 +1168,7 @@ export default function JobsPage() {
 
         {/* Date Posted Filter */}
         <FilterSection
-          title="Date Posted"
+          title={isRu ? "Дата публикации" : "Joylangan sana"}
           isOpen={openSections.datePosted}
           onToggle={() => toggleSection("datePosted")}
         >
@@ -1048,7 +1188,7 @@ export default function JobsPage() {
                   className="h-4 w-4 border-surface-300 text-purple-600 focus:ring-purple-500"
                 />
                 <span className="text-sm text-surface-700 dark:text-surface-300">
-                  {option.label}
+                  {getDatePostedLabel(option.value)}
                 </span>
               </label>
             ))}
@@ -1065,7 +1205,7 @@ export default function JobsPage() {
             <Search className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-surface-400" />
             <input
               type="text"
-              placeholder="Search jobs, companies, skills..."
+              placeholder={isRu ? "Vakansiya, kompaniya, ko'nikmalarni qidiring..." : "Vakansiya, kompaniya, ko'nikmalarni qidiring..."}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               onFocus={() => setShowSuggestions(true)}
@@ -1107,6 +1247,33 @@ export default function JobsPage() {
 
           {/* Actions */}
           <div className="flex items-center gap-3">
+            <div className="hidden items-center gap-2 rounded-xl border border-surface-200 p-1 dark:border-surface-700 sm:flex">
+              <Button
+                type="button"
+                size="sm"
+                variant={feedMode === "matched" ? "default" : "ghost"}
+                onClick={() => {
+                  void switchToMatchedJobs();
+                }}
+                className={cn(feedMode === "matched" && "bg-gradient-to-r from-purple-500 to-indigo-600")}
+              >
+                <Target className="mr-1 h-3.5 w-3.5" />
+                Mos ishlar
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant={feedMode === "all" ? "default" : "ghost"}
+                onClick={() => {
+                  void switchToAllJobs();
+                }}
+                className={cn(feedMode === "all" && "bg-gradient-to-r from-purple-500 to-indigo-600")}
+              >
+                <Briefcase className="mr-1 h-3.5 w-3.5" />
+                Barcha ishlar
+              </Button>
+            </div>
+
             {/* Mobile Filters Button */}
             <Button
               variant="outline"
@@ -1114,7 +1281,7 @@ export default function JobsPage() {
               onClick={() => setShowMobileFilters(true)}
             >
               <Filter className="mr-2 h-4 w-4" />
-              Filters
+              {isRu ? "Фильтры" : "Filtrlar"}
               {activeFiltersCount > 0 && (
                 <Badge variant="default" className="ml-2">
                   {activeFiltersCount}
@@ -1125,25 +1292,25 @@ export default function JobsPage() {
             {/* Sort */}
             <Select value={sortBy} onValueChange={setSortBy}>
               <SelectTrigger className="w-40">
-                <SelectValue placeholder="Sort by" />
+                <SelectValue placeholder={isRu ? "Сортировка" : "Saralash"} />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="relevance">
                   <span className="flex items-center gap-2">
                     <Target className="h-4 w-4" />
-                    Relevance
+                    {isRu ? "По релевантности" : "Moslik bo'yicha"}
                   </span>
                 </SelectItem>
                 <SelectItem value="date">
                   <span className="flex items-center gap-2">
                     <Clock className="h-4 w-4" />
-                    Most Recent
+                    {isRu ? "Сначала новые" : "Eng yangi"}
                   </span>
                 </SelectItem>
                 <SelectItem value="salary">
                   <span className="flex items-center gap-2">
                     <DollarSign className="h-4 w-4" />
-                    Highest Salary
+                    {isRu ? "Самая высокая зарплата" : "Eng yuqori maosh"}
                   </span>
                 </SelectItem>
               </SelectContent>
@@ -1154,19 +1321,32 @@ export default function JobsPage() {
         {/* Results Count */}
         <div className="mb-4 flex items-center justify-between">
           <p className="text-sm text-surface-500">
-            Showing{" "}
+            {isRu ? "Показано" : "Ko'rsatilmoqda"}{" "}
             <span className="font-medium text-surface-900 dark:text-white">
               {sortedJobs.length}
             </span>{" "}
-            jobs
+            {isRu ? "вакансий" : "ta ish"}
           </p>
+          <div className="flex items-center gap-2">
+            {feedMode === "matched" && (
+              <Badge variant="success" className="gap-1">
+                <Target className="h-3 w-3" />
+                {isRu ? "Подбор по резюме" : "Rezyume asosida moslangan"}
+              </Badge>
+            )}
+            {feedMode === "all" && !hasPublishedResume && (
+              <Badge variant="secondary">
+                {isRu ? "Опубликованное резюме не найдено" : "Nashr qilingan rezyume topilmadi"}
+              </Badge>
+            )}
+          </div>
           {activeFiltersCount > 0 && (
             <button
               onClick={resetFilters}
               className="flex items-center gap-1 text-sm text-purple-600 hover:underline lg:hidden"
             >
               <X className="h-4 w-4" />
-              Clear filters
+              {isRu ? "Очистить фильтры" : "Filtrlarni tozalash"}
             </button>
           )}
         </div>
@@ -1205,14 +1385,14 @@ export default function JobsPage() {
                 <Briefcase className="h-10 w-10 text-surface-400" />
               </div>
               <h3 className="font-display text-xl font-semibold text-surface-900 dark:text-white">
-                No jobs found
+                {isRu ? "Вакансии не найдены" : "Ishlar topilmadi"}
               </h3>
               <p className="mt-2 max-w-sm text-surface-500">
-                Try adjusting your search or filter criteria to find more opportunities.
+                {isRu ? "Попробуйте изменить поиск или фильтры, чтобы найти больше вариантов." : "Ko'proq imkoniyatlar uchun qidiruv yoki filtrlarni o'zgartirib ko'ring."}
               </p>
               <Button variant="outline" onClick={resetFilters} className="mt-6">
                 <RotateCcw className="mr-2 h-4 w-4" />
-                Reset Filters
+                {isRu ? "Сбросить фильтры" : "Filtrlarni tozalash"}
               </Button>
             </div>
           ) : (
@@ -1236,7 +1416,7 @@ export default function JobsPage() {
                 {isLoadingMore && (
                   <div className="flex items-center justify-center gap-2 text-sm text-surface-500">
                     <Loader2 className="h-4 w-4 animate-spin" />
-                    Loading more jobs...
+                    {isRu ? "Вакансии загружаются..." : "Ishlar yuklanmoqda..."}
                   </div>
                 )}
               </div>
@@ -1272,10 +1452,10 @@ export default function JobsPage() {
                 <Briefcase className="h-10 w-10 text-surface-400" />
               </div>
               <h3 className="font-display text-lg font-semibold text-surface-900 dark:text-white">
-                Select a job
+                {isRu ? "Вакансияni tanlang" : "Ishni tanlang"}
               </h3>
               <p className="mt-2 text-sm text-surface-500">
-                Click on a job to view details
+                {isRu ? "Подробности uchun vakansiyani bosing" : "Tafsilotlarni ko'rish uchun ishni bosing"}
               </p>
             </motion.div>
           )}
@@ -1309,14 +1489,14 @@ export default function JobsPage() {
       <Dialog open={showMobileFilters} onOpenChange={setShowMobileFilters}>
         <DialogContent className="max-h-[80vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Filters</DialogTitle>
+            <DialogTitle>{isRu ? "Фильтры" : "Filtrlar"}</DialogTitle>
           </DialogHeader>
           
           {/* Same filter content as sidebar */}
           <div className="space-y-4">
             {/* Location */}
             <div>
-              <label className="mb-2 block text-sm font-medium">Location</label>
+              <label className="mb-2 block text-sm font-medium">{isRu ? "Локация" : "Joylashuv"}</label>
               <div className="space-y-2">
                 {locationOptions.map((option) => (
                   <label
@@ -1329,7 +1509,7 @@ export default function JobsPage() {
                       onChange={() => toggleFilterValue("locations", option.value)}
                       className="h-4 w-4 rounded border-surface-300 text-purple-600"
                     />
-                    <span className="text-sm">{option.label}</span>
+                    <span className="text-sm">{getLocationLabel(option.value)}</span>
                   </label>
                 ))}
               </div>
@@ -1337,7 +1517,7 @@ export default function JobsPage() {
 
             {/* Job Type */}
             <div>
-              <label className="mb-2 block text-sm font-medium">Job Type</label>
+              <label className="mb-2 block text-sm font-medium">{isRu ? "Тип работы" : "Ish turi"}</label>
               <div className="space-y-2">
                 {jobTypeOptions.map((option) => (
                   <label
@@ -1350,7 +1530,7 @@ export default function JobsPage() {
                       onChange={() => toggleFilterValue("jobTypes", option.value)}
                       className="h-4 w-4 rounded border-surface-300 text-purple-600"
                     />
-                    <span className="text-sm">{option.label}</span>
+                    <span className="text-sm">{getJobTypeLabel(option.value)}</span>
                   </label>
                 ))}
               </div>
@@ -1358,7 +1538,7 @@ export default function JobsPage() {
 
             {/* Experience Level */}
             <div>
-              <label className="mb-2 block text-sm font-medium">Experience</label>
+              <label className="mb-2 block text-sm font-medium">{isRu ? "Опыт" : "Tajriba"}</label>
               <div className="space-y-2">
                 {experienceLevelOptions.map((option) => (
                   <label
@@ -1371,7 +1551,7 @@ export default function JobsPage() {
                       onChange={() => toggleFilterValue("experienceLevels", option.value)}
                       className="h-4 w-4 rounded border-surface-300 text-purple-600"
                     />
-                    <span className="text-sm">{option.label}</span>
+                    <span className="text-sm">{getExperienceLabel(option.value)}</span>
                   </label>
                 ))}
               </div>
@@ -1379,7 +1559,7 @@ export default function JobsPage() {
 
             {/* Salary */}
             <div>
-              <label className="mb-2 block text-sm font-medium">Salary Range</label>
+              <label className="mb-2 block text-sm font-medium">{isRu ? "Диапазон зарплаты" : "Maosh oralig'i"}</label>
               <SalarySlider
                 value={filters.salaryRange}
                 onChange={(value) =>
@@ -1391,13 +1571,13 @@ export default function JobsPage() {
 
           <div className="mt-6 flex gap-3">
             <Button variant="outline" onClick={resetFilters} className="flex-1">
-              Reset
+              {isRu ? "Сброс" : "Tozalash"}
             </Button>
             <Button
               onClick={() => setShowMobileFilters(false)}
               className="flex-1 bg-gradient-to-r from-purple-500 to-indigo-600"
             >
-              Apply Filters
+              {isRu ? "Применить фильтры" : "Filtrlarni qo'llash"}
             </Button>
           </div>
         </DialogContent>

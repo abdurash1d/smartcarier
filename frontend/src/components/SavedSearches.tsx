@@ -11,6 +11,8 @@ import { Button } from '@/components/ui/button';
 import { api } from '@/lib/api';
 import { toast } from 'sonner';
 import { formatDistanceToNow } from 'date-fns';
+import { ru, uz } from 'date-fns/locale';
+import { useTranslation } from '@/hooks/useTranslation';
 
 interface SavedSearch {
   id: string;
@@ -27,6 +29,9 @@ interface SavedSearchesProps {
 }
 
 export function SavedSearches({ searchType, onApplySearch }: SavedSearchesProps) {
+  const { locale } = useTranslation();
+  const isRu = locale === "ru";
+  const dateLocale = isRu ? ru : uz;
   const [searches, setSearches] = useState<SavedSearch[]>([]);
   const [loading, setLoading] = useState(false);
 
@@ -52,10 +57,10 @@ export function SavedSearches({ searchType, onApplySearch }: SavedSearchesProps)
         filters,
       });
       
-      toast.success('Search saved!');
+      toast.success(isRu ? "Поиск сохранен!" : "Qidiruv saqlandi!");
       fetchSavedSearches();
     } catch (error: any) {
-      toast.error(error.response?.data?.detail || 'Failed to save search');
+      toast.error(error.response?.data?.detail || (isRu ? "Не удалось сохранить поиск" : "Qidiruvni saqlab bo'lmadi"));
     } finally {
       setLoading(false);
     }
@@ -69,24 +74,24 @@ export function SavedSearches({ searchType, onApplySearch }: SavedSearchesProps)
       // Apply filters
       onApplySearch(search.filters);
       
-      toast.success(`Applied "${search.name}"`);
+      toast.success(isRu ? `"${search.name}" применен` : `"${search.name}" qo'llandi`);
       
       // Refresh to update last_used_at
       fetchSavedSearches();
     } catch (error) {
-      toast.error('Failed to apply search');
+      toast.error(isRu ? "Не удалось применить поиск" : "Qidiruvni qo'llab bo'lmadi");
     }
   };
 
   const deleteSearch = async (id: string) => {
-    if (!confirm('Delete this saved search?')) return;
+    if (!confirm(isRu ? 'Удалить этот сохраненный поиск?' : "Bu saqlangan qidiruv o'chirilsinmi?")) return;
     
     try {
       await api.delete(`/saved-searches/${id}`);
-      toast.success('Search deleted');
+      toast.success(isRu ? "Поиск удален" : "Qidiruv o'chirildi");
       fetchSavedSearches();
     } catch (error) {
-      toast.error('Failed to delete search');
+      toast.error(isRu ? "Не удалось удалить поиск" : "Qidiruvni o'chirib bo'lmadi");
     }
   };
 
@@ -95,8 +100,8 @@ export function SavedSearches({ searchType, onApplySearch }: SavedSearchesProps)
       {searches.length === 0 ? (
         <div className="text-center py-8 text-surface-500">
           <Bookmark className="h-10 w-10 mx-auto mb-2 opacity-50" />
-          <p className="text-sm">No saved searches yet</p>
-          <p className="text-xs mt-1">Save your frequent searches for quick access</p>
+          <p className="text-sm">{isRu ? "Сохраненных поисков пока нет" : "Saqlangan qidiruvlar hali yo'q"}</p>
+          <p className="text-xs mt-1">{isRu ? "Сохраните частые поиски для быстрого доступа" : "Tez kirish uchun tez-tez ishlatiladigan qidiruvlarni saqlang"}</p>
         </div>
       ) : (
         searches.map(search => (
@@ -114,7 +119,8 @@ export function SavedSearches({ searchType, onApplySearch }: SavedSearchesProps)
               <p className="font-medium text-sm">{search.name}</p>
               <p className="text-xs text-surface-500 mt-1">
                 <Clock className="h-3 w-3 inline mr-1" />
-                Used {formatDistanceToNow(new Date(search.last_used_at), { addSuffix: true })}
+                {isRu ? "Использовано: " : "Oxirgi foydalanish: "}
+                {formatDistanceToNow(new Date(search.last_used_at), { addSuffix: true, locale: dateLocale })}
               </p>
             </div>
 
@@ -125,7 +131,7 @@ export function SavedSearches({ searchType, onApplySearch }: SavedSearchesProps)
                 size="sm"
                 onClick={() => applySearch(search)}
               >
-                Apply
+                {isRu ? "Применить" : "Qo'llash"}
               </Button>
               <Button
                 variant="ghost"
@@ -159,7 +165,7 @@ export async function saveSearch(
   } catch (error: any) {
     return { 
       success: false, 
-      error: error.response?.data?.detail || 'Failed to save search' 
+      error: error.response?.data?.detail || "Qidiruvni saqlab bo'lmadi" 
     };
   }
 }

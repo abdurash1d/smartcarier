@@ -52,13 +52,13 @@ import { ThemeToggle } from "@/components/ui/theme-toggle";
 // =============================================================================
 
 const fadeInUp = {
-  initial: { opacity: 0, y: 20 },
+  initial: { opacity: 1, y: 0 },
   animate: { opacity: 1, y: 0 },
   transition: { duration: 0.5 },
 };
 
 const fadeIn = {
-  initial: { opacity: 0 },
+  initial: { opacity: 1 },
   animate: { opacity: 1 },
   transition: { duration: 0.5 },
 };
@@ -72,7 +72,7 @@ const staggerContainer = {
 };
 
 const scaleIn = {
-  initial: { opacity: 0, scale: 0.9 },
+  initial: { opacity: 1, scale: 1 },
   animate: { opacity: 1, scale: 1 },
   transition: { duration: 0.5 },
 };
@@ -202,7 +202,7 @@ const testimonials = [
     company: "EPAM Systems",
     image: null,
     quote:
-      "SmartCareer AI completely transformed my job search. The AI resume generator helped me create a professional resume that got me 5x more interviews!",
+      "CareerUZ completely transformed my job search. The AI resume generator helped me create a professional resume that got me 5x more interviews!",
     rating: 5,
   },
   {
@@ -220,7 +220,7 @@ const testimonials = [
     company: "Click.uz",
     image: null,
     quote:
-      "As a fresh graduate, I didn't know how to write a proper resume. SmartCareer AI created a stunning resume that helped me land my first tech job.",
+      "As a fresh graduate, I didn't know how to write a proper resume. CareerUZ created a stunning resume that helped me land my first tech job.",
     rating: 5,
   },
   {
@@ -263,15 +263,15 @@ function TestimonialCard({
 }) {
   return (
     <motion.div
-      initial={{ opacity: 0, scale: 0.9 }}
+      initial={false}
       animate={{ opacity: isActive ? 1 : 0.5, scale: isActive ? 1 : 0.95 }}
       transition={{ duration: 0.3 }}
-      className={`relative rounded-2xl border bg-white p-6 shadow-xl transition-all ${
-        isActive ? "border-brand-500/50" : "border-surface-200"
+      className={`relative rounded-2xl border bg-white p-6 shadow-xl transition-all dark:bg-surface-900/80 ${
+        isActive ? "border-brand-500/50" : "border-surface-200 dark:border-surface-700"
       }`}
     >
       {/* Quote */}
-      <p className="mb-6 text-surface-600 italic">&ldquo;{testimonial.quote}&rdquo;</p>
+      <p className="mb-6 text-surface-600 italic dark:text-surface-300">&ldquo;{testimonial.quote}&rdquo;</p>
 
       {/* Rating */}
       <div className="mb-4 flex gap-1">
@@ -289,8 +289,8 @@ function TestimonialCard({
             .join("")}
         </div>
         <div>
-          <p className="font-semibold text-surface-900">{testimonial.name}</p>
-          <p className="text-sm text-surface-500">
+          <p className="font-semibold text-surface-900 dark:text-surface-100">{testimonial.name}</p>
+          <p className="text-sm text-surface-500 dark:text-surface-400">
             {testimonial.role} at {testimonial.company}
           </p>
         </div>
@@ -319,11 +319,11 @@ export default function LandingPage() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-white text-surface-900 transition-colors dark:bg-surface-950 dark:text-surface-100">
       {/* ===================================================================
           NAVIGATION
           =================================================================== */}
-      <nav className="fixed top-0 left-0 right-0 z-50 border-b border-surface-200/50 bg-white/80 backdrop-blur-xl">
+      <nav className="fixed top-0 left-0 right-0 z-50 border-b border-surface-200/50 bg-white/80 backdrop-blur-xl transition-colors dark:border-surface-700/60 dark:bg-surface-950/80">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="flex h-16 items-center justify-between">
             {/* Logo */}
@@ -331,32 +331,32 @@ export default function LandingPage() {
               <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-purple-500 to-indigo-600 shadow-lg shadow-purple-500/25">
                 <Sparkles className="h-5 w-5 text-white" />
               </div>
-              <span className="font-display text-xl font-bold text-surface-900">SmartCareer</span>
+              <span className="font-display text-xl font-bold text-surface-900 dark:text-surface-100">CareerUZ</span>
             </Link>
 
             {/* Nav Links */}
             <div className="hidden items-center gap-8 md:flex">
               <Link
                 href="#features"
-                className="text-sm font-medium text-surface-600 transition-colors hover:text-surface-900"
+                className="text-sm font-medium text-surface-600 transition-colors hover:text-surface-900 dark:text-surface-300 dark:hover:text-surface-100"
               >
                 {t("nav.features")}
               </Link>
               <Link
                 href="#how-it-works"
-                className="text-sm font-medium text-surface-600 transition-colors hover:text-surface-900"
+                className="text-sm font-medium text-surface-600 transition-colors hover:text-surface-900 dark:text-surface-300 dark:hover:text-surface-100"
               >
                 {t("nav.howItWorks")}
               </Link>
               <Link
                 href="#pricing"
-                className="text-sm font-medium text-surface-600 transition-colors hover:text-surface-900"
+                className="text-sm font-medium text-surface-600 transition-colors hover:text-surface-900 dark:text-surface-300 dark:hover:text-surface-100"
               >
                 {t("nav.pricing")}
               </Link>
               <Link
                 href="#testimonials"
-                className="text-sm font-medium text-surface-600 transition-colors hover:text-surface-900"
+                className="text-sm font-medium text-surface-600 transition-colors hover:text-surface-900 dark:text-surface-300 dark:hover:text-surface-100"
               >
                 {t("nav.testimonials")}
               </Link>
@@ -372,7 +372,7 @@ export default function LandingPage() {
               
               <Link
                 href="/login"
-                className="rounded-lg px-4 py-2 text-sm font-medium text-surface-600 transition-colors hover:text-surface-900"
+                className="rounded-lg px-4 py-2 text-sm font-medium text-surface-600 transition-colors hover:text-surface-900 dark:text-surface-300 dark:hover:text-surface-100"
               >
                 {t("nav.signIn")}
               </Link>
@@ -392,7 +392,7 @@ export default function LandingPage() {
           =================================================================== */}
       <section className="relative min-h-screen overflow-hidden pt-16">
         {/* Gradient Background */}
-        <div className="absolute inset-0 bg-gradient-to-br from-purple-600 via-indigo-600 to-blue-700">
+        <div className="absolute inset-0 bg-gradient-to-br from-fuchsia-500 via-indigo-500 to-blue-600 dark:from-slate-950 dark:via-indigo-950 dark:to-slate-900">
           {/* Animated shapes */}
           <div className="absolute inset-0 overflow-hidden">
             <motion.div
@@ -441,7 +441,7 @@ export default function LandingPage() {
           <div className="text-center">
             {/* Headline */}
             <motion.h1
-              initial={{ opacity: 0, y: 20 }}
+              initial={false}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.3 }}
               className="mx-auto max-w-4xl font-display text-4xl font-bold tracking-tight text-white sm:text-5xl lg:text-6xl xl:text-7xl"
@@ -451,7 +451,7 @@ export default function LandingPage() {
 
             {/* Subheadline */}
             <motion.p
-              initial={{ opacity: 0, y: 20 }}
+              initial={false}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.4 }}
               className="mx-auto mt-6 max-w-2xl text-lg text-purple-100 sm:text-xl"
@@ -461,7 +461,7 @@ export default function LandingPage() {
 
             {/* CTA Buttons */}
             <motion.div
-              initial={{ opacity: 0, y: 20 }}
+              initial={false}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.5 }}
               className="mt-10 flex flex-col items-center justify-center gap-4 sm:flex-row"
@@ -483,7 +483,7 @@ export default function LandingPage() {
 
             {/* Stats */}
             <motion.div
-              initial={{ opacity: 0, y: 20 }}
+              initial={false}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.6 }}
               className="mt-16 grid grid-cols-2 gap-8 sm:grid-cols-4"
@@ -499,7 +499,7 @@ export default function LandingPage() {
 
           {/* Hero Image / Dashboard Preview */}
           <motion.div
-            initial={{ opacity: 0, y: 40 }}
+            initial={false}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.7, duration: 0.8 }}
             className="relative mx-auto mt-16 max-w-5xl"
@@ -517,7 +517,7 @@ export default function LandingPage() {
                   <div className="h-3 w-3 rounded-full bg-green-400" />
                 </div>
                 <div className="ml-4 flex-1 rounded-lg bg-white/10 px-3 py-1 text-xs text-white/70">
-                  smartcareer.uz/dashboard
+                  careeruz.uz/dashboard
                 </div>
               </div>
 
@@ -581,10 +581,10 @@ export default function LandingPage() {
 
         {/* Wave separator */}
         <div className="absolute bottom-0 left-0 right-0">
-          <svg viewBox="0 0 1440 120" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <svg viewBox="0 0 1440 120" fill="none" xmlns="http://www.w3.org/2000/svg" className="text-white dark:text-surface-950">
             <path
               d="M0 120L60 110C120 100 240 80 360 70C480 60 600 60 720 65C840 70 960 80 1080 85C1200 90 1320 90 1380 90L1440 90V120H1380C1320 120 1200 120 1080 120C960 120 840 120 720 120C600 120 480 120 360 120C240 120 120 120 60 120H0Z"
-              fill="white"
+              fill="currentColor"
             />
           </svg>
         </div>
@@ -596,7 +596,7 @@ export default function LandingPage() {
       <section id="features" className="py-20 lg:py-32">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <motion.div
-            initial="initial"
+            initial={false}
             whileInView="animate"
             viewport={{ once: true }}
             variants={staggerContainer}
@@ -604,13 +604,13 @@ export default function LandingPage() {
           >
             <motion.span
               variants={fadeInUp}
-              className="inline-block rounded-full bg-purple-100 px-4 py-1.5 text-sm font-semibold text-purple-700"
+              className="inline-block rounded-full bg-purple-100 px-4 py-1.5 text-sm font-semibold text-purple-700 dark:bg-purple-500/20 dark:text-purple-200"
             >
               {t("landing.features.badge")}
             </motion.span>
             <motion.h2
               variants={fadeInUp}
-              className="mt-4 font-display text-3xl font-bold text-surface-900 sm:text-4xl lg:text-5xl"
+              className="mt-4 font-display text-3xl font-bold text-surface-900 dark:text-surface-100 sm:text-4xl lg:text-5xl"
             >
               {t("landing.features.title")}{" "}
               <span className="bg-gradient-to-r from-purple-600 to-indigo-600 bg-clip-text text-transparent">
@@ -619,14 +619,14 @@ export default function LandingPage() {
             </motion.h2>
             <motion.p
               variants={fadeInUp}
-              className="mx-auto mt-4 max-w-2xl text-lg text-surface-600"
+              className="mx-auto mt-4 max-w-2xl text-lg text-surface-600 dark:text-surface-300"
             >
               {t("landing.features.subtitle")}
             </motion.p>
           </motion.div>
 
           <motion.div
-            initial="initial"
+            initial={false}
             whileInView="animate"
             viewport={{ once: true }}
             variants={staggerContainer}
@@ -636,17 +636,17 @@ export default function LandingPage() {
             <motion.div
               variants={fadeInUp}
               whileHover={{ y: -8 }}
-              className="group relative overflow-hidden rounded-3xl border border-surface-200 bg-white p-8 shadow-lg transition-all hover:shadow-2xl"
+              className="group relative overflow-hidden rounded-3xl border border-surface-200 bg-white p-8 shadow-lg transition-all hover:shadow-2xl dark:border-surface-700 dark:bg-surface-900/70 dark:shadow-surface-950/40"
             >
               <div className="absolute inset-0 bg-gradient-to-br from-purple-500 to-indigo-600 opacity-0 transition-opacity group-hover:opacity-5" />
               <div className="relative">
                 <div className="mb-6 inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-purple-500/10">
                   <Bot className="h-7 w-7 text-purple-500" />
                 </div>
-                <h3 className="mb-3 font-display text-xl font-bold text-surface-900">
+                <h3 className="mb-3 font-display text-xl font-bold text-surface-900 dark:text-surface-100">
                   {t("landing.features.ai.title")}
                 </h3>
-                <p className="text-surface-600">{t("landing.features.ai.description")}</p>
+                <p className="text-surface-600 dark:text-surface-300">{t("landing.features.ai.description")}</p>
                 <Link
                   href="#"
                   className="mt-4 inline-flex items-center gap-1 text-sm font-semibold text-purple-500 opacity-0 transition-opacity group-hover:opacity-100"
@@ -660,17 +660,17 @@ export default function LandingPage() {
             <motion.div
               variants={fadeInUp}
               whileHover={{ y: -8 }}
-              className="group relative overflow-hidden rounded-3xl border border-surface-200 bg-white p-8 shadow-lg transition-all hover:shadow-2xl"
+              className="group relative overflow-hidden rounded-3xl border border-surface-200 bg-white p-8 shadow-lg transition-all hover:shadow-2xl dark:border-surface-700 dark:bg-surface-900/70 dark:shadow-surface-950/40"
             >
               <div className="absolute inset-0 bg-gradient-to-br from-cyan-500 to-blue-600 opacity-0 transition-opacity group-hover:opacity-5" />
               <div className="relative">
                 <div className="mb-6 inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-cyan-500/10">
                   <Target className="h-7 w-7 text-cyan-500" />
                 </div>
-                <h3 className="mb-3 font-display text-xl font-bold text-surface-900">
+                <h3 className="mb-3 font-display text-xl font-bold text-surface-900 dark:text-surface-100">
                   {t("landing.features.matching.title")}
                 </h3>
-                <p className="text-surface-600">{t("landing.features.matching.description")}</p>
+                <p className="text-surface-600 dark:text-surface-300">{t("landing.features.matching.description")}</p>
                 <Link
                   href="#"
                   className="mt-4 inline-flex items-center gap-1 text-sm font-semibold text-cyan-500 opacity-0 transition-opacity group-hover:opacity-100"
@@ -684,17 +684,17 @@ export default function LandingPage() {
             <motion.div
               variants={fadeInUp}
               whileHover={{ y: -8 }}
-              className="group relative overflow-hidden rounded-3xl border border-surface-200 bg-white p-8 shadow-lg transition-all hover:shadow-2xl"
+              className="group relative overflow-hidden rounded-3xl border border-surface-200 bg-white p-8 shadow-lg transition-all hover:shadow-2xl dark:border-surface-700 dark:bg-surface-900/70 dark:shadow-surface-950/40"
             >
               <div className="absolute inset-0 bg-gradient-to-br from-amber-500 to-orange-600 opacity-0 transition-opacity group-hover:opacity-5" />
               <div className="relative">
                 <div className="mb-6 inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-500/10">
                   <Zap className="h-7 w-7 text-amber-500" />
                 </div>
-                <h3 className="mb-3 font-display text-xl font-bold text-surface-900">
+                <h3 className="mb-3 font-display text-xl font-bold text-surface-900 dark:text-surface-100">
                   {t("landing.features.autoApply.title")}
                 </h3>
-                <p className="text-surface-600">{t("landing.features.autoApply.description")}</p>
+                <p className="text-surface-600 dark:text-surface-300">{t("landing.features.autoApply.description")}</p>
                 <Link
                   href="#"
                   className="mt-4 inline-flex items-center gap-1 text-sm font-semibold text-amber-500 opacity-0 transition-opacity group-hover:opacity-100"
@@ -710,10 +710,10 @@ export default function LandingPage() {
       {/* ===================================================================
           HOW IT WORKS SECTION
           =================================================================== */}
-      <section id="how-it-works" className="bg-surface-50 py-20 lg:py-32">
+      <section id="how-it-works" className="bg-surface-50 py-20 lg:py-32 dark:bg-surface-900/40">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <motion.div
-            initial="initial"
+            initial={false}
             whileInView="animate"
             viewport={{ once: true }}
             variants={staggerContainer}
@@ -721,13 +721,13 @@ export default function LandingPage() {
           >
             <motion.span
               variants={fadeInUp}
-              className="inline-block rounded-full bg-cyan-100 px-4 py-1.5 text-sm font-semibold text-cyan-700"
+              className="inline-block rounded-full bg-cyan-100 px-4 py-1.5 text-sm font-semibold text-cyan-700 dark:bg-cyan-500/20 dark:text-cyan-200"
             >
               {t("landing.howItWorks.badge")}
             </motion.span>
             <motion.h2
               variants={fadeInUp}
-              className="mt-4 font-display text-3xl font-bold text-surface-900 sm:text-4xl lg:text-5xl"
+              className="mt-4 font-display text-3xl font-bold text-surface-900 dark:text-surface-100 sm:text-4xl lg:text-5xl"
             >
               {t("landing.howItWorks.title")}
             </motion.h2>
@@ -738,7 +738,7 @@ export default function LandingPage() {
             <div className="absolute left-1/2 top-0 hidden h-full w-0.5 -translate-x-1/2 bg-gradient-to-b from-purple-500 via-cyan-500 to-green-500 md:block" />
 
             <motion.div
-              initial="initial"
+              initial={false}
               whileInView="animate"
               viewport={{ once: true }}
               variants={staggerContainer}
@@ -747,76 +747,76 @@ export default function LandingPage() {
               {/* Step 1 */}
               <motion.div variants={fadeInUp} className="relative md:flex md:justify-start">
                 <div className="relative md:w-5/12 md:pr-12">
-                  <motion.div whileHover={{ scale: 1.02 }} className="rounded-2xl border border-surface-200 bg-white p-6 shadow-lg">
+                  <motion.div whileHover={{ scale: 1.02 }} className="rounded-2xl border border-surface-200 bg-white p-6 shadow-lg dark:border-surface-700 dark:bg-surface-900/70">
                     <div className="mb-4 flex items-center gap-4">
                       <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-purple-500 to-indigo-600 text-white shadow-lg shadow-purple-500/25">
                         <User className="h-6 w-6" />
                       </div>
                       <div>
                         <span className="text-sm font-semibold text-purple-600">{t("landing.howItWorks.step")} 1</span>
-                        <h3 className="font-display text-lg font-bold text-surface-900">{t("landing.howItWorks.step1.title")}</h3>
+                        <h3 className="font-display text-lg font-bold text-surface-900 dark:text-surface-100">{t("landing.howItWorks.step1.title")}</h3>
                       </div>
                     </div>
-                    <p className="text-surface-600">{t("landing.howItWorks.step1.description")}</p>
+                    <p className="text-surface-600 dark:text-surface-300">{t("landing.howItWorks.step1.description")}</p>
                   </motion.div>
-                  <div className="absolute right-0 top-1/2 hidden h-4 w-4 translate-x-1/2 -translate-y-1/2 rounded-full bg-white ring-4 ring-purple-500 md:block" />
+                  <div className="absolute right-0 top-1/2 hidden h-4 w-4 translate-x-1/2 -translate-y-1/2 rounded-full bg-white ring-4 ring-purple-500 md:block dark:bg-surface-900" />
                 </div>
               </motion.div>
 
               {/* Step 2 */}
               <motion.div variants={fadeInUp} className="relative md:flex md:justify-end">
                 <div className="relative md:w-5/12 md:pl-12">
-                  <motion.div whileHover={{ scale: 1.02 }} className="rounded-2xl border border-surface-200 bg-white p-6 shadow-lg">
+                  <motion.div whileHover={{ scale: 1.02 }} className="rounded-2xl border border-surface-200 bg-white p-6 shadow-lg dark:border-surface-700 dark:bg-surface-900/70">
                     <div className="mb-4 flex items-center gap-4">
                       <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-purple-500 to-indigo-600 text-white shadow-lg shadow-purple-500/25">
                         <Sparkles className="h-6 w-6" />
                       </div>
                       <div>
                         <span className="text-sm font-semibold text-purple-600">{t("landing.howItWorks.step")} 2</span>
-                        <h3 className="font-display text-lg font-bold text-surface-900">{t("landing.howItWorks.step2.title")}</h3>
+                        <h3 className="font-display text-lg font-bold text-surface-900 dark:text-surface-100">{t("landing.howItWorks.step2.title")}</h3>
                       </div>
                     </div>
-                    <p className="text-surface-600">{t("landing.howItWorks.step2.description")}</p>
+                    <p className="text-surface-600 dark:text-surface-300">{t("landing.howItWorks.step2.description")}</p>
                   </motion.div>
-                  <div className="absolute left-0 top-1/2 hidden h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white ring-4 ring-purple-500 md:block" />
+                  <div className="absolute left-0 top-1/2 hidden h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white ring-4 ring-purple-500 md:block dark:bg-surface-900" />
                 </div>
               </motion.div>
 
               {/* Step 3 */}
               <motion.div variants={fadeInUp} className="relative md:flex md:justify-start">
                 <div className="relative md:w-5/12 md:pr-12">
-                  <motion.div whileHover={{ scale: 1.02 }} className="rounded-2xl border border-surface-200 bg-white p-6 shadow-lg">
+                  <motion.div whileHover={{ scale: 1.02 }} className="rounded-2xl border border-surface-200 bg-white p-6 shadow-lg dark:border-surface-700 dark:bg-surface-900/70">
                     <div className="mb-4 flex items-center gap-4">
                       <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-purple-500 to-indigo-600 text-white shadow-lg shadow-purple-500/25">
                         <Search className="h-6 w-6" />
                       </div>
                       <div>
                         <span className="text-sm font-semibold text-purple-600">{t("landing.howItWorks.step")} 3</span>
-                        <h3 className="font-display text-lg font-bold text-surface-900">{t("landing.howItWorks.step3.title")}</h3>
+                        <h3 className="font-display text-lg font-bold text-surface-900 dark:text-surface-100">{t("landing.howItWorks.step3.title")}</h3>
                       </div>
                     </div>
-                    <p className="text-surface-600">{t("landing.howItWorks.step3.description")}</p>
+                    <p className="text-surface-600 dark:text-surface-300">{t("landing.howItWorks.step3.description")}</p>
                   </motion.div>
-                  <div className="absolute right-0 top-1/2 hidden h-4 w-4 translate-x-1/2 -translate-y-1/2 rounded-full bg-white ring-4 ring-purple-500 md:block" />
+                  <div className="absolute right-0 top-1/2 hidden h-4 w-4 translate-x-1/2 -translate-y-1/2 rounded-full bg-white ring-4 ring-purple-500 md:block dark:bg-surface-900" />
                 </div>
               </motion.div>
 
               {/* Step 4 */}
               <motion.div variants={fadeInUp} className="relative md:flex md:justify-end">
                 <div className="relative md:w-5/12 md:pl-12">
-                  <motion.div whileHover={{ scale: 1.02 }} className="rounded-2xl border border-surface-200 bg-white p-6 shadow-lg">
+                  <motion.div whileHover={{ scale: 1.02 }} className="rounded-2xl border border-surface-200 bg-white p-6 shadow-lg dark:border-surface-700 dark:bg-surface-900/70">
                     <div className="mb-4 flex items-center gap-4">
                       <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-purple-500 to-indigo-600 text-white shadow-lg shadow-purple-500/25">
                         <Award className="h-6 w-6" />
                       </div>
                       <div>
                         <span className="text-sm font-semibold text-purple-600">{t("landing.howItWorks.step")} 4</span>
-                        <h3 className="font-display text-lg font-bold text-surface-900">{t("landing.howItWorks.step4.title")}</h3>
+                        <h3 className="font-display text-lg font-bold text-surface-900 dark:text-surface-100">{t("landing.howItWorks.step4.title")}</h3>
                       </div>
                     </div>
-                    <p className="text-surface-600">{t("landing.howItWorks.step4.description")}</p>
+                    <p className="text-surface-600 dark:text-surface-300">{t("landing.howItWorks.step4.description")}</p>
                   </motion.div>
-                  <div className="absolute left-0 top-1/2 hidden h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white ring-4 ring-purple-500 md:block" />
+                  <div className="absolute left-0 top-1/2 hidden h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white ring-4 ring-purple-500 md:block dark:bg-surface-900" />
                 </div>
               </motion.div>
             </motion.div>
@@ -830,7 +830,7 @@ export default function LandingPage() {
       <section id="pricing" className="py-20 lg:py-32">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <motion.div
-            initial="initial"
+            initial={false}
             whileInView="animate"
             viewport={{ once: true }}
             variants={staggerContainer}
@@ -838,26 +838,26 @@ export default function LandingPage() {
           >
             <motion.span
               variants={fadeInUp}
-              className="inline-block rounded-full bg-amber-100 px-4 py-1.5 text-sm font-semibold text-amber-700"
+              className="inline-block rounded-full bg-amber-100 px-4 py-1.5 text-sm font-semibold text-amber-700 dark:bg-amber-500/20 dark:text-amber-200"
             >
               {t("landing.pricing.badge")}
             </motion.span>
             <motion.h2
               variants={fadeInUp}
-              className="mt-4 font-display text-3xl font-bold text-surface-900 sm:text-4xl lg:text-5xl"
+              className="mt-4 font-display text-3xl font-bold text-surface-900 dark:text-surface-100 sm:text-4xl lg:text-5xl"
             >
               {t("landing.pricing.title")}
             </motion.h2>
             <motion.p
               variants={fadeInUp}
-              className="mx-auto mt-4 max-w-2xl text-lg text-surface-600"
+              className="mx-auto mt-4 max-w-2xl text-lg text-surface-600 dark:text-surface-300"
             >
               {t("landing.pricing.subtitle")}
             </motion.p>
           </motion.div>
 
           <motion.div
-            initial="initial"
+            initial={false}
             whileInView="animate"
             viewport={{ once: true }}
             variants={staggerContainer}
@@ -867,33 +867,33 @@ export default function LandingPage() {
             <motion.div
               variants={fadeInUp}
               whileHover={{ y: -8 }}
-              className="relative rounded-3xl border-2 bg-white p-8 shadow-lg transition-all border-surface-200 hover:border-surface-300"
+              className="relative rounded-3xl border-2 border-surface-200 bg-white p-8 shadow-lg transition-all hover:border-surface-300 dark:border-surface-700 dark:bg-surface-900/70 dark:hover:border-surface-600"
             >
               <div className="mb-8">
-                <h3 className="font-display text-xl font-bold text-surface-900">{t("landing.pricing.free.name")}</h3>
-                <p className="mt-1 text-sm text-surface-500">{t("landing.pricing.free.description")}</p>
+                <h3 className="font-display text-xl font-bold text-surface-900 dark:text-surface-100">{t("landing.pricing.free.name")}</h3>
+                <p className="mt-1 text-sm text-surface-500 dark:text-surface-400">{t("landing.pricing.free.description")}</p>
                 <div className="mt-4">
-                  <span className="text-4xl font-bold text-surface-900">{t("landing.pricing.free.price")}</span>
-                  <span className="text-surface-500">/{t("landing.pricing.month")}</span>
+                  <span className="text-4xl font-bold text-surface-900 dark:text-surface-100">{t("landing.pricing.free.price")}</span>
+                  <span className="text-surface-500 dark:text-surface-400">/{t("landing.pricing.month")}</span>
                 </div>
               </div>
               <ul className="mb-8 space-y-4">
                 {(translations.landing.pricing.free.features as string[]).map((feature: string, fi: number) => (
                   <li key={fi} className="flex items-start gap-3">
                     <Check className="h-5 w-5 flex-shrink-0 text-green-500" />
-                    <span className="text-surface-600">{feature}</span>
+                    <span className="text-surface-600 dark:text-surface-300">{feature}</span>
                   </li>
                 ))}
                 {(translations.landing.pricing.free.notIncluded as string[]).map((feature: string, fi: number) => (
                   <li key={fi} className="flex items-start gap-3 opacity-50">
                     <X className="h-5 w-5 flex-shrink-0 text-surface-400" />
-                    <span className="text-surface-400">{feature}</span>
+                    <span className="text-surface-400 dark:text-surface-500">{feature}</span>
                   </li>
                 ))}
               </ul>
               <Link
                 href="/register"
-                className="block w-full rounded-xl py-3 text-center font-semibold transition-all border-2 border-surface-200 text-surface-900 hover:border-surface-300 hover:bg-surface-50"
+                className="block w-full rounded-xl border-2 border-surface-200 py-3 text-center font-semibold text-surface-900 transition-all hover:border-surface-300 hover:bg-surface-50 dark:border-surface-700 dark:text-surface-100 dark:hover:border-surface-600 dark:hover:bg-surface-800"
               >
                 {t("landing.pricing.free.cta")}
               </Link>
@@ -903,7 +903,7 @@ export default function LandingPage() {
             <motion.div
               variants={fadeInUp}
               whileHover={{ y: -8 }}
-              className="relative rounded-3xl border-2 bg-white p-8 shadow-lg transition-all border-purple-500 shadow-purple-500/20"
+              className="relative rounded-3xl border-2 border-purple-500 bg-white p-8 shadow-lg shadow-purple-500/20 transition-all dark:bg-surface-900/70"
             >
               <div className="absolute -top-4 left-1/2 -translate-x-1/2">
                 <span className="inline-flex items-center gap-1 rounded-full bg-gradient-to-r from-purple-500 to-indigo-600 px-4 py-1 text-sm font-semibold text-white shadow-lg">
@@ -912,24 +912,24 @@ export default function LandingPage() {
                 </span>
               </div>
               <div className="mb-8">
-                <h3 className="font-display text-xl font-bold text-surface-900">{t("landing.pricing.pro.name")}</h3>
-                <p className="mt-1 text-sm text-surface-500">{t("landing.pricing.pro.description")}</p>
+                <h3 className="font-display text-xl font-bold text-surface-900 dark:text-surface-100">{t("landing.pricing.pro.name")}</h3>
+                <p className="mt-1 text-sm text-surface-500 dark:text-surface-400">{t("landing.pricing.pro.description")}</p>
                 <div className="mt-4">
-                  <span className="text-4xl font-bold text-surface-900">{t("landing.pricing.pro.price")}</span>
-                  <span className="text-surface-500">/{t("landing.pricing.month")}</span>
+                  <span className="text-4xl font-bold text-surface-900 dark:text-surface-100">{t("landing.pricing.pro.price")}</span>
+                  <span className="text-surface-500 dark:text-surface-400">/{t("landing.pricing.month")}</span>
                 </div>
               </div>
               <ul className="mb-8 space-y-4">
                 {(translations.landing.pricing.pro.features as string[]).map((feature: string, fi: number) => (
                   <li key={fi} className="flex items-start gap-3">
                     <Check className="h-5 w-5 flex-shrink-0 text-green-500" />
-                    <span className="text-surface-600">{feature}</span>
+                    <span className="text-surface-600 dark:text-surface-300">{feature}</span>
                   </li>
                 ))}
                 {(translations.landing.pricing.pro.notIncluded as string[]).map((feature: string, fi: number) => (
                   <li key={fi} className="flex items-start gap-3 opacity-50">
                     <X className="h-5 w-5 flex-shrink-0 text-surface-400" />
-                    <span className="text-surface-400">{feature}</span>
+                    <span className="text-surface-400 dark:text-surface-500">{feature}</span>
                   </li>
                 ))}
               </ul>
@@ -945,26 +945,26 @@ export default function LandingPage() {
             <motion.div
               variants={fadeInUp}
               whileHover={{ y: -8 }}
-              className="relative rounded-3xl border-2 bg-white p-8 shadow-lg transition-all border-surface-200 hover:border-surface-300"
+              className="relative rounded-3xl border-2 border-surface-200 bg-white p-8 shadow-lg transition-all hover:border-surface-300 dark:border-surface-700 dark:bg-surface-900/70 dark:hover:border-surface-600"
             >
               <div className="mb-8">
-                <h3 className="font-display text-xl font-bold text-surface-900">{t("landing.pricing.enterprise.name")}</h3>
-                <p className="mt-1 text-sm text-surface-500">{t("landing.pricing.enterprise.description")}</p>
+                <h3 className="font-display text-xl font-bold text-surface-900 dark:text-surface-100">{t("landing.pricing.enterprise.name")}</h3>
+                <p className="mt-1 text-sm text-surface-500 dark:text-surface-400">{t("landing.pricing.enterprise.description")}</p>
                 <div className="mt-4">
-                  <span className="text-4xl font-bold text-surface-900">{t("landing.pricing.enterprise.price")}</span>
+                  <span className="text-4xl font-bold text-surface-900 dark:text-surface-100">{t("landing.pricing.enterprise.price")}</span>
                 </div>
               </div>
               <ul className="mb-8 space-y-4">
                 {(translations.landing.pricing.enterprise.features as string[]).map((feature: string, fi: number) => (
                   <li key={fi} className="flex items-start gap-3">
                     <Check className="h-5 w-5 flex-shrink-0 text-green-500" />
-                    <span className="text-surface-600">{feature}</span>
+                    <span className="text-surface-600 dark:text-surface-300">{feature}</span>
                   </li>
                 ))}
               </ul>
               <Link
                 href="/register"
-                className="block w-full rounded-xl py-3 text-center font-semibold transition-all border-2 border-surface-200 text-surface-900 hover:border-surface-300 hover:bg-surface-50"
+                className="block w-full rounded-xl border-2 border-surface-200 py-3 text-center font-semibold text-surface-900 transition-all hover:border-surface-300 hover:bg-surface-50 dark:border-surface-700 dark:text-surface-100 dark:hover:border-surface-600 dark:hover:bg-surface-800"
               >
                 {t("landing.pricing.enterprise.cta")}
               </Link>
@@ -976,10 +976,10 @@ export default function LandingPage() {
       {/* ===================================================================
           TESTIMONIALS SECTION
           =================================================================== */}
-      <section id="testimonials" className="bg-surface-50 py-20 lg:py-32">
+      <section id="testimonials" className="bg-surface-50 py-20 lg:py-32 dark:bg-surface-900/40">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <motion.div
-            initial="initial"
+            initial={false}
             whileInView="animate"
             viewport={{ once: true }}
             variants={staggerContainer}
@@ -987,19 +987,19 @@ export default function LandingPage() {
           >
             <motion.span
               variants={fadeInUp}
-              className="inline-block rounded-full bg-green-100 px-4 py-1.5 text-sm font-semibold text-green-700"
+              className="inline-block rounded-full bg-green-100 px-4 py-1.5 text-sm font-semibold text-green-700 dark:bg-green-500/20 dark:text-green-200"
             >
               {t("landing.testimonials.badge")}
             </motion.span>
             <motion.h2
               variants={fadeInUp}
-              className="mt-4 font-display text-3xl font-bold text-surface-900 sm:text-4xl lg:text-5xl"
+              className="mt-4 font-display text-3xl font-bold text-surface-900 dark:text-surface-100 sm:text-4xl lg:text-5xl"
             >
               {t("landing.testimonials.title")}
             </motion.h2>
             <motion.p
               variants={fadeInUp}
-              className="mx-auto mt-4 max-w-2xl text-lg text-surface-600"
+              className="mx-auto mt-4 max-w-2xl text-lg text-surface-600 dark:text-surface-300"
             >
               {t("landing.testimonials.subtitle")}
             </motion.p>
@@ -1015,7 +1015,7 @@ export default function LandingPage() {
                     (prev) => (prev - 1 + testimonials.length) % testimonials.length
                   )
                 }
-                className="flex h-12 w-12 items-center justify-center rounded-full border border-surface-200 bg-white text-surface-600 shadow-lg transition-all hover:border-surface-300 hover:shadow-xl"
+                className="flex h-12 w-12 items-center justify-center rounded-full border border-surface-200 bg-white text-surface-600 shadow-lg transition-all hover:border-surface-300 hover:shadow-xl dark:border-surface-700 dark:bg-surface-900 dark:text-surface-300 dark:hover:border-surface-600"
               >
                 <ChevronLeft className="h-6 w-6" />
               </button>
@@ -1033,7 +1033,7 @@ export default function LandingPage() {
                 onClick={() =>
                   setCurrentTestimonial((prev) => (prev + 1) % testimonials.length)
                 }
-                className="flex h-12 w-12 items-center justify-center rounded-full border border-surface-200 bg-white text-surface-600 shadow-lg transition-all hover:border-surface-300 hover:shadow-xl"
+                className="flex h-12 w-12 items-center justify-center rounded-full border border-surface-200 bg-white text-surface-600 shadow-lg transition-all hover:border-surface-300 hover:shadow-xl dark:border-surface-700 dark:bg-surface-900 dark:text-surface-300 dark:hover:border-surface-600"
               >
                 <ChevronRight className="h-6 w-6" />
               </button>
@@ -1063,7 +1063,7 @@ export default function LandingPage() {
       <section className="py-20 lg:py-32">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <motion.div
-            initial={{ opacity: 0, y: 20 }}
+            initial={false}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
             className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-purple-600 via-indigo-600 to-blue-700 p-8 text-center md:p-16"
@@ -1075,7 +1075,7 @@ export default function LandingPage() {
 
             <div className="relative">
               <motion.div
-                initial={{ scale: 0 }}
+                initial={false}
                 whileInView={{ scale: 1 }}
                 viewport={{ once: true }}
                 transition={{ type: "spring", delay: 0.2 }}
@@ -1108,7 +1108,7 @@ export default function LandingPage() {
       {/* ===================================================================
           FOOTER
           =================================================================== */}
-      <footer className="border-t border-surface-200 bg-white py-12">
+      <footer className="border-t border-surface-200 bg-white py-12 dark:border-surface-700 dark:bg-surface-950">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="grid gap-8 md:grid-cols-4">
             {/* Brand */}
@@ -1117,36 +1117,36 @@ export default function LandingPage() {
                 <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-purple-500 to-indigo-600">
                   <Sparkles className="h-5 w-5 text-white" />
                 </div>
-                <span className="font-display text-xl font-bold text-surface-900">
-                  SmartCareer
+                <span className="font-display text-xl font-bold text-surface-900 dark:text-surface-100">
+                  CareerUZ
                 </span>
               </Link>
-              <p className="mt-4 text-sm text-surface-500">
+              <p className="mt-4 text-sm text-surface-500 dark:text-surface-400">
                 {t("landing.footer.description")}
               </p>
             </div>
 
             {/* Product */}
             <div>
-              <h4 className="font-semibold text-surface-900">{t("landing.footer.product")}</h4>
-              <ul className="mt-4 space-y-2 text-sm text-surface-500">
+              <h4 className="font-semibold text-surface-900 dark:text-surface-100">{t("landing.footer.product")}</h4>
+              <ul className="mt-4 space-y-2 text-sm text-surface-500 dark:text-surface-400">
                 <li>
-                  <Link href="#features" className="hover:text-surface-900">
+                  <Link href="#features" className="hover:text-surface-900 dark:hover:text-surface-200">
                     {t("landing.footer.features")}
                   </Link>
                 </li>
                 <li>
-                  <Link href="#pricing" className="hover:text-surface-900">
+                  <Link href="#pricing" className="hover:text-surface-900 dark:hover:text-surface-200">
                     {t("landing.footer.pricingLink")}
                   </Link>
                 </li>
                 <li>
-                  <Link href="#" className="hover:text-surface-900">
+                  <Link href="#" className="hover:text-surface-900 dark:hover:text-surface-200">
                     {t("landing.footer.api")}
                   </Link>
                 </li>
                 <li>
-                  <Link href="#" className="hover:text-surface-900">
+                  <Link href="#" className="hover:text-surface-900 dark:hover:text-surface-200">
                     {t("landing.footer.integrations")}
                   </Link>
                 </li>
@@ -1155,25 +1155,25 @@ export default function LandingPage() {
 
             {/* Company */}
             <div>
-              <h4 className="font-semibold text-surface-900">{t("landing.footer.company")}</h4>
-              <ul className="mt-4 space-y-2 text-sm text-surface-500">
+              <h4 className="font-semibold text-surface-900 dark:text-surface-100">{t("landing.footer.company")}</h4>
+              <ul className="mt-4 space-y-2 text-sm text-surface-500 dark:text-surface-400">
                 <li>
-                  <Link href="#" className="hover:text-surface-900">
+                  <Link href="#" className="hover:text-surface-900 dark:hover:text-surface-200">
                     {t("landing.footer.about")}
                   </Link>
                 </li>
                 <li>
-                  <Link href="#" className="hover:text-surface-900">
+                  <Link href="#" className="hover:text-surface-900 dark:hover:text-surface-200">
                     {t("landing.footer.blog")}
                   </Link>
                 </li>
                 <li>
-                  <Link href="#" className="hover:text-surface-900">
+                  <Link href="#" className="hover:text-surface-900 dark:hover:text-surface-200">
                     {t("landing.footer.careers")}
                   </Link>
                 </li>
                 <li>
-                  <Link href="#" className="hover:text-surface-900">
+                  <Link href="#" className="hover:text-surface-900 dark:hover:text-surface-200">
                     {t("landing.footer.contact")}
                   </Link>
                 </li>
@@ -1182,20 +1182,20 @@ export default function LandingPage() {
 
             {/* Legal */}
             <div>
-              <h4 className="font-semibold text-surface-900">{t("landing.footer.legal")}</h4>
-              <ul className="mt-4 space-y-2 text-sm text-surface-500">
+              <h4 className="font-semibold text-surface-900 dark:text-surface-100">{t("landing.footer.legal")}</h4>
+              <ul className="mt-4 space-y-2 text-sm text-surface-500 dark:text-surface-400">
                 <li>
-                  <Link href="/privacy" className="hover:text-surface-900">
+                  <Link href="/privacy" className="hover:text-surface-900 dark:hover:text-surface-200">
                     {t("landing.footer.privacy")}
                   </Link>
                 </li>
                 <li>
-                  <Link href="/terms" className="hover:text-surface-900">
+                  <Link href="/terms" className="hover:text-surface-900 dark:hover:text-surface-200">
                     {t("landing.footer.terms")}
                   </Link>
                 </li>
                 <li>
-                  <Link href="#" className="hover:text-surface-900">
+                  <Link href="#" className="hover:text-surface-900 dark:hover:text-surface-200">
                     {t("landing.footer.cookies")}
                   </Link>
                 </li>
@@ -1204,14 +1204,14 @@ export default function LandingPage() {
           </div>
 
           {/* Bottom */}
-          <div className="mt-12 flex flex-col items-center justify-between gap-4 border-t border-surface-200 pt-8 md:flex-row">
-            <p className="text-sm text-surface-500">
-              © {new Date().getFullYear()} SmartCareer AI. {t("landing.footer.rights")}
+          <div className="mt-12 flex flex-col items-center justify-between gap-4 border-t border-surface-200 pt-8 md:flex-row dark:border-surface-700">
+            <p className="text-sm text-surface-500 dark:text-surface-400">
+              © {new Date().getFullYear()} CareerUZ. {t("landing.footer.rights")}
             </p>
             <div className="flex gap-4">
               <Link
                 href="#"
-                className="text-surface-400 transition-colors hover:text-surface-600"
+                className="text-surface-400 transition-colors hover:text-surface-600 dark:text-surface-500 dark:hover:text-surface-300"
               >
                 <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 24 24">
                   <path d="M24 4.557c-.883.392-1.832.656-2.828.775 1.017-.609 1.798-1.574 2.165-2.724-.951.564-2.005.974-3.127 1.195-.897-.957-2.178-1.555-3.594-1.555-3.179 0-5.515 2.966-4.797 6.045-4.091-.205-7.719-2.165-10.148-5.144-1.29 2.213-.669 5.108 1.523 6.574-.806-.026-1.566-.247-2.229-.616-.054 2.281 1.581 4.415 3.949 4.89-.693.188-1.452.232-2.224.084.626 1.956 2.444 3.379 4.6 3.419-2.07 1.623-4.678 2.348-7.29 2.04 2.179 1.397 4.768 2.212 7.548 2.212 9.142 0 14.307-7.721 13.995-14.646.962-.695 1.797-1.562 2.457-2.549z" />
@@ -1219,7 +1219,7 @@ export default function LandingPage() {
               </Link>
               <Link
                 href="#"
-                className="text-surface-400 transition-colors hover:text-surface-600"
+                className="text-surface-400 transition-colors hover:text-surface-600 dark:text-surface-500 dark:hover:text-surface-300"
               >
                 <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 24 24">
                   <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z" />
@@ -1227,7 +1227,7 @@ export default function LandingPage() {
               </Link>
               <Link
                 href="#"
-                className="text-surface-400 transition-colors hover:text-surface-600"
+                className="text-surface-400 transition-colors hover:text-surface-600 dark:text-surface-500 dark:hover:text-surface-300"
               >
                 <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 24 24">
                   <path d="M19 0h-14c-2.761 0-5 2.239-5 5v14c0 2.761 2.239 5 5 5h14c2.762 0 5-2.239 5-5v-14c0-2.761-2.238-5-5-5zm-11 19h-3v-11h3v11zm-1.5-12.268c-.966 0-1.75-.79-1.75-1.764s.784-1.764 1.75-1.764 1.75.79 1.75 1.764-.783 1.764-1.75 1.764zm13.5 12.268h-3v-5.604c0-3.368-4-3.113-4 0v5.604h-3v-11h3v1.765c1.396-2.586 7-2.777 7 2.476v6.759z" />
@@ -1235,7 +1235,7 @@ export default function LandingPage() {
               </Link>
               <Link
                 href="#"
-                className="text-surface-400 transition-colors hover:text-surface-600"
+                className="text-surface-400 transition-colors hover:text-surface-600 dark:text-surface-500 dark:hover:text-surface-300"
               >
                 <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 24 24">
                   <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z" />

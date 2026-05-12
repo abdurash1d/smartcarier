@@ -173,9 +173,9 @@ const config: Config = {
       // TYPOGRAPHY - Font Families
       // =============================================================================
       fontFamily: {
-        sans: ["Inter", "system-ui", "-apple-system", "sans-serif"],
-        display: ["Inter", "system-ui", "-apple-system", "sans-serif"],
-        mono: ["Fira Code", "Consolas", "Monaco", "monospace"],
+        sans: ["var(--font-inter)", "system-ui", "-apple-system", "sans-serif"],
+        display: ["var(--font-inter)", "system-ui", "-apple-system", "sans-serif"],
+        mono: ["var(--font-fira-code)", "Consolas", "Monaco", "monospace"],
       },
 
       // =============================================================================

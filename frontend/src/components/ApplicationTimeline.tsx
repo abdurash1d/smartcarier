@@ -7,6 +7,8 @@
 
 import { CheckCircle, Clock, XCircle, AlertCircle, FileText } from 'lucide-react';
 import { formatDistanceToNow, format } from 'date-fns';
+import { ru, uz } from 'date-fns/locale';
+import { useTranslation } from '@/hooks/useTranslation';
 
 interface TimelineEvent {
   id: string;
@@ -22,6 +24,9 @@ interface ApplicationTimelineProps {
 }
 
 export function ApplicationTimeline({ events }: ApplicationTimelineProps) {
+  const { locale } = useTranslation();
+  const isRu = locale === "ru";
+  const dateLocale = isRu ? ru : uz;
   const getIcon = (type: string, status?: string) => {
     if (type === 'status_change') {
       switch (status) {
@@ -76,7 +81,7 @@ export function ApplicationTimeline({ events }: ApplicationTimelineProps) {
     return (
       <div className="text-center py-12 text-surface-500">
         <Clock className="h-12 w-12 mx-auto mb-3 opacity-50" />
-        <p>No timeline events yet</p>
+        <p>{isRu ? "Событий пока нет" : "Hozircha vaqt jadvali hodisalari yo'q"}</p>
       </div>
     );
   }
@@ -108,10 +113,10 @@ export function ApplicationTimeline({ events }: ApplicationTimelineProps) {
                     </p>
                   </div>
                   <div className="text-right text-xs text-surface-500">
-                    <p>{format(new Date(event.timestamp), 'MMM d, yyyy')}</p>
-                    <p>{format(new Date(event.timestamp), 'h:mm a')}</p>
+                    <p>{format(new Date(event.timestamp), 'MMM d, yyyy', { locale: dateLocale })}</p>
+                    <p>{format(new Date(event.timestamp), 'HH:mm', { locale: dateLocale })}</p>
                     <p className="mt-1 font-medium">
-                      {formatDistanceToNow(new Date(event.timestamp), { addSuffix: true })}
+                      {formatDistanceToNow(new Date(event.timestamp), { addSuffix: true, locale: dateLocale })}
                     </p>
                   </div>
                 </div>

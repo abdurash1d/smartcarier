@@ -1,6 +1,6 @@
-# 🚀 SmartCareer AI - Production Deployment Guide
+# 🚀 CareerUZ - Production Deployment Guide
 
-Complete guide to deploy SmartCareer AI to production with Railway (Backend) and Vercel (Frontend).
+Complete guide to deploy CareerUZ to production with Railway (Backend) and Vercel (Frontend).
 
 ## 📋 Table of Contents
 
@@ -140,8 +140,8 @@ SMTP_HOST=smtp.gmail.com
 SMTP_PORT=587
 SMTP_USER=<your-email@gmail.com>
 SMTP_PASSWORD=<your-gmail-app-password>
-SMTP_FROM_EMAIL=noreply@smartcareer.uz
-SMTP_FROM_NAME=SmartCareer AI
+SMTP_FROM_EMAIL=noreply@careeruz.uz
+SMTP_FROM_NAME=CareerUZ
 SMTP_USE_TLS=true
 FRONTEND_URL=<will-update-after-vercel-deploy>
 
@@ -155,7 +155,7 @@ REDIS_ENABLED=true
 CORS_ORIGINS=<will-update-after-vercel-deploy>
 
 # Application
-APP_NAME=SmartCareer AI
+APP_NAME=CareerUZ
 APP_VERSION=1.0.0
 ```
 
@@ -287,7 +287,7 @@ from app.models.user import User, UserRole
 from app.core.security import get_password_hash
 db = SessionLocal()
 admin = User(
-    email='admin@smartcareer.uz',
+    email='admin@careeruz.uz',
     full_name='Admin User',
     hashed_password=get_password_hash('AdminPassword123!'),
     role=UserRole.ADMIN,
@@ -477,7 +477,7 @@ After deployment, verify:
 
 ## 🎉 Congratulations!
 
-Your SmartCareer AI platform is now LIVE in production!
+Your CareerUZ platform is now LIVE in production!
 
 **Your URLs:**
 - 🌐 **Frontend**: `https://your-app.vercel.app`

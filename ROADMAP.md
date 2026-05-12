@@ -1,4 +1,4 @@
-# 🚀 SmartCareer AI - Development Roadmap
+# 🚀 CareerUZ - Development Roadmap
 
 ## Mening Strategiyam (Agar men sizning o'rningizda bo'lganimda)
 
@@ -15,7 +15,7 @@
 ### Hafta 2: Polish & Deploy
 - [ ] Vercel ga frontend deploy
 - [ ] Railway/Render ga backend deploy
-- [ ] Domain ulash (smartcareer.uz)
+- [ ] Domain ulash (careeruz.uz)
 - [ ] SSL sertifikat
 
 ---
@@ -160,7 +160,7 @@ Sentry.init({
 - Database: Supabase (bepul tier) yoki Neon
 
 ### Domain
-- smartcareer.uz - ~$15/yil
+- careeruz.uz - ~$15/yil
 
 ---
 

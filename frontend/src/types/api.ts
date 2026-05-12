@@ -280,6 +280,13 @@ export interface Application {
   decided_at?: string;
   notes?: string;
   updated_at: string;
+  match_score?: string | null;
+  match_breakdown?: {
+    score: number;
+    matched_skills: string[];
+    missing_skills: string[];
+    reasons: string[];
+  } | null;
   job?: Job;
   resume?: Resume;
   applicant?: User;
@@ -484,6 +491,27 @@ export interface AdminUserStats {
 export interface AdminUserStatsResponse {
   success: boolean;
   stats: AdminUserStats;
+}
+
+export interface AdminManagedUser {
+  id: string;
+  email: string;
+  full_name: string;
+  role: UserRole;
+  is_active: boolean;
+  is_verified: boolean;
+  created_at: string;
+  last_login?: string | null;
+}
+
+export interface AdminManagedUsersResponse {
+  success: boolean;
+  total: number;
+  users: AdminManagedUser[];
+}
+
+export interface AdminUpdateUserStatusRequest {
+  is_active: boolean;
 }
 
 export interface AdminSystemHealthComponent {

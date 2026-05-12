@@ -215,6 +215,31 @@ class ForgotPasswordRequest(BaseModel):
     )
 
 
+class ForgotPasswordResponse(BaseModel):
+    """
+    Response for forgot password requests.
+
+    `debug_reset_url` is returned only in debug-like environments when
+    outbound email delivery is disabled, so local/staging can complete
+    the reset flow without SMTP/SendGrid.
+    """
+
+    message: str = Field(
+        ...,
+        description="Response message"
+    )
+
+    success: bool = Field(
+        default=True,
+        description="Operation success status"
+    )
+
+    debug_reset_url: Optional[str] = Field(
+        default=None,
+        description="Password reset URL for debug/testing only"
+    )
+
+
 class ResetPasswordRequest(BaseModel):
     """Schema for password reset."""
     

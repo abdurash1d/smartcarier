@@ -79,7 +79,7 @@ Resume deleted → Applications SET NULL (keep resume_id = NULL)
     Resume content might be archived separately
 
 =============================================================================
-AUTHOR: SmartCareer AI Team
+AUTHOR: CareerUZ Team
 VERSION: 1.0.0
 =============================================================================
 """
@@ -95,7 +95,7 @@ from typing import Optional, Dict, Any, TYPE_CHECKING
 # SQLAlchemy imports
 from sqlalchemy import (
     Column, String, Text, DateTime, ForeignKey,
-    Index, UniqueConstraint
+    Index, JSON, UniqueConstraint
 )
 from app.models.types import GUID
 from sqlalchemy.orm import relationship, validates
@@ -268,6 +268,14 @@ class Application(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin):
         String(10),
         nullable=True,
         comment="AI match score (e.g., '85%', 'Good Match')"
+    )
+
+    # Snapshot of the matching breakdown computed at application time
+    # Shape: {"score": 87.5, "matched_skills": [...], "missing_skills": [...], "reasons": [...]}
+    match_breakdown = Column(
+        JSON,
+        nullable=True,
+        comment="Snapshot of skill/experience match analysis at application time",
     )
     
     # =========================================================================

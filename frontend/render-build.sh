@@ -1,22 +1,19 @@
 #!/bin/bash
-# Render.com Build Script for Frontend
-# Bu script Render.com'da build vaqtida ishlaydi
+# Render.com Build Script for Frontend (Next.js)
+# Render sets NODE_ENV=production by default, which skips devDependencies.
+# We pass --production=false so TypeScript, ESLint, etc. are available for the build.
 
-set -e  # Xatolik bo'lsa to'xtatish
+set -e
 
-echo "🚀 Starting frontend build..."
+echo "==> Starting frontend build..."
 
-# Node version tekshirish
 node --version
 npm --version
 
-# Dependencies install
-echo "📦 Installing dependencies..."
+echo "==> Installing dependencies (including devDeps for build tools)..."
 npm ci --production=false
 
-# Build
-echo "🏗️ Building Next.js application..."
+echo "==> Building Next.js application..."
 npm run build
 
-echo "✅ Build completed successfully!"
-
+echo "==> Build complete."

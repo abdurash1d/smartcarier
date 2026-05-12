@@ -1,6 +1,6 @@
 # 🚂 RAILWAY DEPLOYMENT GUIDE
 
-**SmartCareer AI - Step-by-Step Railway Deployment**
+**CareerUZ - Step-by-Step Railway Deployment**
 
 ---
 
@@ -101,8 +101,8 @@ CORS_ORIGINS=<your-frontend-url-from-vercel>
 
 # Email Service (Choose one)
 SENDGRID_API_KEY=<your-sendgrid-key>
-EMAIL_FROM=noreply@smartcareer.ai
-EMAIL_FROM_NAME=SmartCareer AI
+EMAIL_FROM=noreply@careeruz.uz
+EMAIL_FROM_NAME=CareerUZ
 
 # Payment Gateways
 STRIPE_SECRET_KEY=<your-stripe-key>

@@ -1,5 +1,5 @@
 # =============================================================================
-# SmartCareer AI - Production Docker Compose
+# CareerUZ - Production Docker Compose
 # =============================================================================
 # Usage:
 #   docker-compose -f docker-compose.prod.yml up -d --build
@@ -46,11 +46,11 @@ services:
   # ---------------------------------------------------------------------------
   postgres:
     image: postgres:15-alpine
-    container_name: smartcareer_postgres
+    container_name: careeruz_postgres
     restart: unless-stopped
     environment:
-      POSTGRES_DB: ${POSTGRES_DB:-smartcareer}
-      POSTGRES_USER: ${POSTGRES_USER:-smartcareer}
+      POSTGRES_DB: ${POSTGRES_DB:-careeruz}
+      POSTGRES_USER: ${POSTGRES_USER:-careeruz}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
       TZ: Asia/Tashkent
     volumes:
@@ -58,7 +58,7 @@ services:
     networks:
       - app_network
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-smartcareer} -d ${POSTGRES_DB:-smartcareer}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-careeruz} -d ${POSTGRES_DB:-careeruz}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -71,7 +71,7 @@ services:
   # ---------------------------------------------------------------------------
   redis:
     image: redis:7-alpine
-    container_name: smartcareer_redis
+    container_name: careeruz_redis
     restart: unless-stopped
     command: >
       redis-server
@@ -97,13 +97,13 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    container_name: smartcareer_backend
+    container_name: careeruz_backend
     restart: unless-stopped
     env_file:
       - ./backend/.env
     environment:
       # Override with production database URL
-      DATABASE_URL: postgresql://${POSTGRES_USER:-smartcareer}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-smartcareer}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-careeruz}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-careeruz}
       REDIS_URL: redis://:${REDIS_PASSWORD:-changeme_redis_password}@redis:6379/0
       DEBUG: "False"
       # Workers (override in .env if needed)
@@ -149,7 +149,7 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
-    container_name: smartcareer_frontend
+    container_name: careeruz_frontend
     restart: unless-stopped
     env_file:
       - ./frontend/.env.local
@@ -170,7 +170,7 @@ services:
   # ---------------------------------------------------------------------------
   nginx:
     image: nginx:alpine
-    container_name: smartcareer_nginx
+    container_name: careeruz_nginx
     restart: unless-stopped
     ports:
       - "80:80"
