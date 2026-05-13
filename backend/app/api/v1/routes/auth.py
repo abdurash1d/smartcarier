@@ -291,22 +291,50 @@ def _consume_oauth_state(provider: str, state: str) -> dict:
     state_key = _oauth_state_key(provider, state)
     provider_label = provider.title()
 
+    def _pop_state_from_store(store: object) -> Optional[str]:
+        """
+        Pop OAuth state payload from a key-value store.
+
+        Supports:
+        - Redis-like clients with get/delete
+        - legacy/mock clients with exists/delete only
+        """
+        get_fn = getattr(store, "get", None)
+        delete_fn = getattr(store, "delete", None)
+        exists_fn = getattr(store, "exists", None)
+
+        if callable(get_fn):
+            raw_value = get_fn(state_key)
+            if raw_value is None:
+                return None
+            if callable(delete_fn):
+                delete_fn(state_key)
+            return raw_value.decode() if isinstance(raw_value, bytes) else raw_value
+
+        # Backward compatibility for tests/mocks that expose exists() only.
+        if callable(exists_fn):
+            present = bool(exists_fn(state_key))
+            if not present:
+                return None
+            if callable(delete_fn):
+                delete_fn(state_key)
+            return "1"
+
+        raise RuntimeError("OAuth state store must provide get() or exists()")
+
     if _local_oauth_state_enabled():
         from app.core.redis_client import get_redis
 
         redis_client = get_redis()
         if redis_client is not None:
-            raw = redis_client.get(state_key)
+            raw = _pop_state_from_store(redis_client)
             if raw is None:
                 raise _oauth_error(
                     status.HTTP_400_BAD_REQUEST,
                     "INVALID_OAUTH_STATE",
                     f"Invalid or expired {provider_label} OAuth state.",
                 )
-            redis_client.delete(state_key)
-            return _deserialize_oauth_state_payload(
-                raw.decode() if isinstance(raw, bytes) else raw
-            )
+            return _deserialize_oauth_state_payload(raw)
 
         now = time()
         _cleanup_local_oauth_states(now)
@@ -333,7 +361,7 @@ def _consume_oauth_state(provider: str, state: str) -> dict:
     redis_client = _require_oauth_state_store(provider)
 
     try:
-        raw = redis_client.get(state_key)
+        raw = _pop_state_from_store(redis_client)
         if raw is None:
             raise _oauth_error(
                 status.HTTP_400_BAD_REQUEST,
@@ -341,10 +369,7 @@ def _consume_oauth_state(provider: str, state: str) -> dict:
                 f"Invalid or expired {provider_label} OAuth state.",
             )
 
-        redis_client.delete(state_key)
-        return _deserialize_oauth_state_payload(
-            raw.decode() if isinstance(raw, bytes) else raw
-        )
+        return _deserialize_oauth_state_payload(raw)
     except HTTPException:
         raise
     except Exception as e:
@@ -1245,7 +1270,6 @@ async def linkedin_oauth_callback(
             error_code="LINKEDIN_OAUTH_AUTHENTICATION_FAILED",
             message="OAuth authentication failed",
         )
-
 
 
 
