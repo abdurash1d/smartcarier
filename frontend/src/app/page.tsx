@@ -308,7 +308,21 @@ export default function LandingPage() {
   const { scrollYProgress } = useScroll();
   const heroY = useTransform(scrollYProgress, [0, 0.5], [0, -100]);
   const heroOpacity = useTransform(scrollYProgress, [0, 0.3], [1, 0]);
-  const { t, translations } = useTranslation();
+  const { t, translations, locale } = useTranslation();
+  const isRu = locale === "ru";
+  const heroJobs = isRu
+    ? [
+        { title: "Frontend-разработчик", company: "EPAM Systems", salary: "$1200–1800", match: "98%", color: "from-purple-400 to-indigo-500" },
+        { title: "React-инженер", company: "Click.uz", salary: "$900–1400", match: "94%", color: "from-cyan-400 to-blue-500" },
+        { title: "UI/UX-дизайнер", company: "Uzum Market", salary: "$800–1200", match: "91%", color: "from-pink-400 to-rose-500" },
+        { title: "Аналитик данных", company: "Payme", salary: "$1000–1500", match: "87%", color: "from-amber-400 to-orange-500" },
+      ]
+    : [
+        { title: "Frontend dasturchi", company: "EPAM Systems", salary: "$1200–1800", match: "98%", color: "from-purple-400 to-indigo-500" },
+        { title: "React muhandisi", company: "Click.uz", salary: "$900–1400", match: "94%", color: "from-cyan-400 to-blue-500" },
+        { title: "UI/UX dizayner", company: "Uzum Market", salary: "$800–1200", match: "91%", color: "from-pink-400 to-rose-500" },
+        { title: "Ma'lumotlar tahlilchisi", company: "Payme", salary: "$1000–1500", match: "87%", color: "from-amber-400 to-orange-500" },
+      ];
 
   // Auto-rotate testimonials
   useEffect(() => {
@@ -552,12 +566,7 @@ export default function LandingPage() {
                     <span className="rounded-full bg-gradient-to-r from-cyan-400 to-blue-500 px-3 py-0.5 text-xs font-semibold text-white">AI moslik</span>
                   </div>
                   <div className="grid gap-3 md:grid-cols-2">
-                    {[
-                      { title: "Frontend Developer", company: "EPAM Systems", salary: "$1200–1800", match: "98%", color: "from-purple-400 to-indigo-500" },
-                      { title: "React Engineer", company: "Click.uz", salary: "$900–1400", match: "94%", color: "from-cyan-400 to-blue-500" },
-                      { title: "UI/UX Designer", company: "Uzum Market", salary: "$800–1200", match: "91%", color: "from-pink-400 to-rose-500" },
-                      { title: "Data Analyst", company: "Payme", salary: "$1000–1500", match: "87%", color: "from-amber-400 to-orange-500" },
-                    ].map((job) => (
+                    {heroJobs.map((job) => (
                       <div key={job.title} className="rounded-lg border border-white/10 bg-white/5 p-3">
                         <div className="mb-2 flex items-center gap-2.5">
                           <div className={`flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-gradient-to-br ${job.color} text-xs font-bold text-white`}>

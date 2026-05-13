@@ -141,7 +141,7 @@ export default function ResumesPage() {
         break;
       case "duplicate":
         await createResume({
-          title: `${resume.title} (Copy)`,
+          title: `${resume.title} ${isRu ? "(Копия)" : "(Nusxa)"}`,
           content: resume.content,
         });
         break;

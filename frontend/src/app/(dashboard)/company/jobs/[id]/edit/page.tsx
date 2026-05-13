@@ -181,7 +181,7 @@ export default function EditJobPage() {
             <Input
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              placeholder="masalan: Frontend Developer"
+              placeholder="masalan: Dasturchi"
               className="mt-1"
             />
           </div>

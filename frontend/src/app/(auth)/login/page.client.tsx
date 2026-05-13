@@ -71,7 +71,8 @@ export default function LoginPageClient() {
   const redirectTo = searchParams.get("redirect");
 
   const { login, isLoading, error, clearError } = useAuth();
-  const { t } = useTranslation();
+  const { t, locale } = useTranslation();
+  const isRu = locale === "ru";
   const loginSchema = useMemo(() => createLoginSchema(t), [t]);
   const [showPassword, setShowPassword] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
@@ -205,7 +206,7 @@ export default function LoginPageClient() {
               type="button"
               onClick={() => setShowPassword((v) => !v)}
               className="absolute right-3 top-1/2 -translate-y-1/2 text-surface-400 hover:text-surface-600"
-              aria-label={showPassword ? "Hide password" : "Show password"}
+              aria-label={showPassword ? (isRu ? "Скрыть пароль" : "Parolni yashirish") : (isRu ? "Показать пароль" : "Parolni ko'rsatish")}
             >
               {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
             </button>
