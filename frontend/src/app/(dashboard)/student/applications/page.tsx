@@ -92,6 +92,13 @@ const statusConfig: Record<
   },
 };
 
+const fallbackStatusConfig = {
+  labelKey: "applicationsPage.pending",
+  color: "text-surface-600",
+  bgColor: "bg-surface-100",
+  icon: Clock,
+} as const;
+
 // =============================================================================
 // ANIMATION VARIANTS
 // =============================================================================
@@ -391,7 +398,7 @@ export default function ApplicationsPage() {
       ) : (
         <motion.div variants={containerVariants} className="space-y-4">
           {filteredApplications.map((application) => {
-            const status = statusConfig[application.status];
+            const status = statusConfig[application.status] ?? fallbackStatusConfig;
             const StatusIcon = status.icon;
 
             return (

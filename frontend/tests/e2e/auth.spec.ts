@@ -13,6 +13,16 @@ import { test, expect } from '@playwright/test';
  */
 
 test.describe('Authentication Flow', () => {
+  async function goToRegisterCredentialsStep(page: any) {
+    await page.goto('/register');
+    await page
+      .getByRole('button', { name: /ish izlovchiman|job seeker|соискатель/i })
+      .first()
+      .click();
+    await page.getByRole('button', { name: /davom|continue|next|далее/i }).click();
+    await expect(page.locator('input[name="email"]').first()).toBeVisible();
+  }
+
   async function submitLoginAndWait(page: any) {
     const loginResponsePromise = page.waitForResponse(
       (res: any) =>
@@ -73,7 +83,9 @@ test.describe('Authentication Flow', () => {
     await page.goto('/register');
 
     await expect(page).toHaveURL('/register');
-    await expect(page.locator('input[name=\"email\"]').first()).toBeVisible();
+    await expect(
+      page.getByRole('button', { name: /ish izlovchiman|job seeker|соискатель/i }).first()
+    ).toBeVisible();
   });
 
   // ===========================================================================
@@ -81,70 +93,63 @@ test.describe('Authentication Flow', () => {
   // ===========================================================================
 
   test('should register new student successfully', async ({ page }) => {
-    await page.goto('/register');
+    await goToRegisterCredentialsStep(page);
     
     // Generate unique email
     const timestamp = Date.now();
     const email = `test.student.${timestamp}@example.com`;
     
     // Step 1: credentials
-    await page.locator('input[name=\"email\"]').fill(email);
-    await page.locator('input[name=\"password\"]').fill('TestPassword123!');
-    await page.locator('input[name=\"confirmPassword\"]').fill('TestPassword123!');
-    await page.getByRole('button', { name: /continue|davom|next/i }).click();
+    await page.locator('input[name="email"]').fill(email);
+    await page.locator('input[name="password"]').fill('TestPassword123!');
+    await page.locator('input[name="confirmPassword"]').fill('TestPassword123!');
+    await page.getByRole('button', { name: /continue|davom|next|далее/i }).click();
 
     // Step 2: profile
-    await page.locator('input[name=\"fullName\"]').fill('Test Student');
-    await page.locator('input[name=\"phone\"]').fill('+998901234567');
-    await page.getByRole('button', { name: /continue|davom|next/i }).click();
-
-    // Step 3: role selection (pick student)
-    await page.getByRole('button', { name: /AI Resume/i }).click();
-    await page.getByRole('button', { name: /create|hisob|account/i }).click();
+    await page.locator('input[name="fullName"]').fill('Test Student');
+    await page.locator('input[name="phone"]').fill('+998901234567');
+    await page.getByRole('button', { name: /create|yarat|создать|hisob/i }).click();
     
     // Should redirect to dashboard or show success
     await expect(page).toHaveURL(/\/student/, { timeout: 15000 });
   });
 
   test('should show error for invalid email', async ({ page }) => {
-    await page.goto('/register');
+    await goToRegisterCredentialsStep(page);
     
-    await page.locator('input[name=\"email\"]').fill('invalid-email');
-    await page.locator('input[name=\"password\"]').fill('TestPassword123!');
-    await page.locator('input[name=\"confirmPassword\"]').fill('TestPassword123!');
-    await page.getByRole('button', { name: /continue|davom|next/i }).click();
+    await page.locator('input[name="email"]').fill('invalid-email');
+    await page.locator('input[name="password"]').fill('TestPassword123!');
+    await page.locator('input[name="confirmPassword"]').fill('TestPassword123!');
+    await page.getByRole('button', { name: /continue|davom|next|далее/i }).click();
 
     // Should not advance to step 2
     await expect(page.locator('input[name=\"fullName\"]')).toHaveCount(0);
   });
 
   test('should show error for weak password', async ({ page }) => {
-    await page.goto('/register');
+    await goToRegisterCredentialsStep(page);
     
-    await page.locator('input[name=\"email\"]').fill('test@example.com');
-    await page.locator('input[name=\"password\"]').fill('weak');
-    await page.locator('input[name=\"confirmPassword\"]').fill('weak');
-    await page.getByRole('button', { name: /continue|davom|next/i }).click();
+    await page.locator('input[name="email"]').fill('test@example.com');
+    await page.locator('input[name="password"]').fill('weak');
+    await page.locator('input[name="confirmPassword"]').fill('weak');
+    await page.getByRole('button', { name: /continue|davom|next|далее/i }).click();
 
     // Should not advance to step 2
     await expect(page.locator('input[name=\"fullName\"]')).toHaveCount(0);
   });
 
   test('should show error for duplicate email', async ({ page }) => {
-    await page.goto('/register');
+    await goToRegisterCredentialsStep(page);
     
     // Use known existing email (from seed data)
-    await page.locator('input[name=\"email\"]').fill('john@example.com');
-    await page.locator('input[name=\"password\"]').fill('Student123!');
-    await page.locator('input[name=\"confirmPassword\"]').fill('Student123!');
-    await page.getByRole('button', { name: /continue|davom|next/i }).click();
+    await page.locator('input[name="email"]').fill('john@example.com');
+    await page.locator('input[name="password"]').fill('Student123!');
+    await page.locator('input[name="confirmPassword"]').fill('Student123!');
+    await page.getByRole('button', { name: /continue|davom|next|далее/i }).click();
 
-    await page.locator('input[name=\"fullName\"]').fill('Test User');
-    await page.locator('input[name=\"phone\"]').fill('+998901234567');
-    await page.getByRole('button', { name: /continue|davom|next/i }).click();
-
-    await page.getByRole('button', { name: /AI Resume/i }).click();
-    await page.getByRole('button', { name: /create|hisob|account/i }).click();
+    await page.locator('input[name="fullName"]').fill('Test User');
+    await page.locator('input[name="phone"]').fill('+998901234567');
+    await page.getByRole('button', { name: /create|yarat|создать|hisob/i }).click();
 
     await expect(
       page.getByText(/already exists|allaqachon.*mavjud|уже.*существует/i)
@@ -261,7 +266,6 @@ test.describe('Authentication Flow', () => {
     }
   });
 });
-
 
 
 

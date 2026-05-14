@@ -74,6 +74,7 @@ User.__table__.create(bind=engine, checkfirst=True)
 inspector = inspect(engine)
 user_columns = {column["name"] for column in inspector.get_columns("users")}
 has_admin_role_column = "admin_role" in user_columns
+has_subscription_tier_column = "subscription_tier" in user_columns
 
 db = SessionLocal()
 try:
@@ -105,6 +106,8 @@ try:
         ]
         if has_admin_role_column:
             update_fields.append("admin_role = :admin_role")
+        if has_subscription_tier_column:
+            update_fields.append("subscription_tier = :subscription_tier")
 
         db.execute(
             text(
@@ -119,6 +122,7 @@ try:
                 "password_hash": password_hash,
                 "role": ADMIN_ROLE_VALUE,
                 "admin_role": ADMIN_SUB_ROLE_VALUE,
+                "subscription_tier": "enterprise",
                 "is_active": True,
                 "is_verified": True,
                 "is_deleted": False,
@@ -151,6 +155,9 @@ try:
         if has_admin_role_column:
             insert_columns.append("admin_role")
             insert_values.append(":admin_role")
+        if has_subscription_tier_column:
+            insert_columns.append("subscription_tier")
+            insert_values.append(":subscription_tier")
 
         db.execute(
             text(
@@ -165,6 +172,7 @@ try:
                 "password_hash": password_hash,
                 "role": ADMIN_ROLE_VALUE,
                 "admin_role": ADMIN_SUB_ROLE_VALUE,
+                "subscription_tier": "enterprise",
                 "is_active": True,
                 "is_verified": True,
                 "is_deleted": False,
@@ -185,16 +193,37 @@ finally:
   const seedSecretKey = resolveSeedSecretKey();
   const candidatePythonBinaries = [
     process.env.PYTHON,
+    path.join(BACKEND_DIR, '.venv311local', 'bin', 'python'),
+    path.join(BACKEND_DIR, '.venv311', 'bin', 'python'),
     path.join(BACKEND_DIR, '.venv311-mac', 'bin', 'python'),
     path.join(BACKEND_DIR, '.venv', 'bin', 'python'),
     'python',
     'python3',
   ].filter((value): value is string => Boolean(value));
 
+  const hasCompatiblePythonVersion = (pythonBinary: string): boolean => {
+    try {
+      execFileSync(
+        pythonBinary,
+        [
+          '-c',
+          'import sys; raise SystemExit(0 if sys.version_info >= (3, 10) else 1)',
+        ],
+        { cwd: BACKEND_DIR, stdio: 'ignore', env: process.env as NodeJS.ProcessEnv }
+      );
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
   for (const databaseUrl of candidateDatabaseUrls) {
     for (const pythonBinary of candidatePythonBinaries) {
       // Skip local absolute paths that do not exist on this machine.
       if (pythonBinary.includes(path.sep) && !existsSync(pythonBinary)) {
+        continue;
+      }
+      if (!hasCompatiblePythonVersion(pythonBinary)) {
         continue;
       }
 

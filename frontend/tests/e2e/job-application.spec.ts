@@ -87,7 +87,9 @@ test.describe("Job Application Flow", () => {
 
   test("should search for jobs", async ({ page }) => {
     await page.goto(`${APP_URL}/student/jobs`);
-    const searchInput = page.getByPlaceholder(/Search jobs, companies, skills/i);
+    const searchInput = page.getByPlaceholder(
+      /Search jobs, companies, skills|Vakansiya, kompaniya, ko'nikmalarni qidiring|Ищите вакансии, компании и навыки/i
+    );
     await searchInput.fill("Python");
 
     await expect(page.getByText(/Python Developer/i).first()).toBeVisible({ timeout: 15000 });
@@ -118,22 +120,22 @@ test.describe("Job Application Flow", () => {
     await page.goto(`${APP_URL}/student/jobs/${jobId}/apply`);
 
     // Step 1: select resume
-    await expect(page.getByText(/Select a Resume/i)).toBeVisible({ timeout: 15000 });
+    await expect(page.getByText(/Select a Resume|Rezyumeni tanlang|Выберите резюме/i)).toBeVisible({ timeout: 15000 });
     const resumeCard = page
       .getByText(/John Doe Resume/i)
       .first()
       .locator('xpath=ancestor::*[contains(@class,"cursor-pointer")]')
       .first();
     await resumeCard.click();
-    await page.getByRole("button", { name: /^Next$/i }).click();
+    await page.getByRole("button", { name: /Next|Keyingi|Далее/i }).click();
 
     // Step 2: cover letter is optional
-    await page.getByRole("button", { name: /^Next$/i }).click();
+    await page.getByRole("button", { name: /Next|Keyingi|Далее/i }).click();
 
     // Step 3: answer required questions (q1 textarea + q3 select)
     await page.locator("textarea").first().fill("I am excited about this role and I can contribute immediately.");
-    await page.locator("select").first().selectOption({ label: "Immediately" });
-    await page.getByRole("button", { name: /^Next$/i }).click();
+    await page.locator("select").first().selectOption({ index: 1 });
+    await page.getByRole("button", { name: /Next|Keyingi|Далее/i }).click();
 
     // Step 4: submit
     const submitResponsePromise = page.waitForResponse(
@@ -141,13 +143,13 @@ test.describe("Job Application Flow", () => {
         res.url().includes("/api/v1/applications/apply") &&
         res.request().method() === "POST"
     );
-    await page.getByRole("button", { name: /Submit Application/i }).click();
+    await page.getByRole("button", { name: /Submit Application|Arizani yuborish|Отправить заявку/i }).click();
     const submitResponse = await submitResponsePromise;
     expect([201, 409]).toContain(submitResponse.status());
   });
 
   test("should view my applications", async ({ page }) => {
     await page.goto(`${APP_URL}/student/applications`);
-    await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+    await expect(page.getByRole("heading", { name: /Arizalarim|Мои заявки|My Applications/i })).toBeVisible();
   });
 });
