@@ -41,11 +41,11 @@ const jobTypeLabels: Record<string, string> = {
 };
 
 const experienceLevelLabels: Record<string, string> = {
-  junior: "Junior (0-2 yil)",
-  mid: "Mid-Level (2-5 yil)",
-  senior: "Senior (5+ yil)",
-  lead: "Lead/Manager (7+ yil)",
-  executive: "Executive",
+  junior: "Boshlovchi (0-2 yil)",
+  mid: "O'rta daraja (2-5 yil)",
+  senior: "Katta daraja (5+ yil)",
+  lead: "Rahbar (7+ yil)",
+  executive: "Direktor",
 };
 
 const jobTypeColors: Record<string, string> = {

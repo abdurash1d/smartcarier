@@ -232,6 +232,49 @@ class EmailService:
             logger.exception(f"Email error: {e}")
             return False
     
+    async def send_raw_email(
+        self,
+        to_email: str,
+        subject: str,
+        body: str,
+        to_name: Optional[str] = None,
+        html: bool = False,
+    ) -> bool:
+        """Send a raw email with an arbitrary subject + body (no templates).
+
+        Used by AI-drafted recruiter emails where the body is already prepared.
+        Plain-text bodies are wrapped in a minimal HTML container so SMTP
+        clients render line breaks correctly.
+        """
+        providers = self._get_delivery_providers()
+        if not providers:
+            logger.warning("Email delivery disabled; skipping raw send to %s***", to_email[:3])
+            return False
+
+        html_body = body if html else (
+            "<!doctype html><html><body style=\"font-family: -apple-system,Segoe UI,Roboto,Arial,sans-serif;"
+            "max-width:600px;margin:0 auto;padding:24px;color:#0f172a;line-height:1.55\">"
+            + body.replace("\n", "<br>")
+            + "</body></html>"
+        )
+
+        for provider in providers:
+            try:
+                if provider == "smtp":
+                    ok = await self._send_via_smtp(to_email, to_name, subject, html_body)
+                elif provider == "sendgrid":
+                    ok = await self._send_via_sendgrid(to_email, to_name, subject, html_body)
+                else:
+                    ok = False
+                if ok:
+                    logger.info(f"Raw email sent via {provider} to {to_email[:3]}***")
+                    return True
+            except Exception as e:
+                logger.warning(f"Raw email provider {provider} failed: {e}")
+
+        logger.error(f"Raw email failed for all providers to {to_email[:3]}***")
+        return False
+
     async def send_welcome_email(
         self,
         to_email: str,

@@ -7,7 +7,7 @@ export default function CheckoutPage() {
     <Suspense
       fallback={
         <div className="min-h-screen flex items-center justify-center text-surface-500">
-          Loading checkout...
+          To'lov sahifasi yuklanmoqda... / Загружается страница оплаты...
         </div>
       }
     >

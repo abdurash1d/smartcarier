@@ -29,6 +29,7 @@ import { applicationApi } from "@/lib/api";
 import { formatDate, formatRelativeTime, formatSalaryRange, cn } from "@/lib/utils";
 import type { Application } from "@/types/api";
 import { toast } from "sonner";
+import { useTranslation } from "@/hooks/useTranslation";
 
 const statusConfig: Record<string, { label: string; color: string; icon: any; description: string }> = {
   pending: {
@@ -87,6 +88,8 @@ export default function ApplicationDetailPage() {
   const router = useRouter();
   const params = useParams();
   const appId = params!.id as string;
+  const { locale } = useTranslation();
+  const isRu = locale === "ru";
 
   const [application, setApplication] = useState<Application | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -306,7 +309,7 @@ export default function ApplicationDetailPage() {
               </div>
               {applicationDetails.meeting_link ? (
                 <div className="flex items-center justify-between gap-4">
-                  <span className="text-surface-500">Meeting link</span>
+                  <span className="text-surface-500">{isRu ? "Ссылка на встречу" : "Uchrashuv havolasi"}</span>
                   <Button
                     asChild
                     variant="outline"
@@ -324,7 +327,7 @@ export default function ApplicationDetailPage() {
                 </div>
               ) : (
                 <div className="flex items-center justify-between gap-4">
-                  <span className="text-surface-500">Meeting link</span>
+                  <span className="text-surface-500">{isRu ? "Ссылка на встречу" : "Uchrashuv havolasi"}</span>
                   <span className="font-medium text-surface-500">Mavjud emas</span>
                 </div>
               )}
@@ -332,11 +335,11 @@ export default function ApplicationDetailPage() {
           </div>
         )}
 
-        {/* Cover Letter */}
+        {/* Motivation Letter */}
         {applicationDetails.cover_letter && (
           <div className="mt-4 rounded-xl border border-surface-100 bg-surface-50 p-4">
             <p className="mb-2 flex items-center gap-2 text-sm font-semibold text-surface-700">
-              <MessageSquare className="h-4 w-4" /> Cover Letter
+              <MessageSquare className="h-4 w-4" /> {isRu ? "Сопроводительное письмо" : "Motivatsion xat"}
             </p>
             <p className="text-sm text-surface-600 leading-relaxed whitespace-pre-wrap">
               {applicationDetails.cover_letter}

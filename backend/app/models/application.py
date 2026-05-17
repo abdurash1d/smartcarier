@@ -357,6 +357,15 @@ class Application(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin):
         back_populates="applications",
         lazy="joined"
     )
+
+    # One-to-many: An application can have many interview scorecards
+    # (different interviewers can each submit one).
+    scorecards = relationship(
+        "InterviewScorecard",
+        back_populates="application",
+        cascade="all, delete-orphan",
+        lazy="select",
+    )
     
     # =========================================================================
     # VALIDATORS

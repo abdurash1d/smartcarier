@@ -166,18 +166,18 @@ export default function AutoApplyPage() {
   const getExperienceLabel = (value: ExperienceLevel) => {
     if (isRu) {
       return {
-        junior: "Junior",
-        mid: "Middle",
-        senior: "Senior",
-        lead: "Lead",
-        executive: "Executive",
+        junior: "Начинающий",
+        mid: "Средний",
+        senior: "Старший",
+        lead: "Руководитель",
+        executive: "Директор",
       }[value];
     }
     return {
-      junior: "Junior",
+      junior: "Boshlovchi",
       mid: "O'rta",
-      senior: "Senior",
-      lead: "Lead",
+      senior: "Katta",
+      lead: "Rahbar",
       executive: "Rahbar",
     }[value];
   };

@@ -29,6 +29,7 @@ import {
   Target,
   Check,
   Minus,
+  Sparkles,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -36,7 +37,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
-import { applicationApi } from "@/lib/api";
+import { aiApi, applicationApi } from "@/lib/api";
 import { formatDate, formatRelativeTime, cn } from "@/lib/utils";
 import type { Application, KnownApplicationStatus } from "@/types/api";
 import { useTranslation } from "@/hooks/useTranslation";
@@ -110,6 +111,127 @@ export default function ApplicantDetailPage() {
   const [meetingLink, setMeetingLink] = useState("");
   const [interviewNotes, setInterviewNotes] = useState("");
 
+  // AI HR panel state
+  type AISummary = {
+    summary: string;
+    strengths: string[];
+    gaps: string[];
+    recommendation: "shortlist" | "review" | "pass";
+    fit_score: number | null;
+    ai_generated: boolean;
+  };
+  type AIQuestion = { question: string; category: string; rationale: string };
+  type AIEmail = { subject: string; body: string; ai_generated: boolean };
+
+  const [aiSummary, setAiSummary] = useState<AISummary | null>(null);
+  const [aiSummaryLoading, setAiSummaryLoading] = useState(false);
+  const [aiQuestions, setAiQuestions] = useState<AIQuestion[] | null>(null);
+  const [aiQuestionsLoading, setAiQuestionsLoading] = useState(false);
+  const [aiEmail, setAiEmail] = useState<AIEmail | null>(null);
+  const [aiEmailLoading, setAiEmailLoading] = useState<null | "interview" | "reject" | "offer" | "shortlist">(null);
+  const [aiEmailSending, setAiEmailSending] = useState(false);
+
+  // Structured interview scorecard
+  type Scorecard = {
+    id: string;
+    technical_score: number | null;
+    communication_score: number | null;
+    cultural_fit_score: number | null;
+    motivation_score: number | null;
+    problem_solving_score: number | null;
+    overall_score: number | null;
+    recommendation: "hire" | "maybe" | "pass" | null;
+    notes: string | null;
+    created_at: string | null;
+    evaluator: { id: string | null; name: string | null };
+  };
+  const [scorecards, setScorecards] = useState<Scorecard[]>([]);
+  const [scoreForm, setScoreForm] = useState({
+    technical_score: 0,
+    communication_score: 0,
+    cultural_fit_score: 0,
+    motivation_score: 0,
+    problem_solving_score: 0,
+    recommendation: "" as "" | "hire" | "maybe" | "pass",
+    notes: "",
+  });
+  const [scoreSubmitting, setScoreSubmitting] = useState(false);
+
+  const loadScorecards = async () => {
+    try {
+      const res = await applicationApi.listScorecards(appId);
+      setScorecards((res.data as { data: { scorecards: Scorecard[] } }).data.scorecards || []);
+    } catch {
+      /* ignore */
+    }
+  };
+
+  const submitScorecard = async () => {
+    setScoreSubmitting(true);
+    try {
+      await applicationApi.submitScorecard(appId, {
+        technical_score: scoreForm.technical_score || null,
+        communication_score: scoreForm.communication_score || null,
+        cultural_fit_score: scoreForm.cultural_fit_score || null,
+        motivation_score: scoreForm.motivation_score || null,
+        problem_solving_score: scoreForm.problem_solving_score || null,
+        recommendation: scoreForm.recommendation || null,
+        notes: scoreForm.notes || null,
+      });
+      toast.success(isRu ? "Оценка сохранена" : "Baholash saqlandi");
+      setScoreForm({
+        technical_score: 0,
+        communication_score: 0,
+        cultural_fit_score: 0,
+        motivation_score: 0,
+        problem_solving_score: 0,
+        recommendation: "",
+        notes: "",
+      });
+      await loadScorecards();
+    } catch (e: any) {
+      toast.error(e?.response?.data?.detail || (e as Error).message);
+    } finally {
+      setScoreSubmitting(false);
+    }
+  };
+
+  const fetchAiSummary = async () => {
+    setAiSummaryLoading(true);
+    try {
+      const res = await aiApi.hrCandidateSummary(appId, locale);
+      setAiSummary((res.data as { data: AISummary }).data);
+    } catch (e) {
+      toast.error((e as Error).message || "AI error");
+    } finally {
+      setAiSummaryLoading(false);
+    }
+  };
+
+  const fetchAiQuestions = async () => {
+    setAiQuestionsLoading(true);
+    try {
+      const res = await aiApi.hrInterviewQuestions(appId, 8, locale);
+      setAiQuestions((res.data as { data: { questions: AIQuestion[] } }).data.questions);
+    } catch (e) {
+      toast.error((e as Error).message || "AI error");
+    } finally {
+      setAiQuestionsLoading(false);
+    }
+  };
+
+  const fetchAiEmail = async (action: "interview" | "reject" | "offer" | "shortlist") => {
+    setAiEmailLoading(action);
+    try {
+      const res = await aiApi.hrEmailTemplate(appId, { action, locale });
+      setAiEmail((res.data as { data: AIEmail }).data);
+    } catch (e) {
+      toast.error((e as Error).message || "AI error");
+    } finally {
+      setAiEmailLoading(null);
+    }
+  };
+
   useEffect(() => {
     const fetchApplication = async () => {
       try {
@@ -122,7 +244,11 @@ export default function ApplicantDetailPage() {
         setIsLoading(false);
       }
     };
-    if (appId) fetchApplication();
+    if (appId) {
+      fetchApplication();
+      void loadScorecards();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [appId]);
 
   useEffect(() => {
@@ -412,7 +538,7 @@ export default function ApplicantDetailPage() {
 
               {isVideoInterview && (
                 <div className="space-y-2">
-                  <Label htmlFor="meeting-link">Meeting link</Label>
+                  <Label htmlFor="meeting-link">{isRu ? "Ссылка на встречу" : "Uchrashuv havolasi"}</Label>
                   <Input
                     id="meeting-link"
                     type="url"
@@ -482,7 +608,7 @@ export default function ApplicantDetailPage() {
             </motion.div>
           )}
 
-          {/* Cover Letter */}
+          {/* Motivation Letter */}
           {application.cover_letter && (
             <motion.div
               initial={{ opacity: 0, y: 20 }}
@@ -492,7 +618,7 @@ export default function ApplicantDetailPage() {
             >
               <h3 className="mb-3 flex items-center gap-2 font-semibold text-surface-900 dark:text-white">
                 <MessageSquare className="h-5 w-5 text-purple-500" />
-                Cover Letter
+                {isRu ? "Сопроводительное письмо" : "Motivatsion xat"}
               </h3>
               <p className="text-sm text-surface-600 leading-relaxed whitespace-pre-wrap dark:text-surface-300">
                 {application.cover_letter}
@@ -596,6 +722,425 @@ export default function ApplicantDetailPage() {
               )}
             </motion.div>
           )}
+
+          {/* AI HR Panel — Summary + Interview Questions + Email Drafts */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.28 }}
+            className="overflow-hidden rounded-2xl border border-purple-200 bg-gradient-to-br from-purple-50 to-white p-5 shadow-sm dark:border-purple-500/30 dark:from-purple-500/10 dark:to-surface-800"
+          >
+            <div className="mb-4 flex items-center gap-2">
+              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-purple-500 to-indigo-600 text-white shadow-md">
+                <Sparkles className="h-5 w-5" />
+              </div>
+              <div>
+                <h3 className="font-display text-lg font-semibold text-surface-900 dark:text-white">
+                  {isRu ? "AI HR помощник" : "AI HR yordamchi"}
+                </h3>
+                <p className="text-xs text-surface-500">
+                  {isRu
+                    ? "Анализ кандидата, вопросы для интервью и шаблоны писем."
+                    : "Nomzod tahlili, intervyu savollari va xat shablonlari."}
+                </p>
+              </div>
+            </div>
+
+            {/* AI Summary */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <p className="text-xs font-bold uppercase tracking-wider text-purple-700 dark:text-purple-300">
+                  {isRu ? "Краткое резюме кандидата" : "Nomzod tahlili"}
+                </p>
+                {!aiSummary && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={aiSummaryLoading}
+                    onClick={() => void fetchAiSummary()}
+                  >
+                    {aiSummaryLoading ? (
+                      <>
+                        <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
+                        {isRu ? "Анализ…" : "Tahlil…"}
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="mr-1 h-3.5 w-3.5" />
+                        {isRu ? "Сгенерировать" : "Yaratish"}
+                      </>
+                    )}
+                  </Button>
+                )}
+              </div>
+              {aiSummary && (
+                <div className="rounded-xl border border-purple-100 bg-white p-4 dark:border-purple-500/20 dark:bg-surface-900/50">
+                  <div className="flex items-start justify-between gap-3">
+                    <p className="flex-1 text-sm leading-relaxed text-surface-700 dark:text-surface-300">
+                      {aiSummary.summary}
+                    </p>
+                    <div className="flex flex-col items-end gap-1">
+                      {aiSummary.fit_score !== null && (
+                        <span className="rounded-md bg-emerald-100 px-2 py-0.5 text-xs font-bold text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300">
+                          {aiSummary.fit_score}%
+                        </span>
+                      )}
+                      <span
+                        className={`rounded-md px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${
+                          aiSummary.recommendation === "shortlist"
+                            ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300"
+                            : aiSummary.recommendation === "pass"
+                            ? "bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-300"
+                            : "bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300"
+                        }`}
+                      >
+                        {aiSummary.recommendation}
+                      </span>
+                    </div>
+                  </div>
+                  {aiSummary.strengths.length > 0 && (
+                    <div className="mt-3">
+                      <p className="text-[11px] font-semibold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
+                        {isRu ? "Сильные стороны" : "Kuchli tomonlar"}
+                      </p>
+                      <ul className="mt-1 space-y-0.5 text-sm text-surface-700 dark:text-surface-300">
+                        {aiSummary.strengths.map((s, i) => (
+                          <li key={i} className="flex items-start gap-1.5">
+                            <CheckCircle className="mt-0.5 h-3 w-3 flex-shrink-0 text-emerald-600" />
+                            <span>{s}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                  {aiSummary.gaps.length > 0 && (
+                    <div className="mt-3">
+                      <p className="text-[11px] font-semibold uppercase tracking-wider text-amber-600 dark:text-amber-400">
+                        {isRu ? "Зоны риска" : "Kamchiliklar"}
+                      </p>
+                      <ul className="mt-1 space-y-0.5 text-sm text-surface-700 dark:text-surface-300">
+                        {aiSummary.gaps.map((g, i) => (
+                          <li key={i} className="flex items-start gap-1.5">
+                            <AlertCircle className="mt-0.5 h-3 w-3 flex-shrink-0 text-amber-600" />
+                            <span>{g}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* AI Interview Questions */}
+            <div className="mt-5 space-y-2">
+              <div className="flex items-center justify-between">
+                <p className="text-xs font-bold uppercase tracking-wider text-purple-700 dark:text-purple-300">
+                  {isRu ? "Вопросы для интервью" : "Intervyu savollari"}
+                </p>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={aiQuestionsLoading}
+                  onClick={() => void fetchAiQuestions()}
+                >
+                  {aiQuestionsLoading ? (
+                    <>
+                      <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
+                      {isRu ? "Генерация…" : "Generatsiya…"}
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="mr-1 h-3.5 w-3.5" />
+                      {aiQuestions ? (isRu ? "Перегенерировать" : "Qayta yaratish") : (isRu ? "Сгенерировать" : "Yaratish")}
+                    </>
+                  )}
+                </Button>
+              </div>
+              {aiQuestions && aiQuestions.length > 0 && (
+                <ol className="space-y-2 rounded-xl border border-purple-100 bg-white p-4 dark:border-purple-500/20 dark:bg-surface-900/50">
+                  {aiQuestions.map((q, i) => (
+                    <li key={i} className="flex gap-3 text-sm">
+                      <span className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-purple-100 text-xs font-bold text-purple-700 dark:bg-purple-500/20 dark:text-purple-300">
+                        {i + 1}
+                      </span>
+                      <div className="flex-1">
+                        <p className="text-surface-900 dark:text-white">{q.question}</p>
+                        {q.category && (
+                          <span className="mt-0.5 inline-block rounded-md bg-surface-100 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wider text-surface-600 dark:bg-surface-700 dark:text-surface-300">
+                            {q.category}
+                          </span>
+                        )}
+                      </div>
+                    </li>
+                  ))}
+                </ol>
+              )}
+            </div>
+
+            {/* AI Email Templates */}
+            <div className="mt-5 space-y-2">
+              <p className="text-xs font-bold uppercase tracking-wider text-purple-700 dark:text-purple-300">
+                {isRu ? "Шаблон письма кандидату" : "Nomzodga xat shabloni"}
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {(["interview", "shortlist", "offer", "reject"] as const).map((action) => (
+                  <Button
+                    key={action}
+                    size="sm"
+                    variant="outline"
+                    disabled={aiEmailLoading !== null}
+                    onClick={() => void fetchAiEmail(action)}
+                  >
+                    {aiEmailLoading === action ? (
+                      <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <Sparkles className="mr-1 h-3.5 w-3.5" />
+                    )}
+                    {action === "interview" && (isRu ? "Приглашение" : "Taklif")}
+                    {action === "shortlist" && (isRu ? "Шорт-лист" : "Shortlist")}
+                    {action === "offer" && (isRu ? "Оффер" : "Offer")}
+                    {action === "reject" && (isRu ? "Отказ" : "Rad etish")}
+                  </Button>
+                ))}
+              </div>
+              {aiEmail && (
+                <div className="space-y-2 rounded-xl border border-purple-100 bg-white p-4 dark:border-purple-500/20 dark:bg-surface-900/50">
+                  <div>
+                    <p className="text-[11px] font-semibold uppercase tracking-wider text-surface-500">
+                      {isRu ? "Тема" : "Mavzu"}
+                    </p>
+                    <p className="text-sm font-medium text-surface-900 dark:text-white">
+                      {aiEmail.subject}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-[11px] font-semibold uppercase tracking-wider text-surface-500">
+                      {isRu ? "Текст" : "Matn"}
+                    </p>
+                    <p className="whitespace-pre-wrap text-sm leading-relaxed text-surface-700 dark:text-surface-300">
+                      {aiEmail.body}
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => {
+                        navigator.clipboard.writeText(`${aiEmail.subject}\n\n${aiEmail.body}`);
+                        toast.success(isRu ? "Скопировано" : "Nusxalandi");
+                      }}
+                    >
+                      {isRu ? "Скопировать" : "Nusxalash"}
+                    </Button>
+                    <Button
+                      size="sm"
+                      disabled={aiEmailSending}
+                      onClick={async () => {
+                        if (!aiEmail) return;
+                        setAiEmailSending(true);
+                        try {
+                          await aiApi.hrEmailSend(appId, {
+                            subject: aiEmail.subject,
+                            body: aiEmail.body,
+                          });
+                          toast.success(isRu ? "Письмо отправлено" : "Xat yuborildi");
+                        } catch (e: any) {
+                          const msg = e?.response?.data?.detail || (e as Error).message;
+                          toast.error(msg);
+                        } finally {
+                          setAiEmailSending(false);
+                        }
+                      }}
+                    >
+                      {aiEmailSending ? (
+                        <>
+                          <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
+                          {isRu ? "Отправляется…" : "Yuborilmoqda…"}
+                        </>
+                      ) : (
+                        <>
+                          <Mail className="mr-1 h-3.5 w-3.5" />
+                          {isRu ? "Отправить кандидату" : "Nomzodga yuborish"}
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </motion.div>
+
+          {/* Interview Scorecard — structured evaluation */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.29 }}
+            className="rounded-2xl border border-surface-200 bg-white p-5 shadow-sm dark:border-surface-700 dark:bg-surface-800"
+          >
+            <div className="mb-4 flex items-start justify-between gap-2">
+              <div>
+                <h3 className="flex items-center gap-2 font-display text-lg font-semibold text-surface-900 dark:text-white">
+                  <Target className="h-5 w-5 text-emerald-600" />
+                  {isRu ? "Оценочный лист интервью" : "Intervyu baholash varaqasi"}
+                </h3>
+                <p className="text-xs text-surface-500">
+                  {isRu
+                    ? "5 критериев, по шкале 1–5. Снижает субъективность."
+                    : "5 mezon, 1–5 ball. Subyektivlikni kamaytiradi."}
+                </p>
+              </div>
+              {scorecards.length > 0 && (
+                <span className="rounded-md bg-emerald-100 px-2 py-0.5 text-xs font-bold text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300">
+                  {scorecards.length} {isRu ? "оценок" : "baholash"}
+                </span>
+              )}
+            </div>
+
+            {/* Form: 5 sliders */}
+            {(() => {
+              const criteria: Array<{
+                key: "technical_score" | "communication_score" | "cultural_fit_score" | "motivation_score" | "problem_solving_score";
+                label: string;
+              }> = [
+                { key: "technical_score", label: isRu ? "Технические навыки" : "Texnik ko'nikma" },
+                { key: "communication_score", label: isRu ? "Коммуникация" : "Muloqot" },
+                { key: "cultural_fit_score", label: isRu ? "Соответствие культуре" : "Madaniyat mosligi" },
+                { key: "motivation_score", label: isRu ? "Мотивация" : "Motivatsiya" },
+                { key: "problem_solving_score", label: isRu ? "Решение задач" : "Muammo yechish" },
+              ];
+              const filled = criteria.filter((c) => scoreForm[c.key] > 0).length;
+              const liveAvg =
+                filled > 0
+                  ? criteria.reduce((sum, c) => sum + (scoreForm[c.key] || 0), 0) / filled
+                  : 0;
+              return (
+                <div className="space-y-3">
+                  {criteria.map((c) => (
+                    <div key={c.key} className="flex items-center gap-3">
+                      <div className="w-44 flex-shrink-0 text-sm text-surface-700 dark:text-surface-300">
+                        {c.label}
+                      </div>
+                      <div className="flex flex-1 gap-1">
+                        {[1, 2, 3, 4, 5].map((n) => {
+                          const active = scoreForm[c.key] >= n;
+                          return (
+                            <button
+                              key={n}
+                              type="button"
+                              onClick={() => setScoreForm((s) => ({ ...s, [c.key]: s[c.key] === n ? 0 : n }))}
+                              className={`h-9 flex-1 rounded-md border text-xs font-semibold transition-colors ${
+                                active
+                                  ? "border-emerald-500 bg-emerald-500 text-white"
+                                  : "border-surface-200 bg-white text-surface-500 hover:bg-surface-50 dark:border-surface-700 dark:bg-surface-900 dark:hover:bg-surface-800"
+                              }`}
+                            >
+                              {n}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
+
+                  <div className="flex flex-wrap items-center gap-2 pt-2">
+                    <p className="text-xs font-semibold uppercase tracking-wider text-surface-500">
+                      {isRu ? "Рекомендация" : "Tavsiya"}
+                    </p>
+                    {(["hire", "maybe", "pass"] as const).map((opt) => (
+                      <button
+                        key={opt}
+                        type="button"
+                        onClick={() => setScoreForm((s) => ({ ...s, recommendation: s.recommendation === opt ? "" : opt }))}
+                        className={`rounded-md border px-3 py-1 text-xs font-semibold transition-colors ${
+                          scoreForm.recommendation === opt
+                            ? opt === "hire"
+                              ? "border-emerald-500 bg-emerald-500 text-white"
+                              : opt === "maybe"
+                              ? "border-amber-500 bg-amber-500 text-white"
+                              : "border-red-500 bg-red-500 text-white"
+                            : "border-surface-200 bg-white text-surface-700 hover:bg-surface-50 dark:border-surface-700 dark:bg-surface-900 dark:text-surface-200"
+                        }`}
+                      >
+                        {opt === "hire" && (isRu ? "Нанимать" : "Yollash")}
+                        {opt === "maybe" && (isRu ? "Возможно" : "Ehtimol")}
+                        {opt === "pass" && (isRu ? "Отказать" : "Rad etish")}
+                      </button>
+                    ))}
+                    <span className="ml-auto inline-flex items-center gap-1 rounded-md bg-surface-100 px-2 py-0.5 text-xs text-surface-700 dark:bg-surface-700 dark:text-surface-200">
+                      {isRu ? "Средняя" : "O'rtacha"}: <strong>{liveAvg ? liveAvg.toFixed(2) : "—"}</strong>
+                    </span>
+                  </div>
+
+                  <Textarea
+                    rows={3}
+                    placeholder={isRu ? "Заметки (опционально)" : "Izohlar (ixtiyoriy)"}
+                    value={scoreForm.notes}
+                    onChange={(e) => setScoreForm((s) => ({ ...s, notes: e.target.value }))}
+                  />
+                  <Button
+                    onClick={() => void submitScorecard()}
+                    disabled={scoreSubmitting || filled === 0}
+                  >
+                    {scoreSubmitting ? (
+                      <>
+                        <Loader2 className="mr-1 h-4 w-4 animate-spin" />
+                        {isRu ? "Сохраняется…" : "Saqlanmoqda…"}
+                      </>
+                    ) : (
+                      <>
+                        <CheckCircle className="mr-1 h-4 w-4" />
+                        {isRu ? "Сохранить оценку" : "Baholashni saqlash"}
+                      </>
+                    )}
+                  </Button>
+                </div>
+              );
+            })()}
+
+            {/* History */}
+            {scorecards.length > 0 && (
+              <div className="mt-5 space-y-2 border-t border-surface-200 pt-4 dark:border-surface-700">
+                <p className="text-xs font-bold uppercase tracking-wider text-surface-500">
+                  {isRu ? "Предыдущие оценки" : "Avvalgi baholashlar"}
+                </p>
+                {scorecards.map((s) => (
+                  <div
+                    key={s.id}
+                    className="grid grid-cols-[1fr_auto] items-center gap-2 rounded-lg border border-surface-200 p-2 text-sm dark:border-surface-700"
+                  >
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium text-surface-900 dark:text-white">
+                          {s.evaluator.name || "—"}
+                        </span>
+                        {s.recommendation && (
+                          <span
+                            className={`rounded-md px-1.5 py-0.5 text-[10px] font-bold uppercase ${
+                              s.recommendation === "hire"
+                                ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300"
+                                : s.recommendation === "maybe"
+                                ? "bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300"
+                                : "bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-300"
+                            }`}
+                          >
+                            {s.recommendation}
+                          </span>
+                        )}
+                        <span className="text-xs text-surface-500">
+                          {s.created_at ? formatRelativeTime(s.created_at, locale) : ""}
+                        </span>
+                      </div>
+                      {s.notes && <p className="mt-1 text-xs text-surface-600 dark:text-surface-300">{s.notes}</p>}
+                    </div>
+                    <span className="rounded-md bg-emerald-100 px-2 py-1 text-sm font-bold text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300">
+                      {s.overall_score?.toFixed(2) ?? "—"} / 5
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </motion.div>
 
           {/* Resume */}
           {resume && (

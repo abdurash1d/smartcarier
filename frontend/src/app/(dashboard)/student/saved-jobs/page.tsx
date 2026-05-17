@@ -23,14 +23,15 @@ import { SkeletonCard } from "@/components/ui/skeleton";
 import { jobApi } from "@/lib/api";
 import { formatRelativeTime, formatSalaryRange, cn } from "@/lib/utils";
 import { toast } from "sonner";
+import { useTranslation } from "@/hooks/useTranslation";
 
-const jobTypeLabels: Record<string, string> = {
-  full_time: "To'liq stavka",
-  part_time: "Yarim stavka",
-  remote: "Masofaviy",
-  hybrid: "Gibrid",
-  contract: "Shartnoma",
-};
+const getJobTypeLabels = (isRu: boolean): Record<string, string> => ({
+  full_time: isRu ? "Полная занятость" : "To'liq stavka",
+  part_time: isRu ? "Частичная занятость" : "Yarim stavka",
+  remote: isRu ? "Удалённо" : "Masofaviy",
+  hybrid: isRu ? "Гибрид" : "Gibrid",
+  contract: isRu ? "Контракт" : "Shartnoma",
+});
 
 const jobTypeColors: Record<string, string> = {
   full_time: "bg-green-100 text-green-700",
@@ -57,6 +58,9 @@ interface SavedJobItem {
 }
 
 export default function SavedJobsPage() {
+  const { locale } = useTranslation();
+  const isRu = locale === "ru";
+  const jobTypeLabels = getJobTypeLabels(isRu);
   const [jobs, setJobs] = useState<SavedJobItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
@@ -83,7 +87,7 @@ export default function SavedJobsPage() {
     try {
       await jobApi.unsaveJob(jobId);
       setJobs((prev) => prev.filter((j) => j.id !== jobId));
-      toast.success("Ish saqlanganlar ro'yxatidan o'chirildi.");
+      toast.success(isRu ? "Вакансия удалена из сохранённых." : "Ish saqlanganlar ro'yxatidan o'chirildi.");
     } catch {
       toast.error("O'chirishda xatolik yuz berdi.");
     } finally {
@@ -112,7 +116,7 @@ export default function SavedJobsPage() {
             Saqlangan ishlar
           </h1>
           <p className="mt-1 text-sm text-surface-500">
-            {jobs.length} ta saqlangan ish
+            {jobs.length} {isRu ? "сохранённых вакансий" : "ta saqlangan ish"}
           </p>
         </div>
         <Link href="/student/jobs">
@@ -149,7 +153,9 @@ export default function SavedJobsPage() {
         >
           <BookmarkCheck className="h-16 w-16 text-surface-300" />
           <h3 className="mt-4 text-lg font-semibold text-surface-700">
-            {searchQuery ? "Qidiruv bo'yicha natija topilmadi" : "Hali saqlangan ish yo'q"}
+            {searchQuery
+              ? (isRu ? "По вашему запросу ничего не найдено" : "Qidiruv bo'yicha natija topilmadi")
+              : (isRu ? "Пока нет сохранённых вакансий" : "Hali saqlangan ish yo'q")}
           </h3>
           <p className="mt-2 text-sm text-surface-500">
             {searchQuery
@@ -203,7 +209,7 @@ export default function SavedJobsPage() {
                       <p className="truncate text-sm font-medium text-surface-900">{companyName}</p>
                       <p className="flex items-center gap-1 text-xs text-surface-500">
                         <Clock className="h-3 w-3" />
-                        {formatRelativeTime(job.saved_at)} saqlangan
+                        {formatRelativeTime(job.saved_at, locale)} {isRu ? "сохранено" : "saqlangan"}
                       </p>
                     </div>
                   </div>

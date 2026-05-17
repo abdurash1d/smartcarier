@@ -28,6 +28,7 @@ import type { ResumeContent } from "@/types/api";
 import { ResumePreview } from "@/components/resume/ResumePreview";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import { useTranslation } from "@/hooks/useTranslation";
 
 type ExperienceItem = NonNullable<ResumeContent["experience"]>[number];
 type EducationItem = NonNullable<ResumeContent["education"]>[number];
@@ -49,6 +50,8 @@ function sanitizeFilename(value: string) {
 
 export default function CreateResumePage() {
   const router = useRouter();
+  const { locale } = useTranslation();
+  const isRu = locale === "ru";
   const [step, setStep] = useState(0);
   const [isSaving, setIsSaving] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
@@ -127,7 +130,7 @@ export default function CreateResumePage() {
 
   const saveResume = async (publish = false): Promise<string | null> => {
     if (!title.trim()) {
-      toast.error("Resume nomi kiritilishi kerak");
+      toast.error(isRu ? "Нужно указать название резюме" : "Rezyume nomini kiriting");
       return null;
     }
 
@@ -144,14 +147,14 @@ export default function CreateResumePage() {
       const newId = created?.id;
 
       if (!newId) {
-        throw new Error("Resume ID topilmadi");
+        throw new Error(isRu ? "ID резюме не найден" : "Rezyume ID topilmadi");
       }
 
       if (publish) {
         await resumeApi.publish(newId);
       }
 
-      toast.success(publish ? "Resume nashr etildi!" : "Resume saqlandi!");
+      toast.success(publish ? (isRu ? "Резюме опубликовано!" : "Rezyume nashr etildi!") : (isRu ? "Резюме сохранено!" : "Rezyume saqlandi!"));
       return newId;
     } catch {
       toast.error("Saqlashda xatolik yuz berdi.");
@@ -173,7 +176,7 @@ export default function CreateResumePage() {
       link.click();
       link.remove();
       window.URL.revokeObjectURL(url);
-      toast.success("Resume PDF yuklab olindi.");
+      toast.success(isRu ? "PDF резюме загружен." : "Rezyume PDF yuklab olindi.");
     } catch {
       toast.error("PDF yuklab olishda xatolik yuz berdi.");
     } finally {
@@ -206,23 +209,23 @@ export default function CreateResumePage() {
           <div className="flex items-center gap-4">
             <Button variant="ghost" onClick={() => router.back()} className="gap-2 text-surface-600">
               <ArrowLeft className="h-4 w-4" />
-              Orqaga
+              {isRu ? "Назад" : "Orqaga"}
             </Button>
             <div>
-              <p className="text-xs font-black uppercase tracking-[0.26em] text-emerald-700">Professional CV Builder</p>
-              <h1 className="font-display text-2xl font-black text-slate-950">Yangi resume yaratish</h1>
-              <p className="text-sm text-slate-500">Formani to&apos;ldiring, o&apos;ng tomonda CV real vaqtda ko&apos;rinadi.</p>
+              <p className="text-xs font-black uppercase tracking-[0.26em] text-emerald-700">{isRu ? "КОНСТРУКТОР РЕЗЮМЕ" : "REZYUME KONSTRUKTORI"}</p>
+              <h1 className="font-display text-2xl font-black text-slate-950">{isRu ? "Создание нового резюме" : "Yangi rezyume yaratish"}</h1>
+              <p className="text-sm text-slate-500">{isRu ? "Заполните форму, справа будет предпросмотр резюме в реальном времени." : "Formani to&apos;ldiring, o&apos;ng tomonda rezyume real vaqtda ko&apos;rinadi."}</p>
             </div>
           </div>
 
           <div className="flex flex-wrap gap-2">
             <Button variant="outline" onClick={() => void handleSave(false)} disabled={isSaving || isDownloading}>
               {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-              Saqlash
+              {isRu ? "Сохранить" : "Saqlash"}
             </Button>
             <Button onClick={() => void handleSaveAndDownload()} disabled={isSaving || isDownloading} className="bg-gradient-to-r from-emerald-500 to-cyan-600">
               {isDownloading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
-              Saqlab PDF yuklash
+              {isRu ? "Сохранить и скачать PDF" : "Saqlab PDF yuklash"}
             </Button>
           </div>
         </div>
@@ -230,11 +233,11 @@ export default function CreateResumePage() {
         <div className="grid gap-6 lg:grid-cols-[minmax(0,520px)_1fr]">
           <div className="space-y-5">
             <div className="rounded-[24px] border border-white/70 bg-white/90 p-5 shadow-lg shadow-slate-200/50 dark:border-surface-700/70 dark:bg-surface-800/90">
-              <Label>Resume nomi</Label>
+              <Label>{isRu ? "Название резюме" : "Rezyume nomi"}</Label>
               <Input
                 value={title}
                 onChange={(event) => setTitle(event.target.value)}
-                placeholder="Resume nomi"
+                placeholder={isRu ? "Название резюме" : "Rezyume nomi"}
                 className="mt-2 text-lg font-semibold"
               />
             </div>
@@ -274,7 +277,7 @@ export default function CreateResumePage() {
                 </div>
                 <div>
                   <h2 className="font-display text-xl font-black text-slate-950">{currentStep.label}</h2>
-                  <p className="text-sm text-slate-500">Ma&apos;lumotni aniq va qisqa yozing. CV shunda professional chiqadi.</p>
+                  <p className="text-sm text-slate-500">{isRu ? "Пишите кратко и конкретно. Так резюме будет сильнее." : "Ma&apos;lumotni aniq va qisqa yozing. Rezyume professional chiqadi."}</p>
                 </div>
               </div>
 
@@ -282,7 +285,7 @@ export default function CreateResumePage() {
                 <div className="space-y-4">
                   <div className="grid gap-4 sm:grid-cols-2">
                     <Field label="To'liq ism *" value={content.personal_info?.name || ""} onChange={(value) => updatePersonal("name", value)} placeholder="Ism Familiya" />
-                    <Field label="Professional unvon" value={content.personal_info?.professional_title || ""} onChange={(value) => updatePersonal("professional_title", value)} placeholder="Frontend Developer" />
+                    <Field label={isRu ? "Профессиональный заголовок" : "Kasbiy unvon"} value={content.personal_info?.professional_title || ""} onChange={(value) => updatePersonal("professional_title", value)} placeholder={isRu ? "Менеджер по продажам" : "Sotuv menejeri"} />
                     <Field label="Email *" value={content.personal_info?.email || ""} onChange={(value) => updatePersonal("email", value)} placeholder="email@misol.com" />
                     <Field label="Telefon" value={content.personal_info?.phone || ""} onChange={(value) => updatePersonal("phone", value)} placeholder="+998 90 123 4567" />
                     <Field label="Joylashuv" value={content.personal_info?.location || ""} onChange={(value) => updatePersonal("location", value)} placeholder="Toshkent, O'zbekiston" />
@@ -292,7 +295,7 @@ export default function CreateResumePage() {
                     </div>
                   </div>
                   <TextArea
-                    label="Professional summary"
+                    label={isRu ? "Профессиональное резюме (кратко)" : "Kasbiy qisqacha ma'lumot"}
                     value={content.summary || ""}
                     onChange={(value) => setContent((previous) => ({ ...previous, summary: value }))}
                     placeholder="2-3 gapda tajribangiz, kuchli tomonlaringiz va qaysi rolga mos ekaningizni yozing."
@@ -309,7 +312,7 @@ export default function CreateResumePage() {
                       </button>
                       <div className="grid gap-3 sm:grid-cols-2">
                         <Field label="Kompaniya" value={experience.company} onChange={(value) => updateExperience(index, "company", value)} placeholder="Kompaniya nomi" />
-                        <Field label="Lavozim" value={experience.position} onChange={(value) => updateExperience(index, "position", value)} placeholder="Software Engineer" />
+                        <Field label="Lavozim" value={experience.position} onChange={(value) => updateExperience(index, "position", value)} placeholder={isRu ? "Менеджер" : "Menejer"} />
                         <Field label="Boshlanish" type="month" value={experience.start_date} onChange={(value) => updateExperience(index, "start_date", value)} />
                         <div>
                           <Field label="Tugash" type="month" value={experience.end_date || ""} onChange={(value) => updateExperience(index, "end_date", value)} disabled={experience.is_current} />
@@ -349,8 +352,8 @@ export default function CreateResumePage() {
                         <div className="sm:col-span-2">
                           <Field label="O'quv yurti" value={education.institution} onChange={(value) => updateEducation(index, "institution", value)} placeholder="Universitet nomi" />
                         </div>
-                        <Field label="Daraja" value={education.degree} onChange={(value) => updateEducation(index, "degree", value)} placeholder="Bachelor" />
-                        <Field label="Yo'nalish" value={education.field || ""} onChange={(value) => updateEducation(index, "field", value)} placeholder="Computer Science" />
+                        <Field label={isRu ? "Степень" : "Daraja"} value={education.degree} onChange={(value) => updateEducation(index, "degree", value)} placeholder={isRu ? "Бакалавр" : "Bakalavr"} />
+                        <Field label="Yo'nalish" value={education.field || ""} onChange={(value) => updateEducation(index, "field", value)} placeholder={isRu ? "Экономика" : "Iqtisodiyot"} />
                         <Field label="Bitirish yili" value={education.year} onChange={(value) => updateEducation(index, "year", value)} placeholder="2026" />
                         <Field label="GPA" value={education.gpa || ""} onChange={(value) => updateEducation(index, "gpa", value)} placeholder="3.8" />
                       </div>
@@ -374,7 +377,7 @@ export default function CreateResumePage() {
                     label="Soft skills (vergul bilan)"
                     value={(content.skills?.soft || []).join(", ")}
                     onChange={(value) => setContent((previous) => ({ ...previous, skills: { ...previous.skills, soft: value.split(",").map((item) => item.trim()).filter(Boolean) } }))}
-                    placeholder="Communication, Teamwork, Critical Thinking"
+                    placeholder={isRu ? "Коммуникация, работа в команде, критическое мышление" : "Muloqot, jamoaviy ish, tanqidiy fikrlash"}
                   />
                 </div>
               )}
@@ -405,11 +408,11 @@ export default function CreateResumePage() {
                       </button>
                       <div className="grid gap-3 sm:grid-cols-3">
                         <div className="sm:col-span-2">
-                          <Field label="Sertifikat nomi" value={certification.name} onChange={(value) => updateCertification(index, "name", value)} placeholder="AWS Certified" />
+                          <Field label="Sertifikat nomi" value={certification.name} onChange={(value) => updateCertification(index, "name", value)} placeholder={isRu ? "Сертификат по облачным технологиям" : "Bulut texnologiyasi sertifikati"} />
                         </div>
                         <Field label="Yil" value={certification.year} onChange={(value) => updateCertification(index, "year", value)} placeholder="2025" />
                         <div className="sm:col-span-3">
-                          <Field label="Tashkilot" value={certification.issuer} onChange={(value) => updateCertification(index, "issuer", value)} placeholder="Amazon Web Services" />
+                          <Field label="Tashkilot" value={certification.issuer} onChange={(value) => updateCertification(index, "issuer", value)} placeholder={isRu ? "Образовательная платформа" : "Ta'lim platformasi"} />
                         </div>
                       </div>
                     </div>
@@ -424,23 +427,23 @@ export default function CreateResumePage() {
             <div className="flex justify-between rounded-[24px] border border-white/70 bg-white/90 p-3 shadow-lg shadow-slate-200/40 dark:border-surface-700/70 dark:bg-surface-800/90">
               <Button variant="outline" onClick={() => step > 0 ? setStep(step - 1) : router.back()} className="gap-2">
                 <ArrowLeft className="h-4 w-4" />
-                {step > 0 ? "Oldingi" : "Bekor qilish"}
+                {step > 0 ? (isRu ? "Назад" : "Oldingi") : (isRu ? "Отмена" : "Bekor qilish")}
               </Button>
 
               {step < STEPS.length - 1 ? (
                 <Button onClick={() => setStep(step + 1)} className="gap-2 bg-slate-950 hover:bg-slate-800">
-                  Keyingi
+                  {isRu ? "Далее" : "Keyingi"}
                   <ArrowRight className="h-4 w-4" />
                 </Button>
               ) : (
                 <div className="flex gap-2">
                   <Button variant="outline" onClick={() => void handleSave(false)} disabled={isSaving || isDownloading}>
                     {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-                    Qoralama
+                    {isRu ? "Черновик" : "Qoralama"}
                   </Button>
                   <Button onClick={() => void handleSave(true)} disabled={isSaving || isDownloading} className="bg-slate-950 hover:bg-slate-800">
                     {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle className="mr-2 h-4 w-4" />}
-                    Nashr etish
+                    {isRu ? "Опубликовать" : "Nashr etish"}
                   </Button>
                 </div>
               )}
@@ -451,7 +454,7 @@ export default function CreateResumePage() {
             <div className="mb-4 flex items-center justify-between">
               <div className="flex items-center gap-2 text-sm font-bold text-slate-700">
                 <Eye className="h-4 w-4 text-emerald-700" />
-                Jonli professional ko&apos;rinish
+                {isRu ? "Предпросмотр в реальном времени" : "Jonli ko&apos;rinish"}
               </div>
               <Button variant="outline" size="sm" onClick={() => void handleSaveAndDownload()} disabled={isSaving || isDownloading}>
                 {isDownloading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}

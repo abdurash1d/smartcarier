@@ -87,34 +87,34 @@ import { useTranslation } from "@/hooks/useTranslation";
 // FILTER OPTIONS
 // =============================================================================
 
-const locationOptions = [
-  { value: "tashkent", label: "Tashkent" },
-  { value: "samarkand", label: "Samarkand" },
-  { value: "bukhara", label: "Bukhara" },
-  { value: "remote", label: "Remote" },
-  { value: "hybrid", label: "Hybrid" },
+const getLocationOptions = (isRu: boolean) => [
+  { value: "tashkent", label: isRu ? "Ташкент" : "Toshkent" },
+  { value: "samarkand", label: isRu ? "Самарканд" : "Samarqand" },
+  { value: "bukhara", label: isRu ? "Бухара" : "Buxoro" },
+  { value: "remote", label: isRu ? "Удалённо" : "Masofaviy" },
+  { value: "hybrid", label: isRu ? "Гибрид" : "Aralash" },
 ];
 
-const jobTypeOptions = [
-  { value: "full_time", label: "Full Time", icon: Briefcase },
-  { value: "part_time", label: "Part Time", icon: Clock },
-  { value: "remote", label: "Remote", icon: Globe },
-  { value: "hybrid", label: "Hybrid", icon: Building2 },
-  { value: "contract", label: "Contract", icon: Calendar },
+const getJobTypeOptions = (isRu: boolean) => [
+  { value: "full_time", label: isRu ? "Полная занятость" : "To'liq ish kuni", icon: Briefcase },
+  { value: "part_time", label: isRu ? "Частичная занятость" : "Yarim kunlik", icon: Clock },
+  { value: "remote", label: isRu ? "Удалённо" : "Masofaviy", icon: Globe },
+  { value: "hybrid", label: isRu ? "Гибрид" : "Aralash", icon: Building2 },
+  { value: "contract", label: isRu ? "Контракт" : "Shartnoma", icon: Calendar },
 ];
 
-const experienceLevelOptions = [
-  { value: "junior", label: "Junior", sublabel: "0-2 years" },
-  { value: "mid", label: "Mid-Level", sublabel: "2-5 years" },
-  { value: "senior", label: "Senior", sublabel: "5+ years" },
-  { value: "lead", label: "Lead/Manager", sublabel: "7+ years" },
+const getExperienceLevelOptions = (isRu: boolean) => [
+  { value: "junior", label: isRu ? "Начинающий" : "Boshlovchi", sublabel: isRu ? "0-2 года" : "0-2 yil" },
+  { value: "mid", label: isRu ? "Средний" : "O'rta", sublabel: isRu ? "2-5 лет" : "2-5 yil" },
+  { value: "senior", label: isRu ? "Старший" : "Katta", sublabel: isRu ? "5+ лет" : "5+ yil" },
+  { value: "lead", label: isRu ? "Руководитель" : "Rahbar", sublabel: isRu ? "7+ лет" : "7+ yil" },
 ];
 
-const datePostedOptions = [
-  { value: "24h", label: "Last 24 hours" },
-  { value: "7d", label: "Last 7 days" },
-  { value: "30d", label: "Last 30 days" },
-  { value: "all", label: "Any time" },
+const getDatePostedOptions = (isRu: boolean) => [
+  { value: "24h", label: isRu ? "Последние 24 часа" : "Oxirgi 24 soat" },
+  { value: "7d", label: isRu ? "Последние 7 дней" : "Oxirgi 7 kun" },
+  { value: "30d", label: isRu ? "Последние 30 дней" : "Oxirgi 30 kun" },
+  { value: "all", label: isRu ? "Любое время" : "Istalgan vaqt" },
 ];
 
 const companyOptions = [
@@ -628,16 +628,33 @@ function JobDetailsPanel({
 // SEARCH SUGGESTIONS
 // =============================================================================
 
-const searchSuggestions = [
-  "Frontend Developer",
-  "Backend Developer",
-  "Full Stack Engineer",
-  "DevOps Engineer",
-  "Data Scientist",
-  "Mobile Developer",
-  "Python Developer",
-  "React Developer",
-];
+// Broad-industry suggestions so non-tech users feel at home.
+const getSearchSuggestions = (isRu: boolean): string[] =>
+  isRu
+    ? [
+        "Менеджер по продажам",
+        "Бухгалтер",
+        "Маркетолог",
+        "HR-специалист",
+        "Логистика",
+        "Учитель английского",
+        "Переводчик",
+        "Программист",
+        "Дизайнер",
+        "Оператор колл-центра",
+      ]
+    : [
+        "Sotuv menejeri",
+        "Buxgalter",
+        "Marketolog",
+        "HR mutaxassisi",
+        "Logistika koordinatori",
+        "Ingliz tili o'qituvchisi",
+        "Tarjimon",
+        "Dasturchi",
+        "Dizayner",
+        "Call-markaz operatori",
+      ];
 
 // =============================================================================
 // MAIN COMPONENT
@@ -695,15 +712,15 @@ export default function JobsPage() {
   };
   const getExperienceLabel = (value: string) => {
     const ruMap: Record<string, string> = {
-      junior: "Junior",
-      mid: "Middle",
-      senior: "Senior",
-      lead: "Lead/Manager",
+      junior: "Начинающий",
+      mid: "Средний",
+      senior: "Старший",
+      lead: "Руководитель",
     };
     const uzMap: Record<string, string> = {
-      junior: "Junior",
+      junior: "Boshlovchi",
       mid: "O'rta",
-      senior: "Senior",
+      senior: "Katta",
       lead: "Rahbar",
     };
     return isRu ? ruMap[value] || value : uzMap[value] || value;
@@ -1049,7 +1066,7 @@ export default function JobsPage() {
           onToggle={() => toggleSection("location")}
         >
           <div className="space-y-2">
-            {locationOptions.map((option) => (
+            {getLocationOptions(isRu).map((option) => (
               <label
                 key={option.value}
                 className="flex cursor-pointer items-center gap-3 rounded-lg p-2 hover:bg-surface-50 dark:hover:bg-surface-700"
@@ -1075,7 +1092,7 @@ export default function JobsPage() {
           onToggle={() => toggleSection("jobType")}
         >
           <div className="space-y-2">
-            {jobTypeOptions.map((option) => (
+            {getJobTypeOptions(isRu).map((option) => (
               <label
                 key={option.value}
                 className="flex cursor-pointer items-center gap-3 rounded-lg p-2 hover:bg-surface-50 dark:hover:bg-surface-700"
@@ -1102,7 +1119,7 @@ export default function JobsPage() {
           onToggle={() => toggleSection("experience")}
         >
           <div className="space-y-2">
-            {experienceLevelOptions.map((option) => (
+            {getExperienceLevelOptions(isRu).map((option) => (
               <label
                 key={option.value}
                 className="flex cursor-pointer items-center gap-3 rounded-lg p-2 hover:bg-surface-50 dark:hover:bg-surface-700"
@@ -1173,7 +1190,7 @@ export default function JobsPage() {
           onToggle={() => toggleSection("datePosted")}
         >
           <div className="space-y-2">
-            {datePostedOptions.map((option) => (
+            {getDatePostedOptions(isRu).map((option) => (
               <label
                 key={option.value}
                 className="flex cursor-pointer items-center gap-3 rounded-lg p-2 hover:bg-surface-50 dark:hover:bg-surface-700"
@@ -1205,7 +1222,7 @@ export default function JobsPage() {
             <Search className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-surface-400" />
             <input
               type="text"
-              placeholder={isRu ? "Vakansiya, kompaniya, ko'nikmalarni qidiring..." : "Vakansiya, kompaniya, ko'nikmalarni qidiring..."}
+              placeholder={isRu ? "Ищите вакансии, компании и навыки..." : "Vakansiya, kompaniya, ko'nikmalarni qidiring..."}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               onFocus={() => setShowSuggestions(true)}
@@ -1222,7 +1239,7 @@ export default function JobsPage() {
                   exit={{ opacity: 0, y: -10 }}
                   className="absolute left-0 right-0 top-full z-50 mt-2 rounded-xl border border-surface-200 bg-white p-2 shadow-lg dark:border-surface-700 dark:bg-surface-800"
                 >
-                  {searchSuggestions
+                  {getSearchSuggestions(isRu)
                     .filter((s) =>
                       s.toLowerCase().includes(searchQuery.toLowerCase())
                     )
@@ -1452,10 +1469,10 @@ export default function JobsPage() {
                 <Briefcase className="h-10 w-10 text-surface-400" />
               </div>
               <h3 className="font-display text-lg font-semibold text-surface-900 dark:text-white">
-                {isRu ? "Вакансияni tanlang" : "Ishni tanlang"}
+                {isRu ? "Выберите вакансию" : "Vakansiyani tanlang"}
               </h3>
               <p className="mt-2 text-sm text-surface-500">
-                {isRu ? "Подробности uchun vakansiyani bosing" : "Tafsilotlarni ko'rish uchun ishni bosing"}
+                {isRu ? "Нажмите на вакансию для просмотра деталей" : "Tafsilotlarni ko'rish uchun vakansiyani bosing"}
               </p>
             </motion.div>
           )}
@@ -1498,7 +1515,7 @@ export default function JobsPage() {
             <div>
               <label className="mb-2 block text-sm font-medium">{isRu ? "Локация" : "Joylashuv"}</label>
               <div className="space-y-2">
-                {locationOptions.map((option) => (
+                {getLocationOptions(isRu).map((option) => (
                   <label
                     key={option.value}
                     className="flex cursor-pointer items-center gap-3"
@@ -1519,7 +1536,7 @@ export default function JobsPage() {
             <div>
               <label className="mb-2 block text-sm font-medium">{isRu ? "Тип работы" : "Ish turi"}</label>
               <div className="space-y-2">
-                {jobTypeOptions.map((option) => (
+                {getJobTypeOptions(isRu).map((option) => (
                   <label
                     key={option.value}
                     className="flex cursor-pointer items-center gap-3"
@@ -1540,7 +1557,7 @@ export default function JobsPage() {
             <div>
               <label className="mb-2 block text-sm font-medium">{isRu ? "Опыт" : "Tajriba"}</label>
               <div className="space-y-2">
-                {experienceLevelOptions.map((option) => (
+                {getExperienceLevelOptions(isRu).map((option) => (
                   <label
                     key={option.value}
                     className="flex cursor-pointer items-center gap-3"

@@ -92,6 +92,13 @@ const statusConfig: Record<
   },
 };
 
+const fallbackStatusConfig = {
+  labelKey: "applicationsPage.pending",
+  color: "text-surface-600",
+  bgColor: "bg-surface-100",
+  icon: Clock,
+} as const;
+
 // =============================================================================
 // ANIMATION VARIANTS
 // =============================================================================
@@ -120,15 +127,15 @@ type ApplicationInterviewPreview = {
   };
 };
 
-function formatInterviewTypeLabel(interviewType?: string) {
+function formatInterviewTypeLabel(interviewType: string | undefined, isRu: boolean) {
   if (!interviewType) {
-    return "Format belgilanmagan";
+    return isRu ? "Формат не указан" : "Format belgilanmagan";
   }
 
   const normalized = interviewType.trim().toLowerCase();
-  if (normalized === "video") return "Video intervyu";
-  if (normalized === "phone") return "Telefon intervyu";
-  if (normalized === "in-person" || normalized === "in person") return "Shaxsan intervyu";
+  if (normalized === "video") return isRu ? "Видео интервью" : "Video intervyu";
+  if (normalized === "phone") return isRu ? "Телефонное интервью" : "Telefon intervyu";
+  if (normalized === "in-person" || normalized === "in person") return isRu ? "Личное интервью" : "Shaxsan intervyu";
 
   return interviewType;
 }
@@ -151,7 +158,8 @@ function getUpcomingInterviewApplication(applications: ApplicationInterviewPrevi
 // =============================================================================
 
 export default function ApplicationsPage() {
-  const { t } = useTranslation();
+  const { t, locale } = useTranslation();
+  const isRu = locale === "ru";
   const { applications, stats, fetchMyApplications, isLoading } = useApplications();
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
@@ -163,7 +171,7 @@ export default function ApplicationsPage() {
   }, [fetchMyApplications]);
 
   const upcomingInterview = getUpcomingInterviewApplication(applications);
-  const upcomingInterviewCompanyName = upcomingInterview?.job?.company?.name || "Kompaniya";
+  const upcomingInterviewCompanyName = upcomingInterview?.job?.company?.name || (isRu ? "Компания" : "Kompaniya");
 
   // Filter applications
   const filteredApplications = applications
@@ -290,7 +298,7 @@ export default function ApplicationsPage() {
                   {upcomingInterview?.interview_type || upcomingInterview?.meeting_link ? (
                     <div className="mt-2 flex flex-wrap items-center gap-2">
                       <Badge variant="secondary" className="bg-white/80 text-surface-700">
-                        {formatInterviewTypeLabel(upcomingInterview.interview_type)}
+                        {formatInterviewTypeLabel(upcomingInterview.interview_type, isRu)}
                       </Badge>
                       {upcomingInterview?.meeting_link ? (
                         <Button
@@ -305,7 +313,7 @@ export default function ApplicationsPage() {
                             rel="noopener noreferrer"
                           >
                             <ExternalLink className="mr-2 h-3.5 w-3.5" />
-                            Meeting link
+                            {isRu ? "Ссылка на встречу" : "Uchrashuv havolasi"}
                           </a>
                         </Button>
                       ) : null}
@@ -390,7 +398,7 @@ export default function ApplicationsPage() {
       ) : (
         <motion.div variants={containerVariants} className="space-y-4">
           {filteredApplications.map((application) => {
-            const status = statusConfig[application.status];
+            const status = statusConfig[application.status] ?? fallbackStatusConfig;
             const StatusIcon = status.icon;
 
             return (
@@ -412,7 +420,7 @@ export default function ApplicationsPage() {
                         <div>
                           <div className="flex items-center gap-3">
                             <h3 className="font-display text-lg font-semibold text-surface-900">
-                              {application.job?.title ?? "Untitled job"}
+                              {application.job?.title ?? (isRu ? "Без названия" : "Nomsiz vakansiya")}
                             </h3>
                             <Badge
                               className={`gap-1 ${status.bgColor} ${status.color}`}
@@ -440,7 +448,7 @@ export default function ApplicationsPage() {
                                   {t("applicationsPage.interview")}: {formatDate(application.interview_at)}
                                 </span>
                                 <Badge variant="secondary" className="bg-purple-100 text-purple-700">
-                                  {formatInterviewTypeLabel(application.interview_type)}
+                                  {formatInterviewTypeLabel(application.interview_type, isRu)}
                                 </Badge>
                               </>
                             )}
@@ -457,7 +465,7 @@ export default function ApplicationsPage() {
                                   rel="noopener noreferrer"
                                 >
                                   <ExternalLink className="mr-2 h-3.5 w-3.5" />
-                                  Meeting link
+                                  {isRu ? "Ссылка на встречу" : "Uchrashuv havolasi"}
                                 </a>
                               </Button>
                             )}

@@ -22,6 +22,15 @@ export default function AuthLayout({
   children: React.ReactNode;
 }) {
   const { t, translations } = useTranslation();
+  const sidebarFeatures = Array.isArray(translations?.auth?.sidebar?.features)
+    ? (translations.auth.sidebar.features as string[])
+    : [
+        t("auth.sidebar.features.0"),
+        t("auth.sidebar.features.1"),
+        t("auth.sidebar.features.2"),
+        t("auth.sidebar.features.3"),
+        t("auth.sidebar.features.4"),
+      ].filter((item) => item && !item.includes("features."));
   
   return (
     <div className="flex min-h-screen bg-white text-surface-900 dark:bg-surface-950 dark:text-surface-100">
@@ -144,7 +153,7 @@ export default function AuthLayout({
               transition={{ delay: 0.4 }}
               className="mt-8 space-y-3"
             >
-              {(translations.auth.sidebar.features as string[]).map((feature: string, i: number) => (
+              {sidebarFeatures.map((feature: string, i: number) => (
                 <li key={i} className="flex items-center gap-3">
                   <div className="flex h-6 w-6 items-center justify-center rounded-full bg-white/20">
                     <CheckCircle className="h-4 w-4" />

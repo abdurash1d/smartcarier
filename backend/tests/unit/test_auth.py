@@ -179,7 +179,7 @@ class TestAccessToken:
         payload = decode_token(token)
         
         assert "exp" in payload
-        exp_time = datetime.fromtimestamp(payload["exp"])
+        exp_time = datetime.utcfromtimestamp(payload["exp"])
         assert exp_time > datetime.utcnow()
 
     def test_access_token_custom_expiration(self):
@@ -191,7 +191,7 @@ class TestAccessToken:
         )
         
         payload = decode_token(token)
-        exp_time = datetime.fromtimestamp(payload["exp"])
+        exp_time = datetime.utcfromtimestamp(payload["exp"])
         expected_exp = datetime.utcnow() + custom_delta
         
         # Allow 10 second tolerance

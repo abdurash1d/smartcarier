@@ -55,7 +55,8 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
-import { jobApi, getErrorMessage } from "@/lib/api";
+import { jobApi, aiApi, getErrorMessage } from "@/lib/api";
+import { useTranslation } from "@/hooks/useTranslation";
 
 // =============================================================================
 // VALIDATION SCHEMA
@@ -101,11 +102,11 @@ const jobTypes = [
 
 const experienceLevels = [
   { value: "entry", label: "Boshlang'ich" },
-  { value: "junior", label: "Junior (1-2 yil)" },
-  { value: "mid", label: "Middle (3-5 yil)" },
-  { value: "senior", label: "Senior (5+ yil)" },
-  { value: "lead", label: "Lead/Manager" },
-  { value: "executive", label: "Director+" },
+  { value: "junior", label: "Boshlovchi (1-2 yil)" },
+  { value: "mid", label: "O'rta (3-5 yil)" },
+  { value: "senior", label: "Katta (5+ yil)" },
+  { value: "lead", label: "Rahbar" },
+  { value: "executive", label: "Direktor+" },
 ];
 
 const suggestedSkills = [
@@ -120,6 +121,8 @@ const suggestedSkills = [
 
 export default function NewJobPage() {
   const router = useRouter();
+  const { locale } = useTranslation();
+  const isRu = locale === "ru";
   const [currentStep, setCurrentStep] = useState(1);
   const [isGenerating, setIsGenerating] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -191,35 +194,52 @@ export default function NewJobPage() {
     setValue("skills", formData.skills.filter((s) => s !== skill));
   };
 
-  // AI Generate Description
+  // AI Generate full job description (description + requirements + skills) via Gemini.
   const generateDescription = async () => {
     if (!formData.title) {
-      toast.error("Avval lavozim nomini kiriting");
+      toast.error(isRu ? "Сначала введите название позиции" : "Avval lavozim nomini kiriting");
       return;
     }
 
     setIsGenerating(true);
     try {
-      // Fallback template — real AI endpoint can be wired later
-      const generatedDescription = `Biz ${formData.title} lavozimiga tajribali mutaxassisni qidiryapmiz.
+      const res = await aiApi.hrJobDescription({
+        title: formData.title,
+        seniority: formData.experienceLevel || "mid",
+        location: formData.location,
+        must_have: (formData.skills || []).slice(0, 10),
+        locale,
+      });
+      const data = (res.data as { data: { description: string; summary?: string; requirements: string[]; responsibilities: string[]; benefits: string[]; nice_to_have: string[]; ai_generated: boolean } }).data;
 
-O'z sohasida chuqur bilim va ko'nikmalarga ega bo'lgan nomzodlarni kutib qolamiz. Sizning vazifalaringiz:
+      const descriptionBlock = [
+        data.summary,
+        "",
+        data.description,
+        "",
+        isRu ? "Что вам предстоит делать:" : "Sizning vazifalaringiz:",
+        ...(data.responsibilities || []).map((r) => `• ${r}`),
+        "",
+        isRu ? "Преимущества:" : "Imtiyozlar:",
+        ...(data.benefits || []).map((b) => `• ${b}`),
+      ]
+        .filter(Boolean)
+        .join("\n");
 
-• Loyihalarni rejalashtirish va amalga oshirish
-• Jamoa bilan hamkorlik qilish
-• Texnik qarorlar qabul qilish
-• Kod sifatini ta'minlash
-• Yangi texnologiyalarni o'rganish
+      const requirementsBlock = [
+        ...(data.requirements || []).map((r) => `• ${r}`),
+        ...(data.nice_to_have?.length ? ["", isRu ? "Будет плюсом:" : "Qo'shimcha afzallik:", ...data.nice_to_have.map((n) => `• ${n}`)] : []),
+      ].join("\n");
 
-Ish muhiti:
-• Zamonaviy ofis yoki masofaviy ishlash imkoniyati
-• Professional rivojlanish uchun imkoniyatlar
-• Do'stona va qo'llab-quvvatlovchi jamoa`;
-
-      setValue("description", generatedDescription);
-      toast.success("Tavsif muvaffaqiyatli yaratildi!");
+      setValue("description", descriptionBlock);
+      setValue("requirements", requirementsBlock);
+      toast.success(
+        data.ai_generated
+          ? (isRu ? "AI описание сгенерировано!" : "AI tavsif yaratildi!")
+          : (isRu ? "Шаблон сгенерирован (AI временно недоступен)" : "Shablon yaratildi (AI hozircha mavjud emas)")
+      );
     } catch (error) {
-      toast.error("Xatolik yuz berdi");
+      toast.error(getErrorMessage(error));
     } finally {
       setIsGenerating(false);
     }
@@ -358,7 +378,7 @@ Ish muhiti:
                       <Label htmlFor="title">Lavozim nomi *</Label>
                       <Input
                         id="title"
-                        placeholder="masalan: Senior Software Engineer"
+                        placeholder={isRu ? "например: Руководитель отдела разработки" : "masalan: Dasturiy ta'minot bo'limi rahbari"}
                         {...register("title")}
                         error={errors.title?.message}
                       />

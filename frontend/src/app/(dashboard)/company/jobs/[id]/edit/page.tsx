@@ -181,7 +181,7 @@ export default function EditJobPage() {
             <Input
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              placeholder="masalan: Frontend Developer"
+              placeholder="masalan: Dasturchi"
               className="mt-1"
             />
           </div>
@@ -217,11 +217,11 @@ export default function EditJobPage() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="junior">Junior (0-2 yil)</SelectItem>
-                  <SelectItem value="mid">Mid-Level (2-5 yil)</SelectItem>
-                  <SelectItem value="senior">Senior (5+ yil)</SelectItem>
-                  <SelectItem value="lead">Lead/Manager</SelectItem>
-                  <SelectItem value="executive">Executive</SelectItem>
+                  <SelectItem value="junior">Boshlovchi (0-2 yil)</SelectItem>
+                  <SelectItem value="mid">O'rta (2-5 yil)</SelectItem>
+                  <SelectItem value="senior">Katta (5+ yil)</SelectItem>
+                  <SelectItem value="lead">Rahbar</SelectItem>
+                  <SelectItem value="executive">Direktor</SelectItem>
                 </SelectContent>
               </Select>
             </div>

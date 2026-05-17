@@ -526,3 +526,222 @@ async def health_check():
 
 
 
+
+
+# =============================================================================
+# AI HR — recruiter-facing helpers (job desc, candidate summary, questions, email)
+# =============================================================================
+
+from app.core.dependencies import get_db, get_current_company, get_current_active_user
+from app.services import ai_hr as ai_hr_service
+from app.models import Application, Job, Resume, User as _User, UserRole as _UserRole
+from sqlalchemy.orm import Session
+from fastapi import Depends
+from uuid import UUID
+
+
+class JobDescriptionRequest(BaseModel):
+    title: str = Field(..., min_length=2, max_length=120)
+    seniority: str = Field("mid", description="intern | junior | mid | senior | lead")
+    industry: Optional[str] = None
+    location: Optional[str] = None
+    must_have: List[str] = Field(default_factory=list)
+    locale: str = Field("uz", description="uz | ru")
+
+
+@router.post(
+    "/hr/job-description",
+    summary="AI job description generator (HR)",
+    description="Draft a complete job description from a short brief.",
+)
+async def ai_hr_job_description(
+    request: JobDescriptionRequest,
+    company: _User = Depends(get_current_company),
+):
+    data = await ai_hr_service.generate_job_description(
+        title=request.title,
+        seniority=request.seniority,
+        industry=request.industry,
+        location=request.location,
+        must_have=request.must_have,
+        locale=request.locale,
+    )
+    return {"success": True, "data": data}
+
+
+def _resume_payload(resume: Optional[Resume]) -> Dict[str, Any]:
+    if not resume:
+        return {"title": None, "skills": []}
+    content = resume.content or {}
+    skills_section = content.get("skills") or {}
+    flat_skills: List[str] = []
+    if isinstance(skills_section, dict):
+        for entry in skills_section.get("technical_skills", []) or []:
+            if isinstance(entry, dict):
+                flat_skills.extend(entry.get("skills", []) or [])
+        for s in skills_section.get("soft_skills", []) or []:
+            flat_skills.append(s)
+    elif isinstance(skills_section, list):
+        flat_skills.extend([str(s) for s in skills_section])
+    return {"title": resume.title, "skills": flat_skills[:30]}
+
+
+def _job_payload(job: Optional[Job]) -> Dict[str, Any]:
+    if not job:
+        return {}
+    reqs = job.requirements
+    if isinstance(reqs, dict):
+        flat = []
+        for v in reqs.values():
+            if isinstance(v, list):
+                flat.extend([str(x) for x in v])
+            elif isinstance(v, str):
+                flat.append(v)
+        reqs = flat
+    return {
+        "title": job.title,
+        "location": job.location,
+        "experience_level": job.experience_level,
+        "requirements": reqs if isinstance(reqs, list) else [],
+    }
+
+
+def _load_application_for_company(
+    application_id: UUID, company: _User, db: Session
+) -> Application:
+    application = (
+        db.query(Application)
+        .filter(Application.id == application_id, Application.is_deleted == False)
+        .first()
+    )
+    if not application:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Application not found")
+    if not application.job or application.job.company_id != company.id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
+    return application
+
+
+@router.post(
+    "/hr/applications/{application_id}/summary",
+    summary="AI candidate summary (HR)",
+)
+async def ai_hr_candidate_summary(
+    application_id: UUID,
+    locale: str = "uz",
+    company: _User = Depends(get_current_company),
+    db: Session = Depends(get_db),
+):
+    application = _load_application_for_company(application_id, company, db)
+    data = await ai_hr_service.generate_candidate_summary(
+        job=_job_payload(application.job),
+        resume=_resume_payload(application.resume),
+        match_breakdown=application.match_breakdown,
+        locale=locale,
+    )
+    return {"success": True, "data": data}
+
+
+@router.post(
+    "/hr/applications/{application_id}/questions",
+    summary="AI interview questions (HR)",
+)
+async def ai_hr_interview_questions(
+    application_id: UUID,
+    count: int = 8,
+    locale: str = "uz",
+    company: _User = Depends(get_current_company),
+    db: Session = Depends(get_db),
+):
+    application = _load_application_for_company(application_id, company, db)
+    data = await ai_hr_service.generate_interview_questions(
+        job=_job_payload(application.job),
+        resume=_resume_payload(application.resume),
+        count=max(3, min(15, count)),
+        locale=locale,
+    )
+    return {"success": True, "data": data}
+
+
+class EmailTemplateRequest(BaseModel):
+    action: str = Field(..., description="interview | reject | offer | shortlist | follow_up")
+    interview_at: Optional[str] = None
+    meeting_link: Optional[str] = None
+    locale: str = "uz"
+
+
+@router.post(
+    "/hr/applications/{application_id}/email",
+    summary="AI recruiter email template (HR)",
+)
+async def ai_hr_email_template(
+    application_id: UUID,
+    request: EmailTemplateRequest,
+    company: _User = Depends(get_current_company),
+    db: Session = Depends(get_db),
+):
+    application = _load_application_for_company(application_id, company, db)
+    applicant_name = (application.user.full_name if application.user else "—") or "—"
+    job_title = (application.job.title if application.job else "—") or "—"
+    company_name = (company.company_name or company.full_name or "Company")
+
+    data = await ai_hr_service.generate_email_template(
+        action=request.action,
+        applicant_name=applicant_name,
+        job_title=job_title,
+        company_name=company_name,
+        interview_at=request.interview_at,
+        meeting_link=request.meeting_link,
+        locale=request.locale,
+    )
+    return {"success": True, "data": data}
+
+
+class SendEmailRequest(BaseModel):
+    subject: str = Field(..., min_length=1, max_length=300)
+    body: str = Field(..., min_length=1, max_length=10000)
+
+
+@router.post(
+    "/hr/applications/{application_id}/email/send",
+    summary="Send an AI-drafted recruiter email to the candidate",
+    description=(
+        "Sends the provided subject + body to the applicant's email via the "
+        "configured email provider. The frontend typically uses this right "
+        "after generating the draft with /hr/applications/{id}/email."
+    ),
+)
+async def ai_hr_email_send(
+    application_id: UUID,
+    request: SendEmailRequest,
+    company: _User = Depends(get_current_company),
+    db: Session = Depends(get_db),
+):
+    application = _load_application_for_company(application_id, company, db)
+    applicant = application.user
+    if not applicant or not applicant.email:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
+                            detail="Candidate has no email on file")
+
+    from app.services.email_service import email_service
+
+    ok = await email_service.send_raw_email(
+        to_email=applicant.email,
+        to_name=applicant.full_name or None,
+        subject=request.subject,
+        body=request.body,
+    )
+
+    if not ok:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Email delivery is not configured. Configure SMTP or SendGrid in .env to send emails."
+        )
+
+    return {
+        "success": True,
+        "data": {
+            "sent_to": applicant.email,
+            "subject": request.subject,
+        },
+        "message": "Email sent successfully",
+    }

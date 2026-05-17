@@ -5,7 +5,7 @@
  *
  * Multi-step application process:
  * 1. Select Resume
- * 2. Cover Letter (optional, AI can generate)
+ * 2. Motivation letter (optional, AI can generate)
  * 3. Additional Questions (if any)
  * 4. Review and Submit
  * 5. Success with confetti animation
@@ -655,7 +655,7 @@ function ReviewSection({
         </div>
       </div>
 
-      {/* Cover Letter */}
+      {/* Motivation letter */}
       <div className="rounded-xl border border-surface-200 p-4 dark:border-surface-700">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -663,7 +663,7 @@ function ReviewSection({
               <PenLine className="h-5 w-5 text-blue-600" />
             </div>
             <div>
-              <p className="text-sm font-medium text-surface-500">{isRu ? "Сопроводительное письмо" : "Cover letter"}</p>
+              <p className="text-sm font-medium text-surface-500">{isRu ? "Сопроводительное письмо" : "Motivatsion xat"}</p>
               <p className="font-semibold text-surface-900 dark:text-white">
                 {coverLetter ? `${coverLetter.length} ${isRu ? "символов" : "belgi"}` : (isRu ? "Не добавлено" : "Qo'shilmagan")}
               </p>
